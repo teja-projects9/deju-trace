@@ -12,6 +12,8 @@ import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
+import javax.swing.plaf.LabelUI;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.fileChooser.FileChooser;
@@ -22,7 +24,6 @@ import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogPanel;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.ui.panel.ComponentPanelBuilder;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
@@ -30,6 +31,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
+import com.intellij.util.ui.JBFont;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
@@ -181,16 +183,56 @@ public final class DejuConfigurable implements Configurable {
     }
 
     /**
+     * Characters of a hint that fit on one line before it wraps. The platform uses the same
+     * measure (its own {@code MAX_COMMENT_WIDTH}, 70 on every IDE we support); keeping the
+     * number identical is what makes the settings page lay out exactly as it did before.
+     */
+    private static final int HINT_WRAP_CHARS = 70;
+
+    /**
      * A wrapping help line under a field.
      *
      * <p>A plain {@link JBLabel} never wraps, so its preferred width is the whole sentence on
-     * one line, and a settings page full of them is far wider than the dialog. The platform's
-     * own comment component wraps at a sane measure and reports the height that wrapping
-     * actually needs, which is the part a hand-rolled {@code <html>} label gets wrong.
+     * one line, and a settings page full of them is far wider than the dialog. Wrapping is
+     * forced by measuring the first {@link #HINT_WRAP_CHARS} characters and emitting an
+     * explicit {@code <div width>}: that is what makes the label report the height wrapping
+     * actually needs, which is the part a naive {@code <html>} label gets wrong.
+     *
+     * <p>This reproduces the platform's {@code ComponentPanelBuilder.createCommentComponent},
+     * which is deprecated on every IDE in our supported range, 2024.1 included, so there is no
+     * newer version of it to call instead. The text is measured and embedded verbatim, exactly
+     * as the platform does it, so the rendered result is unchanged.
+     *
+     * <p>One deliberate difference: under the classic UI the platform derives a
+     * {@code RelativeFont} two points down rather than {@link JBFont#medium()}, but telling
+     * the two UIs apart needs {@code ExperimentalUI}, which is {@code @ApiStatus.Internal}.
+     * A slightly different comment font on the legacy UI is a better trade than depending on
+     * internal API that the Marketplace verifier reports as a problem.
      */
     private static JComponent hint(String text) {
-        return ComponentPanelBuilder.createCommentComponent(
-                text, true, ComponentPanelBuilder.MAX_COMMENT_WIDTH, true);
+        HintLabel label = new HintLabel(text);
+        label.setCopyable(true);
+        label.setAllowAutoWrapping(true);
+        label.setVerticalTextPosition(SwingConstants.TOP);
+        label.setFocusable(false);
+        // Measured last, once the comment font above is in place, or the width would be
+        // computed from the default font and the hint would wrap at the wrong column.
+        label.setText(wrapAtMeasure(label, text));
+        return label;
+    }
+
+    /**
+     * Wraps {@code text} in the {@code <div width>} that gives the label a finite preferred
+     * width. Short hints get a plain {@code <div>}: a width narrower than the text itself
+     * would wrap them for no reason.
+     */
+    private static String wrapAtMeasure(JBLabel label, String text) {
+        if (text.length() <= HINT_WRAP_CHARS) {
+            return "<html><body><div>" + text + "</div></body></html>";
+        }
+        int width = label.getFontMetrics(label.getFont())
+                .stringWidth(text.substring(0, HINT_WRAP_CHARS));
+        return "<html><body><div width=\"" + width + "\">" + text + "</div></body></html>";
     }
 
     /** Aligns a hint under the checkbox it belongs to rather than the form's left edge. */
@@ -437,5 +479,30 @@ public final class DejuConfigurable implements Configurable {
 
     private static String nullToEmpty(String s) {
         return s == null ? "" : s;
+    }
+
+    /**
+     * The comment-styled label {@link #hint} builds.
+     *
+     * <p>The context-help colour is set once, but the smaller comment font has to be re-derived
+     * in {@link #setUI}: switching theme or IDE font size re-runs {@code updateUI}, which
+     * reinstalls the look-and-feel's default font and would otherwise leave hints sitting at
+     * full size while the rest of the page shrank. The platform's own comment label overrides
+     * the same method for the same reason.
+     */
+    private static final class HintLabel extends JBLabel {
+
+        HintLabel(String text) {
+            super(text);
+            setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
+        }
+
+        // Called from JLabel's constructor by way of updateUI, i.e. before this subclass is
+        // fully built. Safe only because it touches no state of ours.
+        @Override
+        public void setUI(LabelUI ui) {
+            super.setUI(ui);
+            setFont(JBFont.medium());
+        }
     }
 }

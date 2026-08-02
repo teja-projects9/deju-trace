@@ -35,6 +35,40 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.0.1</b>: three ways to read one request</p>
+        <ul>
+          <li><b>The report is now three tabs.</b> <i>Code Trace</i> is everything the
+          report already did, unchanged. <i>Graph</i> and <i>Flow Chart</i> are new, and
+          neither is built until you open it, so the file still opens instantly and a
+          reader who only wants the trace pays nothing for the rest.</li>
+          <li><b>Graph ranks files by the time they actually cost</b>, their own code plus
+          the SQL they issued, each query charged to the method that issued it. Self time
+          on its own hides the database entirely, and totals double-count every caller up
+          the stack, so neither answers "which file is slow" by itself. <b>Include SQL</b>
+          switches between the two readings.</li>
+          <li><b>N+1 detection.</b> A file that issues the same statement more than once
+          carries a <b>&times;N</b> badge with the statement and its total cost, and the
+          run's worst offender is named at the top of the tab. Matching ignores whitespace
+          and case, so the same query built two ways still groups.</li>
+          <li><b>Flow Chart draws the call tree on a canvas</b>, top to bottom in execution
+          order. Click a step to fold its calls away; a run of identical sibling calls
+          collapses into one box marked <b>&times;5</b>, which is usually what an N+1 looks
+          like from the side. Queries are laid out on their clause lines in the box itself
+          rather than trimmed to a hover.</li>
+          <li><b>Flame layout.</b> Switch the diagram from nesting to time: box width is
+          duration, with a time ruler across the top, click-to-zoom into any frame and a
+          breadcrumb back out. Zoom stretches the time axis and not the text, so zooming
+          out to compare shapes keeps the labels readable. <b>Save PNG</b> exports it.</li>
+          <li><b>Frames are coloured by owning class</b> from a fixed palette checked for
+          colour-blind separation against both themes, so two classes never share a hue and
+          the narrow slivers stay tellable apart. Queries keep the SQL orange throughout.</li>
+          <li><b>Chrome moved out of the toolbar.</b> Theme and help are icon buttons in the
+          top-right corner, the code filter sits in the stats row at full height, and the
+          "showing N of M" count now rides with the trace point.</li>
+          <li>Internal: replaced the deprecated platform comment component, so the plugin
+          now reports zero deprecated API usages on 2024.1 through 2024.3.</li>
+        </ul>
+
         <p><b>1.3.0</b>: reading the tree without the noise</p>
         <ul>
           <li><b>Filter calls by time, three ways.</b> The call filter offered only "at least

@@ -11,11 +11,39 @@ __STYLES__
 </head>
 <body>
 <header>
-  <div class="brand">__LOGO_IMG__<h1>Deju Trace</h1><span class="brandchip">Code Traces</span></div>
+  <div class="brand">__LOGO_IMG__<h1>Deju Code Trace Report</h1></div>
+  <div class="headtools">
+  <button class="iconbtn" id="helpBtn" type="button"
+          title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+  <button class="iconbtn" id="themeToggle" type="button"
+          title="Toggle light / dark theme (t)" aria-label="Toggle light or dark theme">
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"
+            d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/>
+    </svg>
+  </button>
+  </div>
 </header>
-<div id="meta" class="meta"></div>
-<div id="summary" class="summary"></div>
+<!-- Trace point on the left, what the current view is showing on the right. Two spans
+     rather than one, because the left half is written once with textContent and the right
+     half is rewritten on every filter change. -->
+<div class="meta" id="meta"><span id="metaText"></span><span class="count" id="count"></span></div>
+<!-- The code filter rides in the stats row rather than the toolbar: it is the widest
+     control on the page and the toolbar is already two lines deep on a laptop. CSS order
+     puts it last, so the stats appended here by script still come first. -->
+<div id="summary" class="summary">
+  <input class="search" id="search" type="search" placeholder="Filter code&hellip; (press /)" autocomplete="off">
+</div>
 <div class="toolbar" id="toolbar">
+  <div class="seg" id="tabSeg" role="tablist">
+    <button class="segbtn on" id="tabTrace" type="button" role="tab" title="Line coverage and the call tree">Code Trace</button>
+    <button class="segbtn" id="tabGraph" type="button" role="tab" title="Where the time went, per file">Graph</button>
+    <button class="segbtn" id="tabFlow" type="button" role="tab" title="The call flow from start to end">Flow Chart</button>
+  </div>
+
+  <!-- display:contents, so these stay direct flex children of the toolbar and the
+       existing wrapping is untouched; hiding the group hides the lot in one go. -->
+  <span class="ctlgroup" id="traceControls">
   <div class="seg" id="viewSeg" role="tablist">
     <button class="segbtn on" id="viewTree" type="button" role="tab">Tree</button>
     <button class="segbtn" id="viewFiles" type="button" role="tab">Files</button>
@@ -97,25 +125,68 @@ Press Enter to apply, Esc to cancel.">
   <!-- Both views -->
   <button class="toggle" id="foldBtn" type="button" title="Collapse or expand everything">Collapse all</button>
   <button class="toggle" id="problemsBtn" type="button" title="Show only lines that did not fully execute">Problems only</button>
-  <input class="search" id="search" type="search" placeholder="Filter code&hellip; (press /)" autocomplete="off">
-  <button class="toggle" id="themeToggle" type="button">Toggle theme</button>
-  <button class="toggle" id="helpBtn" type="button" title="Keyboard shortcuts (?)">?</button>
-  <span class="count" id="count"></span>
-</div>
-<div id="legend" class="legend"></div>
-<p class="notice" id="notice" hidden></p>
+  </span>
 
-<!-- Tree view: every invocation in execution order -->
-<section id="treeView">
-  <p class="fidelity" id="fidelity"></p>
-  <div class="scroll treewrap"><table id="treeTable"></table></div>
-  <div class="empty" id="treeEmpty" hidden>No calls match the current filters.</div>
+
+  <span class="ctlgroup" id="graphControls" hidden>
+    <button class="toggle on" id="graphSqlBtn" type="button"
+            title="Count each query against the method that issued it. Off leaves only time spent in your own code.">Include SQL</button>
+    <button class="toggle" id="graphAllBtn" type="button" hidden
+            title="Show every file rather than the slowest few">Show all files</button>
+  </span>
+
+  <span class="ctlgroup" id="flowControls" hidden>
+    <button class="toggle on" id="flowSqlBtn" type="button" title="Show or hide SQL steps">SQL</button>
+    <button class="toggle on" id="flowGroupBtn" type="button"
+            title="Fold a run of identical sibling calls into one box marked with its count">Group repeats</button>
+    <button class="toggle" id="flowHotBtn" type="button"
+            title="Outline the slowest chain of calls from the trace point">Hot path</button>
+    <button class="toggle" id="flowFlameBtn" type="button"
+            title="Lay the diagram out by time instead of by nesting: box width is duration">Flame</button>
+    <span class="zoomseg">
+      <button class="toggle zoombtn" id="flowOutBtn" type="button" title="Zoom out">&minus;</button>
+      <button class="toggle zoombtn" id="flowInBtn" type="button" title="Zoom in">&plus;</button>
+    </span>
+    <button class="toggle" id="flowFitBtn" type="button" title="Scale the diagram to fit the window width">Fit width</button>
+    <button class="toggle" id="flowPngBtn" type="button" title="Save the diagram as a PNG image">Save PNG</button>
+  </span>
+
+</div>
+<div id="tracePanel">
+  <div id="legend" class="legend"></div>
+  <p class="notice" id="notice" hidden></p>
+
+  <!-- Tree view: every invocation in execution order -->
+  <section id="treeView">
+    <p class="fidelity" id="fidelity"></p>
+    <div class="scroll treewrap"><table id="treeTable"></table></div>
+    <div class="empty" id="treeEmpty" hidden>No calls match the current filters.</div>
+  </section>
+
+  <!-- Files view: per-file line coverage -->
+  <section id="filesView" hidden>
+    <div id="root"></div>
+    <div id="empty" class="empty" hidden>No lines match the current filters.</div>
+  </section>
+</div>
+
+<!-- Graph and Flow are built on first open and never on load; both stay empty until then. -->
+<section id="graphPanel" hidden>
+  <p class="panelnote" id="graphNote"></p>
+  <div class="graphlegend">
+    <span><i class="sw sw-self"></i>Own code</span>
+    <span><i class="sw sw-sql"></i>SQL</span>
+  </div>
+  <div id="graphBody"></div>
+  <div class="empty" id="graphEmpty" hidden>This run recorded no per-file timing.</div>
 </section>
 
-<!-- Files view: per-file line coverage -->
-<section id="filesView" hidden>
-  <div id="root"></div>
-  <div id="empty" class="empty" hidden>No lines match the current filters.</div>
+<section id="flowPanel" hidden>
+  <p class="panelnote" id="flowNote"></p>
+  <div class="flowcrumb" id="flowCrumb" hidden></div>
+  <div class="flowwrap" id="flowWrap"><canvas id="flowCanvas"></canvas></div>
+  <div class="flowtip" id="flowTip" hidden></div>
+  <div class="empty" id="flowEmpty" hidden>This run recorded no call tree.</div>
 </section>
 
 <div class="help" id="help" hidden>
@@ -136,6 +207,19 @@ Press Enter to apply, Esc to cancel.">
       <dt><kbd>?</kbd></dt><dd>This help</dd>
       <dt><kbd>Esc</kbd></dt><dd>Close help, or clear the filter</dd>
     </dl>
+    <h3>Graph</h3>
+    <p>Time per file, slowest first. The bar has two parts: <b>own code</b> is the file's
+    self time, the work its own lines did, and <b>SQL</b> is the time its queries spent in
+    the database, charged to the method that issued them. Self time is the only additive
+    measure here, a method's <i>total</i> time contains everything it called, so summing
+    totals would count the same microseconds once per stack frame. Turning <b>Include
+    SQL</b> off leaves only your own code, which is what you want when the question is
+    which method to optimise rather than which query.</p>
+    <h3>Flow Chart</h3>
+    <p>The call tree drawn start to end, top to bottom in execution order, indented by
+    depth. Each box is one invocation; the bar inside it is that call's total time relative
+    to the whole run. Hover for the full signature and timing. It is the same data as the
+    Tree view, laid out so a long chain of calls is visible at a glance.</p>
     <h3>Reading the tree</h3>
     <p>The <b>numbered badge</b> on each frame is its step number: the order the methods
     actually ran. A
