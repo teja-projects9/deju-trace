@@ -1,0 +1,6 @@
+<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0.6" y="0.6" width="10.8" height="10.8" rx="2.4" fill="#4A90D9"/>
+  <text x="5" y="8.3" font-family="Arial, Helvetica, sans-serif" font-size="5.6" font-weight="700" text-anchor="middle" fill="#FFFFFF">DJ</text>
+  <circle cx="9" cy="9" r="3.1" fill="#2DA44E" stroke="#FFFFFF" stroke-width="0.7"/>
+  <path d="M7.5 9.1 L8.4 10 L10.4 7.9" fill="none" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,214 @@
+<idea-plugin>
+    <id>org.deju.trace</id>
+    <name>Deju Trace</name>
+    <vendor email="creddy.web@gmail.com" url="https://github.com/teja-projects9/deju-trace">Tejas</vendor>
+
+    <description><![CDATA[
+        <b>Deju Trace</b> follows a single targeted live API call through a running
+        Java web app and paints the executed source line/branch coverage back into the
+        editor like JUnit coverage, but for one real request.
+        <ul>
+            <li><b>Green</b>: line fully executed</li>
+            <li><b>Yellow</b>: decision point where only some branches were taken</li>
+            <li><b>Red</b>: a line inside an entered method that never executed</li>
+        </ul>
+        Place a "deju point" on a controller/entry method, hit the endpoint, and see the
+        code traces. Keeps the last 5 executions and exports a self-contained HTML
+        report: a call tree in exact execution order, syntax-highlighted source, and the
+        SQL each line issued. Entities, DTOs and generated builders can be folded out of
+        it, so the report shows the code you are actually debugging.
+        <br/><br/>
+        Works against a JVM you launch from the IDE, one in a Docker container, or one on
+        another machine.
+        <br/><br/>
+        The companion agent is attached by you via <code>-javaagent</code>. It listens on
+        loopback only by default; reaching it from a container or another host takes an
+        explicit <code>bind=</code>, and the agent refuses to start on any non-loopback
+        address unless a token is set. The plugin generates that token for you when it
+        writes the VM option. <b>No variable values are captured.</b> SQL statement text is recorded
+        so queries appear in the call tree, but bound parameters are never read and stay as
+        <code>?</code> placeholders. There is no telemetry.
+        <br/><br/>
+        <b>What Deju records…</b> in Settings shows every file the plugin has written, what
+        each one holds, and what is never captured. <b>Clear Deju data…</b> removes all of
+        it, and uninstalling from a running IDE does the same.
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <p><b>1.3.0</b>: reading the tree without the noise</p>
+        <ul>
+          <li><b>Filter calls by time, three ways.</b> The call filter offered only "at least
+          this long". It now also does <b>less than</b> and <b>between</b>, with presets for
+          each, and <b>Custom&hellip;</b> lets you pick the comparison and type the bounds
+          (<code>750us</code>, <code>1.5 ms</code>, <code>2s</code>). Between-ranges are
+          half-open, so the presets tile without a call landing in two of them.</li>
+          <li><b>Hide SQL, or the excluded-call summaries.</b> Two toolbar toggles for
+          reading control flow on its own: <b>SQL</b> hides every query and folded query
+          run, <b>Excluded rows</b> hides the "&hellip; N excluded calls" summaries.</li>
+          <li><b>Long queries are trimmed to three lines</b> with <b>Show full query</b> to
+          open them, so a trace with thirty statements is still a call tree rather than a
+          wall of SQL.</li>
+          <li><b>Show opens 5 files</b> rather than 10. Every recorded file is still
+          painted, so opening one by hand shows its coverage immediately; the limit only
+          governs how many tabs appear unasked. Configurable as before.</li>
+          <li><b>Total time reads in the unit you think in.</b> It was always milliseconds,
+          so a slow request showed "94812 ms". It now carries the larger unit alongside once
+          it reaches one: <code>94812 ms (1m 34s)</code>.</li>
+          <li>Step numbers are <b>numbered badges</b> instead of "#1", and the report header
+          carries a <b>Code Traces</b> chip.</li>
+          <li><b>Fixed: the Files view hid the top of every method section.</b> A stray
+          <code>overflow</code> on the file card made it the nearest scroll container, which
+          stopped the sticky file header positioning against the page and left it sitting on
+          top of the method heading below it.</li>
+          <li><b>Fixed:</b> the custom time-filter field appeared on load instead of waiting
+          for <b>Custom&hellip;</b> to be chosen.</li>
+        </ul>
+        <p><b>1.2.0</b>: SQL in the trace, and a report you can actually read</p>
+        <ul>
+          <li><b>Docker without a port-forwarding sidecar.</b> The agent takes a new
+          <code>bind=</code> argument, so a containerised JVM can expose its control socket
+          the same way the JVM's own debugger does: <code>bind=0.0.0.0</code> plus a
+          published port, and the IDE connects straight to it. The default is still
+          loopback-only, and the agent refuses to listen on any other address unless a
+          token is set. Tick <b>Traced JVM runs in a container or on another machine</b> in
+          Settings and <b>Copy agent VM option</b> fills the argument in for you.</li>
+          <li><b>SQL queries appear in the call tree</b>, at the line that issued them, with
+          their own timing. Statement text only; bound parameters are never read and stay
+          as <code>?</code> placeholders, and nothing is captured unless a trace is armed.
+          Statements are formatted onto clause lines and syntax-coloured, long ones are
+          trimmed to three lines with an expand control, and a toolbar toggle hides SQL
+          entirely for reading control flow on its own.</li>
+          <li><b>Java syntax highlighting</b> in the exported report, in both light and dark
+          themes (keywords, strings, comments, annotations and types), instead of the
+          flat monochrome the report used to show.</li>
+          <li><b>The report has been redesigned</b> around the platform's own look: system
+          typography, a monospace face that matches the IDE editor, hairline borders, a
+          translucent toolbar that stays put while you scroll, and a segmented control in
+          place of the old buttons. Light and dark are both first-class.</li>
+          <li><b>Smaller reports.</b> The embedded logo was a 1024&times;1024 image shown at
+          28 pixels and carried twice, costing ~149&nbsp;KB in every file; it is now sized
+          for the job. Export also offers an <b>Essential</b> mode that leaves excluded
+          types' source out of the document rather than shipping it and hiding it.</li>
+          <li>The <b>Files</b> picker now works in the Tree view too, so a trace can be
+          stripped down to one layer, and long class names are no longer truncated.</li>
+          <li><b>Excluded types.</b> A single request touches dozens of entities, DTOs and
+          generated builders that are not what you are debugging. The report's new
+          <b>Essential</b> view folds them into one "… N excluded calls" row at the call
+          site, keeping the count and total time visible; <b>Full</b> still shows every
+          recorded frame. A call is only folded when everything underneath it is also
+          excluded, so a getter that triggers a lazy load stays on screen with the query it
+          caused.</li>
+          <li>Choose the types under <b>Settings → Tools → Deju Trace</b>: case-insensitive
+          globs by class name (<code>*dto</code>, <code>*entity</code>) or by package
+          (<code>*.dto.*</code>), plus your own. <b>Per-class exclusions…</b> overrides any
+          pattern for one class, in either direction. Nested classes follow their outer
+          class, so excluding a response wrapper also excludes the builder generated inside
+          it. Stored per project; the recording itself is never filtered.</li>
+          <li><b>Show opens 5 files instead of all of them</b>, in execution order, the
+          traced method's own file first. Every recorded file is still painted, so opening
+          one of the others later shows its coverage and timings immediately. The limit is
+          configurable (0 = no limit) and what was not opened is named in a notification.</li>
+          <li><b>Run configurations repair themselves.</b> A <code>-javaagent</code> path
+          pinned to a previous build stops the JVM from starting at all once the plugin
+          updates. <b>Fix run configurations</b> rewrites the path in place, preserving your
+          port/token/includes arguments and leaving any non-Deju agent untouched;
+          <b>Refresh agent on disk</b> re-extracts the bundled jar.</li>
+          <li>The plugin now reports <b>which agent build is actually loaded</b> in the traced
+          JVM and warns when it is older than the installed plugin, the usual cause of a
+          report missing newer features, since a <code>-javaagent</code> is fixed at process
+          start and needs the application restarted.</li>
+          <li><b>You can see, and delete, everything Deju keeps.</b> <b>What Deju records…</b>
+          in Settings lists every file the plugin has written, what is in it, its size, and
+          what is never captured, with a button to open each location. <b>Clear Deju data…</b>
+          removes the lot: recorded runs, exclusion rules, connection settings and the
+          extracted agent, naming anything it could not delete rather than reporting success.
+          Uninstalling from the Plugins page of a running IDE clears the same data.</li>
+          <li><b>The connection token is generated per installation.</b> It used to ship as a
+          fixed string in the plugin source, which is not a secret, and it is the only thing
+          guarding the agent socket once <code>bind=</code> opens it beyond loopback.</li>
+          <li><b>Recorded runs no longer risk reaching a commit.</b> They live under
+          <code>.idea/</code> and contain executed SQL statement text, so the directory now
+          carries its own <code>.gitignore</code> instead of relying on yours.</li>
+          <li><b>Fixed: <b>Copy agent VM option</b> handed out a path that broke on the next
+          update.</b> It named the version-stamped jar, which is renamed and deleted whenever
+          the plugin updates, so a flag pasted into a compose file, a Gradle build or an env
+          var would fail at JVM start with "Error opening zip file or JAR manifest missing".
+          It now gives the fixed-name path, which stays valid across updates.</li>
+          <li><b>Fixed:</b> the tool window forced a horizontal scrollbar when docked at its
+          usual width. Its controls wrapped onto new rows but still reported their width as
+          if they were on one line, so the panel always claimed to be wider than the dock.</li>
+        </ul>
+        <p><b>1.1.0</b>: the HTML report becomes a call tree</p>
+        <ul>
+          <li><b>New default view: Tree.</b> Every method invocation in exact execution
+          order, each numbered with the step it ran at, with each method's own lines interleaved with the calls it
+          made, placed at the line that made them. A trace now reads top to bottom.</li>
+          <li>Per-call inclusive timing, a <b>hot path</b> highlight that follows the
+          slowest chain, and a minimum-time filter. Neither ever reorders the tree.</li>
+          <li>Runs of identical sibling calls fold automatically, so an N+1 query loop no
+          longer floods the page. Click to expand; order is preserved.</li>
+          <li><b>Files view</b>: lines are grouped into named method sections; file headers
+          stick to the top and carry line, unexecuted and timing counts; long reports open
+          collapsed so they read as an index.</li>
+          <li>Click any line number to <b>open it in the IDE</b> (requires JetBrains
+          Toolbox), with Copy path as a fallback.</li>
+          <li>Keyboard navigation throughout; press <code>?</code> for the full list.</li>
+          <li><b>Fixed:</b> "API order" sorted by hash-set iteration order instead of the
+          order classes were actually entered, making it effectively arbitrary.</li>
+          <li><b>Fixed:</b> "Slowest first" ranked by inclusive time, which always favoured
+          whatever sat highest on the call stack. Self time and total time are now separate
+          options: self time finds the method actually doing the slow work.</li>
+          <li>Unchanged guarantees: no variable capture, no telemetry, and no network calls
+          or remote resources in the exported report.</li>
+        </ul>
+        <p><b>0.1.0</b>: initial MVP, line/branch coverage for one targeted call,
+        last-5 history, and HTML export.</p>
+    ]]></change-notes>
+
+    <!-- Minimal capabilities: platform + Java PSI only. -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="Deju Trace" displayType="BALLOON"/>
+
+        <applicationService serviceImplementation="org.deju.plugin.DejuSettings"/>
+        <projectService serviceImplementation="org.deju.plugin.DejuController"/>
+        <projectService serviceImplementation="org.deju.plugin.history.DejuHistoryStore"/>
+        <projectService serviceImplementation="org.deju.plugin.exclude.DejuExclusions"/>
+
+        <toolWindow id="Deju Trace"
+                    anchor="right"
+                    icon="/icons/dejuToolWindow.svg"
+                    factoryClass="org.deju.plugin.ui.DejuToolWindowFactory"/>
+
+        <codeInsight.lineMarkerProvider language="JAVA"
+                                        implementationClass="org.deju.plugin.action.DejuLineMarkerProvider"/>
+
+        <!-- Auto-attaches the bundled agent to locally IDE-launched Java runs (opt-in). -->
+        <java.programPatcher implementation="org.deju.plugin.run.DejuProgramPatcher"/>
+
+        <!-- Preferences → Tools → Deju Trace -->
+        <!-- Project-level: the exclusion patterns on this page describe one codebase. -->
+        <projectConfigurable parentId="tools"
+                             id="org.deju.plugin.settings.DejuConfigurable"
+                             instance="org.deju.plugin.settings.DejuConfigurable"
+                             displayName="Deju Trace"/>
+    </extensions>
+
+    <!-- Clears stored data when the plugin is uninstalled from a running IDE. Best effort;
+         see DejuUninstallCleanup, and "Clear Deju data…" in Settings for the reliable path. -->
+    <applicationListeners>
+        <listener class="org.deju.plugin.privacy.DejuUninstallCleanup"
+                  topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
+
+    <actions>
+        <action id="Deju.AddDejuPoint"
+                class="org.deju.plugin.action.AddDejuPointAction"
+                text="Set as Trace Point"
+                description="Set the method under the caret as the Deju trace point">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

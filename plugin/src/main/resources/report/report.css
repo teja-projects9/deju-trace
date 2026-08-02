@@ -1,0 +1,338 @@
+/*
+ * Deju HTML report styles. Inlined verbatim into a <style> element by
+ * HtmlReportGenerator, so the exported file stays self-contained (no external
+ * resources, no network). Theme-aware: follows the viewer's light/dark
+ * preference, and the in-page toggle stamps data-theme on <html> to override.
+ */
+
+:root{
+  color-scheme: light dark;
+  --bg:#fff; --fg:#1f2328; --muted:#656d76; --panel:#f6f8fa; --border:#d0d7de;
+  --ln:#8c959f; --accent:#4a90d9;
+  --full-bg:rgba(46,164,79,.14); --partial-bg:rgba(209,167,44,.20); --none-bg:rgba(207,74,74,.16);
+  --full:#2da44e; --partial:#bf8700; --none:#cf4a4a;
+  --heat:rgba(74,144,217,.18);
+  /* Syntax colours, tuned after Xcode's palettes so the report reads like a Mac editor.
+     They sit on top of the green/amber/red coverage tints, which are low-alpha washes,
+     so contrast survives on every row state. */
+  --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
+  --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
+  /* macOS surface tokens: hairline separators, soft elevation, translucent chrome. */
+  --hairline:rgba(0,0,0,.10);
+  --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
+  --elev-sm:0 1px 2px rgba(0,0,0,.06);
+  --glass:rgba(255,255,255,.72);
+  --control:#fff; --control-hover:#f2f3f5;
+  --radius:10px; --radius-sm:7px;
+  /* Brand palette, taken from the logo's diagonal split. Not theme-dependent: it is the
+     product's colour, and a step badge that changed hue between themes would stop being
+     recognisable as the same mark. */
+  /* Step badges and the "Code Traces" chip share one fill. Blue rather than the logo's
+     yellow and green, because those two are already this report's PARTIAL and FULL
+     coverage colours and a badge in either reads as a status. */
+  --badge-bg:cornflowerblue; --badge-ink:#fff;
+  /* Measured at runtime so sticky file headers park directly under the toolbar. */
+  --toolbarH:0px;
+}
+@media (prefers-color-scheme: dark){ :root{
+  --bg:#1e1f22; --fg:#dfe1e5; --muted:#9aa0a6; --panel:#2b2d30; --border:#3a3d42; --ln:#6f737a;
+  --full-bg:rgba(80,180,80,.18); --partial-bg:rgba(210,180,60,.20); --none-bg:rgba(210,80,80,.20);
+  --full:#6abf6a; --partial:#d6b656; --none:#e06c6c;
+  --heat:rgba(120,170,230,.20);
+  --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
+  --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
+  --hairline:rgba(255,255,255,.10);
+  --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
+  --elev-sm:0 1px 2px rgba(0,0,0,.35);
+  --glass:rgba(38,40,44,.72);
+  --control:#33363b; --control-hover:#3c4045;
+}}
+:root[data-theme="dark"]{
+  --bg:#1e1f22; --fg:#dfe1e5; --muted:#9aa0a6; --panel:#2b2d30; --border:#3a3d42; --ln:#6f737a;
+  --full-bg:rgba(80,180,80,.18); --partial-bg:rgba(210,180,60,.20); --none-bg:rgba(210,80,80,.20);
+  --full:#6abf6a; --partial:#d6b656; --none:#e06c6c;
+  --heat:rgba(120,170,230,.20);
+  --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
+  --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
+  --hairline:rgba(255,255,255,.10);
+  --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
+  --elev-sm:0 1px 2px rgba(0,0,0,.35);
+  --glass:rgba(38,40,44,.72);
+  --control:#33363b; --control-hover:#3c4045;
+}
+:root[data-theme="light"]{
+  --bg:#fff; --fg:#1f2328; --muted:#656d76; --panel:#f6f8fa; --border:#d0d7de; --ln:#8c959f;
+  --full-bg:rgba(46,164,79,.14); --partial-bg:rgba(209,167,44,.20); --none-bg:rgba(207,74,74,.16);
+  --full:#2da44e; --partial:#bf8700; --none:#cf4a4a;
+  --heat:rgba(74,144,217,.18);
+  --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
+  --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
+  --hairline:rgba(0,0,0,.10);
+  --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
+  --elev-sm:0 1px 2px rgba(0,0,0,.06);
+  --glass:rgba(255,255,255,.72);
+  --control:#fff; --control-hover:#f2f3f5;
+}
+
+*{box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,sans-serif;
+  margin:0;padding:1.25rem;background:var(--bg);color:var(--fg);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+header{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:.6rem;}
+.brand .logo{width:28px;height:28px;border-radius:6px;flex:0 0 auto;}
+h1{font-size:1.05rem;margin:0;}
+/* "Code Traces" as a chip beside the product name, in the same yellow-fill/green-ink
+   pairing as the step badges, so the report's two branded marks read as one family.
+   Its own class, not the legend's .chip, which is a clickable filter control. */
+.brand .brandchip{font-size:.72rem;font-weight:700;letter-spacing:.02em;line-height:1;
+  padding:.22rem .6rem;border-radius:99px;white-space:nowrap;
+  background:var(--badge-bg);color:var(--badge-ink);box-shadow:var(--elev-sm);}
+.meta{color:var(--muted);font-size:.82rem;margin:.35rem 0 .75rem;}
+
+.legend{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.78rem;}
+.legend .chip{padding:.15rem .6rem;border-radius:99px;border:1px solid var(--hairline);
+  cursor:pointer;user-select:none;box-shadow:var(--elev-sm);}
+.chip.full{background:var(--full-bg);} .chip.partial{background:var(--partial-bg);} .chip.none{background:var(--none-bg);}
+.legend .chip.off{opacity:.4;text-decoration:line-through;}
+
+.toggle{font:inherit;font-size:.8rem;cursor:pointer;padding:.32rem .75rem;border-radius:var(--radius-sm);
+  border:1px solid var(--hairline);background:var(--control);color:var(--fg);
+  box-shadow:var(--elev-sm);transition:background .12s ease,border-color .12s ease;}
+.toggle:hover{background:var(--control-hover);border-color:var(--border);}
+.toggle:active{transform:translateY(.5px);}
+.toggle.on{border-color:var(--accent);background:var(--heat);}
+
+/* ------------------------------------------------------------------ files --- */
+/* No overflow on .file: an overflow value here would make it the nearest scroll
+   container and the sticky h2 would never stick. The radius is clipped by
+   .scroll instead. */
+.file{margin:0 0 1rem;border:1px solid var(--hairline);border-radius:var(--radius);
+  box-shadow:var(--elev-sm);background:var(--bg);}
+.file h2{
+  position:sticky;top:var(--toolbarH);z-index:3;
+  display:flex;align-items:center;gap:.5rem;
+  font-size:.85rem;font-weight:600;margin:0;padding:.55rem .8rem;
+  background:var(--panel);border-bottom:1px solid var(--hairline);
+  border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;
+}
+.file h2 .src{color:var(--muted);font-weight:400;}
+.file h2 .caret{color:var(--muted);font-weight:400;display:inline-block;width:.85rem;flex:0 0 auto;}
+.file h2 .fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.file h2 .stats{margin-left:auto;display:flex;align-items:center;gap:.45rem;font-weight:400;font-size:.74rem;color:var(--muted);white-space:nowrap;}
+.file h2 .stats .pill{padding:.05rem .4rem;border-radius:99px;border:1px solid var(--border);background:var(--bg);}
+.file h2 .stats .pill.red{color:var(--none);border-color:var(--none);}
+.file h2 .stats .pill.amber{color:var(--partial);border-color:var(--partial);}
+.file h2 .act{flex:0 0 auto;font:inherit;font-size:.72rem;cursor:pointer;padding:.1rem .4rem;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);}
+.file h2 .act:hover{border-color:var(--accent);color:var(--fg);}
+.file.collapsed h2{border-bottom:none;border-radius:var(--radius);}
+.file.collapsed .scroll{display:none;}
+.scroll{overflow-x:auto;border-radius:0 0 var(--radius) var(--radius);}
+
+/* ------------------------------------------------------------------- rows --- */
+table{border-collapse:collapse;width:100%;
+  font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:.8rem;}
+td{padding:.08rem .5rem;white-space:pre;vertical-align:top;}
+td.time{text-align:right;color:var(--muted);white-space:nowrap;width:5rem;border-right:1px solid var(--border);font-variant-numeric:tabular-nums;}
+td.ln{text-align:right;color:var(--ln);user-select:none;width:3.2rem;border-right:1px solid var(--border);}
+td.ln a{color:inherit;text-decoration:none;}
+td.ln a:hover{color:var(--accent);text-decoration:underline;}
+td.code{width:100%;}
+
+/* --------------------------------------------------------------- syntax --- */
+/* Presentational only. paintCode() writes every fragment with textContent, so a
+   colour class can never be a route to executing traced source. */
+.k-kw{color:var(--k-kw);}
+.k-str{color:var(--k-str);}
+.k-chr{color:var(--k-chr);}
+.k-cmt{color:var(--k-cmt);font-style:italic;}
+.k-ann{color:var(--k-ann);}
+.k-num{color:var(--k-num);}
+.k-typ{color:var(--k-typ);}
+tr.FULL{background:var(--full-bg);} tr.FULL td.code{box-shadow:inset 3px 0 0 var(--full);}
+tr.PARTIAL{background:var(--partial-bg);} tr.PARTIAL td.code{box-shadow:inset 3px 0 0 var(--partial);}
+tr.NONE{background:var(--none-bg);} tr.NONE td.code{box-shadow:inset 3px 0 0 var(--none);}
+tr.cursor td{background:var(--heat);}
+tr.cursor td.code{box-shadow:inset 3px 0 0 var(--accent);}
+.br{color:var(--muted);font-size:.72rem;}
+
+/* ----------------------------------------------------- method sections --- */
+tr.mrow td{
+  padding:.3rem .5rem .22rem;background:var(--bg);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  white-space:normal;cursor:pointer;
+}
+tr.mrow:first-child td{border-top:none;}
+.mhead{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+.mhead .mcaret{color:var(--muted);width:.8rem;flex:0 0 auto;}
+.mhead .mname{font-weight:600;font-size:.82rem;}
+.mhead .mkind{color:var(--muted);font-weight:400;font-style:italic;}
+.mhead .mmeta{color:var(--muted);font-size:.72rem;margin-left:auto;font-variant-numeric:tabular-nums;}
+
+/* -------------------------------------------------------------- tree view --- */
+/* One table for the whole tree so the time and line columns stay aligned at every
+   depth; nesting is expressed by indenting the code cell, not by nested tables. */
+.treewrap{border:1px solid var(--border);border-radius:8px;}
+#treeTable{width:100%;}
+.fidelity{font-size:.74rem;color:var(--muted);margin:0 0 .5rem;}
+
+tr.frame td{
+  padding:.26rem .5rem;background:var(--panel);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  white-space:normal;cursor:pointer;
+}
+tr.frame:first-child td{border-top:none;}
+tr.frame.hot td{background:var(--heat);}
+.fhead{display:flex;align-items:baseline;gap:.45rem;font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+/* The step badge: the logo's yellow-to-green sweep, numeral in near-black. A pill rather
+   than a strict circle, because step numbers reach three and four digits on a real trace
+   and a fixed circle would either clip them or force every badge as wide as the longest.
+   Single digits still come out round. The fill is theme-independent, so the mark stays
+   recognisable as the same badge in light and dark. */
+.fhead .step{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  box-sizing:border-box;min-width:1.5rem;height:1.5rem;padding:0 .38rem;
+  border-radius:999px;
+  background:var(--badge-bg);
+  color:var(--badge-ink);font-size:.68rem;font-weight:700;line-height:1;
+  font-variant-numeric:tabular-nums;
+  box-shadow:var(--elev-sm);}
+.fhead .fcaret{color:var(--muted);width:.8rem;flex:0 0 auto;}
+.fhead .ffile{font-weight:600;font-size:.82rem;}
+.fhead .fsep{color:var(--muted);}
+.fhead .fmethod{font-weight:600;font-size:.82rem;}
+.fhead .fkind{color:var(--muted);font-weight:400;font-style:italic;font-size:.76rem;}
+.fhead .fsite{color:var(--muted);font-size:.72rem;}
+.fhead .fsite a{color:inherit;text-decoration:none;}
+.fhead .fsite a:hover{color:var(--accent);text-decoration:underline;}
+.fhead .ftime{margin-left:auto;color:var(--muted);font-size:.74rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+tr.frame.hot .ftime{color:var(--fg);font-weight:600;}
+
+/* A run of identical sibling calls, folded so an N+1 loop cannot flood the page. */
+tr.fold td{padding:.22rem .5rem;background:var(--bg);border-bottom:1px solid var(--border);white-space:normal;cursor:pointer;}
+.foldhead{display:flex;align-items:baseline;gap:.45rem;font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:.78rem;color:var(--muted);}
+.foldhead .fcount{font-weight:600;color:var(--fg);}
+.foldhead:hover{color:var(--fg);}
+/* An executed query. Distinct from a call frame because there is no source to step into, and
+   the statement text is the content. */
+tr.sqlrow td{padding:.22rem .5rem;background:var(--bg);border-bottom:1px solid var(--border);white-space:normal;}
+.fhead .sqltag{font-size:.66rem;font-weight:700;letter-spacing:.04em;padding:.05rem .3rem;
+  border:1px solid var(--border);border-radius:3px;color:var(--muted);flex:0 0 auto;}
+/* A formatted statement, so newlines and indentation are significant. pre-wrap keeps them
+   while still wrapping a forty-column select instead of scrolling the page sideways. */
+.sqltext{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.76rem;
+  line-height:1.5;white-space:pre-wrap;word-break:break-word;color:var(--fg);
+  margin:.15rem 0 .1rem;padding:.3rem .5rem;
+  background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius-sm);
+  border-left:2px solid var(--border);
+  position:relative;}
+/* Three rendered lines, counted visually rather than by newline: a single SELECT clause
+   over forty columns wraps to five lines and is exactly the case worth collapsing. */
+.sqltext.clamped{max-height:calc(3 * 1.5em + .6rem);overflow:hidden;}
+/* Fades the cut edge so it reads as "there is more" instead of a hard crop. */
+.sqltext.clamped::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.4em;
+  background:linear-gradient(to bottom,transparent,var(--panel));pointer-events:none;}
+.sqlmore{font:inherit;font-size:.72rem;cursor:pointer;padding:.1rem .45rem;margin:0 0 .2rem;
+  border:1px solid var(--hairline);border-radius:99px;
+  background:var(--control);color:var(--muted);}
+.sqlmore:hover{background:var(--control-hover);color:var(--fg);}
+.sqlmore[hidden]{display:none;}
+/* Roll-ups of excluded types read as an aside, not as executed code: dashed rule and no
+   solid bottom border, so the eye slides past them while following the real call flow. */
+tr.rollup td{border-bottom:1px dashed var(--border);opacity:.85;}
+tr.rollup:hover td{opacity:1;}
+
+/* Nesting depth is expressed as leading pad on the cell; --depth is set per row.
+   These selectors must out-specify `tr.frame td` / `tr.fold td` / `td` above, which set
+   the `padding` shorthand and would otherwise reset padding-left back to .5rem. */
+tr td.tcode,
+tr.frame td.tframe,
+tr.sqlrow td.tframe,
+tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
+
+.seg{display:inline-flex;border:1px solid var(--hairline);border-radius:var(--radius-sm);
+  background:var(--panel);padding:2px;gap:2px;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);}
+.segbtn{font:inherit;font-size:.8rem;cursor:pointer;padding:.26rem .75rem;border:0;
+  border-radius:calc(var(--radius-sm) - 2px);background:transparent;color:var(--muted);
+  transition:background .12s ease,color .12s ease;}
+.segbtn + .segbtn{border-left:0;}
+.segbtn.on{background:var(--control);color:var(--fg);font-weight:600;box-shadow:var(--elev-sm);}
+.segbtn:hover:not(.on){color:var(--fg);}
+.segbtn:disabled{opacity:.4;cursor:not-allowed;}
+[hidden]{display:none !important;}
+
+/* ---------------------------------------------------------------- chrome --- */
+.toolbar{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+  padding:.55rem .75rem;margin:0 -.75rem .75rem;background:var(--glass);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--hairline);}
+.dropdown{position:relative;}
+/* Opaque, deliberately. This popover sits over dense code, and it is nested inside the
+   toolbar, which already has a backdrop-filter: an ancestor filter establishes a backdrop
+   root, so a child's blur has nothing behind it to sample and a translucent background just
+   lets the call tree show through unblurred. A list you have to read is not a place for
+   glass. */
+.menu{position:absolute;top:112%;left:0;width:min(30rem,88vw);background:var(--bg);
+  border:1px solid var(--hairline);border-radius:var(--radius);padding:.4rem;
+  box-shadow:var(--elev);z-index:10;}
+.menu[hidden]{display:none;}
+.menu-search{width:100%;font:inherit;font-size:.78rem;padding:.3rem .45rem;margin-bottom:.35rem;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--fg);}
+.menu-search:focus{outline:none;border-color:var(--accent);}
+.menu-actions{display:flex;gap:.35rem;margin-bottom:.35rem;}
+.menu-actions button{flex:1;font:inherit;font-size:.75rem;cursor:pointer;padding:.22rem;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--fg);}
+.menu-actions button:hover{border-color:var(--accent);}
+.menu-list{max-height:50vh;overflow:auto;overscroll-behavior:contain;}
+.menu label{display:flex;align-items:center;gap:.45rem;padding:.24rem .35rem;font-size:.78rem;
+  border-radius:var(--radius-sm);cursor:pointer;width:max-content;min-width:100%;}
+.menu label[hidden]{display:none;}
+.menu label:hover{background:var(--panel);}
+/* No ellipsis: a truncated fully-qualified name is exactly the part you need to tell
+   two same-named classes apart. The list scrolls sideways instead. */
+.menu label .mtxt{white-space:nowrap;}
+.menu label .gen{color:var(--muted);font-size:.72rem;flex:0 0 auto;}
+.menu .none{color:var(--muted);font-size:.76rem;padding:.3rem;}
+.search{font:inherit;font-size:.85rem;padding:.42rem .75rem;border-radius:99px;
+  border:1px solid var(--hairline);background:var(--panel);color:var(--fg);
+  flex:1 1 18rem;min-width:12rem;max-width:40rem;box-shadow:inset 0 1px 2px rgba(0,0,0,.04);}
+.search:focus{outline:none;border-color:var(--accent);}
+.sort{font:inherit;font-size:.8rem;padding:.3rem .5rem;border-radius:var(--radius-sm);
+  border:1px solid var(--hairline);background:var(--control);color:var(--fg);cursor:pointer;
+  box-shadow:var(--elev-sm);}
+.sort:focus{outline:none;border-color:var(--accent);}
+/* The hand-entered threshold. Narrow on purpose: it holds "750us", not a sentence, and it
+   sits between two controls in a toolbar that already wraps. */
+.mintime-custom{flex:0 0 auto;min-width:0;width:7.5rem;max-width:7.5rem;text-align:center;}
+.mintime-custom.bad{border-color:var(--none-bg);background:var(--none-bg);}
+.mintime-and{flex:0 0 auto;color:var(--muted);font-size:.78rem;}
+.mintime-and[hidden]{display:none;}
+.genToggle{display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--muted);cursor:pointer;white-space:nowrap;}
+.genToggle[hidden]{display:none;}
+.count{color:var(--muted);font-size:.78rem;margin-left:auto;white-space:nowrap;}
+
+.summary{display:flex;gap:1.5rem;flex-wrap:wrap;margin:.25rem 0 .9rem;padding:.55rem .8rem;background:var(--panel);border:1px solid var(--border);border-radius:8px;}
+.summary .stat{display:flex;flex-direction:column;line-height:1.25;}
+.summary .stat b{font-size:1rem;font-weight:600;}
+/* The seconds/minutes reading beside a millisecond total: present, but clearly secondary
+   to the figure it restates. */
+.summary .stat b .statalt{font-size:.78rem;font-weight:400;color:var(--muted);
+  text-transform:none;letter-spacing:0;}
+.summary .stat span{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+.empty{color:var(--muted);font-size:.85rem;padding:1rem;border:1px dashed var(--border);border-radius:8px;text-align:center;}
+.notice{color:var(--muted);font-size:.76rem;margin:0 0 .75rem;}
+
+/* ------------------------------------------------------------------ help --- */
+.help{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);padding:1rem;}
+.help[hidden]{display:none;}
+.help .card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;max-width:32rem;width:100%;max-height:80vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+.help h3{margin:0 0 .6rem;font-size:.95rem;}
+.help dl{display:grid;grid-template-columns:auto 1fr;gap:.3rem .8rem;margin:0 0 .8rem;font-size:.8rem;align-items:baseline;}
+.help dt{margin:0;}
+.help dd{margin:0;color:var(--muted);}
+.help kbd{font-family:SFMono-Regular,Consolas,monospace;font-size:.74rem;padding:.08rem .35rem;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;background:var(--panel);}
+.help p{font-size:.76rem;color:var(--muted);margin:.5rem 0 0;}
+.help .close{margin-top:.8rem;}
+
+@media (max-width:640px){
+  body{padding:.75rem;}
+  .file h2 .stats{display:none;}
+  .count{margin-left:0;}
+}

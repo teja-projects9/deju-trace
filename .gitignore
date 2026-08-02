@@ -1,0 +1,37 @@
+# --- Build output ----------------------------------------------------------
+build/
+out/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# --- Gradle ----------------------------------------------------------------
+.gradle/
+gradle-app.setting
+.gradletasknamecache
+.kotlin/
+
+# --- IntelliJ Platform Gradle plugin ---------------------------------------
+# Locks + locally-generated Ivy descriptors pinned to whichever IDE build this
+# machine resolved; regenerated on demand and never portable between checkouts.
+.intellijPlatform/
+
+# --- IDE -------------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.local/
+
+# --- OS junk ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# --- Machine-local config --------------------------------------------------
+.env
+.env.*
+*.pem
+*.p12
+*.crt
+*.key
