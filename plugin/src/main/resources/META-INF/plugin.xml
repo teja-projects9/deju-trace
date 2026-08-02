@@ -35,6 +35,20 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.0.2</b>: the agent ships as its own release asset</p>
+        <ul>
+          <li><b>Fixed: the standalone agent jar was never built.</b> Every release now
+          produces <code>deju-agent-&lt;version&gt;.jar</code> alongside the plugin zip. The
+          task that makes it existed but was wired to nothing, so it only ran if you invoked
+          it by name, and the versioned asset was missing from the release.</li>
+          <li>This is what a containerised JVM downloads. A setup script pins
+          <code>DEJU_VERSION</code> and fetches that file, so the agent in the container
+          always matches the plugin in the IDE; without the version in the name, a cached
+          copy survives a bump and surfaces much later as a protocol mismatch. The copy
+          bundled in the plugin keeps its fixed <code>deju-agent.jar</code> name and is
+          byte-identical to the published one.</li>
+        </ul>
+
         <p><b>2.0.1</b>: three ways to read one request</p>
         <ul>
           <li><b>The report is now three tabs.</b> <i>Code Trace</i> is everything the
