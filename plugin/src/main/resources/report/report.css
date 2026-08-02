@@ -12,6 +12,7 @@
   --full-bg:rgba(46,164,79,.14); --partial-bg:rgba(209,167,44,.20); --none-bg:rgba(207,74,74,.16);
   --full:#2da44e; --partial:#bf8700; --none:#cf4a4a;
   --heat:rgba(74,144,217,.18);
+  --sql-ink:#ff9933; --flow-cls:#2e9e4f; --flow-mth:#2f6fd0;
   /* Syntax colours, tuned after Xcode's palettes so the report reads like a Mac editor.
      They sit on top of the green/amber/red coverage tints, which are low-alpha washes,
      so contrast survives on every row state. */
@@ -24,13 +25,12 @@
   --glass:rgba(255,255,255,.72);
   --control:#fff; --control-hover:#f2f3f5;
   --radius:10px; --radius-sm:7px;
-  /* Brand palette, taken from the logo's diagonal split. Not theme-dependent: it is the
-     product's colour, and a step badge that changed hue between themes would stop being
-     recognisable as the same mark. */
-  /* Step badges and the "Code Traces" chip share one fill. Blue rather than the logo's
-     yellow and green, because those two are already this report's PARTIAL and FULL
-     coverage colours and a badge in either reads as a status. */
-  --badge-bg:cornflowerblue; --badge-ink:#fff;
+  /* Step badges carry the product's orange on white ink: the step number is the one thing
+     in a frame that says where you are in the run, so it is deliberately loud. Each theme
+     gets its own strength, #e67f18 on white and a dimmer #a0652a on the dark pages, since
+     one orange cannot both hold its own against white and avoid glaring off near-black in
+     a column of thirty badges. Same hue throughout, so it still reads as the same mark. */
+  --badge-bg:#e67f18; --badge-ink:#fff;
   /* Measured at runtime so sticky file headers park directly under the toolbar. */
   --toolbarH:0px;
 }
@@ -39,6 +39,7 @@
   --full-bg:rgba(80,180,80,.18); --partial-bg:rgba(210,180,60,.20); --none-bg:rgba(210,80,80,.20);
   --full:#6abf6a; --partial:#d6b656; --none:#e06c6c;
   --heat:rgba(120,170,230,.20);
+  --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
   --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
   --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
   --hairline:rgba(255,255,255,.10);
@@ -46,12 +47,14 @@
   --elev-sm:0 1px 2px rgba(0,0,0,.35);
   --glass:rgba(38,40,44,.72);
   --control:#33363b; --control-hover:#3c4045;
+  --badge-bg:#a0652a;
 }}
 :root[data-theme="dark"]{
   --bg:#1e1f22; --fg:#dfe1e5; --muted:#9aa0a6; --panel:#2b2d30; --border:#3a3d42; --ln:#6f737a;
   --full-bg:rgba(80,180,80,.18); --partial-bg:rgba(210,180,60,.20); --none-bg:rgba(210,80,80,.20);
   --full:#6abf6a; --partial:#d6b656; --none:#e06c6c;
   --heat:rgba(120,170,230,.20);
+  --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
   --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
   --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
   --hairline:rgba(255,255,255,.10);
@@ -59,12 +62,14 @@
   --elev-sm:0 1px 2px rgba(0,0,0,.35);
   --glass:rgba(38,40,44,.72);
   --control:#33363b; --control-hover:#3c4045;
+  --badge-bg:#a0652a;
 }
 :root[data-theme="light"]{
   --bg:#fff; --fg:#1f2328; --muted:#656d76; --panel:#f6f8fa; --border:#d0d7de; --ln:#8c959f;
   --full-bg:rgba(46,164,79,.14); --partial-bg:rgba(209,167,44,.20); --none-bg:rgba(207,74,74,.16);
   --full:#2da44e; --partial:#bf8700; --none:#cf4a4a;
   --heat:rgba(74,144,217,.18);
+  --sql-ink:#ff9933; --flow-cls:#2e9e4f; --flow-mth:#2f6fd0;
   --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
   --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
   --hairline:rgba(0,0,0,.10);
@@ -72,6 +77,7 @@
   --elev-sm:0 1px 2px rgba(0,0,0,.06);
   --glass:rgba(255,255,255,.72);
   --control:#fff; --control-hover:#f2f3f5;
+  --badge-bg:#e67f18;
 }
 
 *{box-sizing:border-box;}
@@ -88,7 +94,20 @@ h1{font-size:1.05rem;margin:0;}
 .brand .brandchip{font-size:.72rem;font-weight:700;letter-spacing:.02em;line-height:1;
   padding:.22rem .6rem;border-radius:99px;white-space:nowrap;
   background:var(--badge-bg);color:var(--badge-ink);box-shadow:var(--elev-sm);}
-.meta{color:var(--muted);font-size:.82rem;margin:.35rem 0 .75rem;}
+/* Theme switch, parked in the header's top-right corner. An icon rather than a labelled
+   toggle because it is the one control on the page that changes nothing about the trace,
+   and header is already justify-content:space-between, so it needs no positioning. */
+.headtools{display:flex;align-items:center;gap:.4rem;flex:0 0 auto;}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  font:inherit;font-size:.9rem;font-weight:700;line-height:1;
+  width:2rem;height:2rem;padding:0;border-radius:50%;cursor:pointer;
+  border:1px solid var(--hairline);background:var(--control);color:var(--muted);
+  box-shadow:var(--elev-sm);transition:background .12s ease,color .12s ease,border-color .12s ease;}
+.iconbtn:hover{background:var(--control-hover);color:var(--fg);border-color:var(--border);}
+.iconbtn:active{transform:translateY(.5px);}
+.iconbtn svg{display:block;}
+.meta{display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;
+  color:var(--muted);font-size:.82rem;margin:.35rem 0 .75rem;}
 
 .legend{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.78rem;}
 .legend .chip{padding:.15rem .6rem;border-radius:99px;border:1px solid var(--hairline);
@@ -308,7 +327,12 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .genToggle[hidden]{display:none;}
 .count{color:var(--muted);font-size:.78rem;margin-left:auto;white-space:nowrap;}
 
-.summary{display:flex;gap:1.5rem;flex-wrap:wrap;margin:.25rem 0 .9rem;padding:.55rem .8rem;background:var(--panel);border:1px solid var(--border);border-radius:8px;}
+.summary{display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;margin:.25rem 0 .9rem;padding:.55rem .8rem;background:var(--panel);border:1px solid var(--border);border-radius:8px;}
+/* Ordered last and pushed right, so the stats the script appends after it in the DOM
+   still read left to right. Sized to the stat blocks' own height rather than the
+   toolbar's, which is why it does not simply inherit .search. */
+.summary .search{order:2;margin-left:auto;height:2.3rem;font-size:.85rem;
+  padding:.3rem 1rem;flex:0 1 24rem;min-width:11rem;background:var(--bg);}
 .summary .stat{display:flex;flex-direction:column;line-height:1.25;}
 .summary .stat b{font-size:1rem;font-weight:600;}
 /* The seconds/minutes reading beside a millisecond total: present, but clearly secondary
@@ -331,8 +355,71 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .help p{font-size:.76rem;color:var(--muted);margin:.5rem 0 0;}
 .help .close{margin-top:.8rem;}
 
+/* ------------------------------------------------- graph / flow panels --- */
+
+/* Groups of toolbar controls that appear and disappear as a unit. display:contents keeps
+   the buttons themselves as flex children of .toolbar, so wrapping behaves exactly as it
+   did when they were written inline; [hidden] is !important, so it still wins. */
+.ctlgroup{display:contents;}
+
+.panelnote{color:var(--muted);font-size:.76rem;margin:0 0 .75rem;}
+
+.graphlegend{display:flex;gap:1rem;align-items:center;font-size:.74rem;color:var(--muted);
+  margin:0 0 .6rem;}
+.graphlegend span{display:inline-flex;align-items:center;gap:.35rem;}
+.sw{width:.7rem;height:.7rem;border-radius:3px;display:inline-block;}
+.sw-self{background:var(--accent);}
+.sw-sql{background:var(--sql-ink);}
+
+.zoomseg{display:inline-flex;gap:.25rem;}
+.zoombtn{min-width:2rem;text-align:center;font-weight:600;padding:.32rem .5rem;}
+
+.graphrow{display:grid;grid-template-columns:minmax(7rem,15rem) 1fr auto auto;gap:.6rem;
+  align-items:center;padding:.22rem 0;font-size:.8rem;}
+.graphmeta{display:flex;align-items:center;gap:.35rem;white-space:nowrap;
+  font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;}
+/* A repeat count earns a warning colour: the same statement issued N times is the one
+   thing on this page a reader should stop and look at. */
+.graphmeta .nplus1{font-weight:700;color:var(--none);border:1px solid var(--none);
+  border-radius:99px;padding:.02rem .35rem;cursor:help;}
+.graphrow + .graphrow{border-top:1px solid var(--hairline);}
+.graphname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+.graphname .sub{display:block;font-weight:400;font-size:.68rem;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;}
+.graphbar{display:flex;height:.85rem;border-radius:4px;background:var(--panel);
+  overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);}
+.graphbar i{display:block;height:100%;}
+.graphbar .b-self{background:var(--accent);}
+.graphbar .b-sql{background:var(--partial);}
+.graphtime{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;
+  font-size:.76rem;}
+.graphtime b{color:var(--fg);font-weight:600;}
+
+/* Zoom trail for the flame view. Only shown once you are inside a frame, so the diagram
+   never carries chrome it does not need. */
+.flowcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.15rem;
+  margin:0 0 .5rem;font-size:.76rem;color:var(--muted);}
+.flowcrumb button{font:inherit;font-size:.76rem;cursor:pointer;padding:.1rem .4rem;
+  border:0;border-radius:5px;background:transparent;color:var(--accent);}
+.flowcrumb button:hover{background:var(--heat);}
+.flowcrumb button:disabled{color:var(--fg);cursor:default;font-weight:600;}
+.flowcrumb .sep{opacity:.6;}
+
+.flowwrap{position:relative;overflow:auto;max-height:78vh;border:1px solid var(--hairline);
+  border-radius:var(--radius);background:var(--panel);}
+#flowCanvas{display:block;}
+.flowtip{position:fixed;z-index:20;pointer-events:none;max-width:32rem;
+  background:var(--control);color:var(--fg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);box-shadow:var(--elev);padding:.45rem .6rem;
+  font-size:.74rem;line-height:1.45;}
+.flowtip .t-sig{font-weight:600;}
+.flowtip .t-sub{color:var(--muted);}
+.flowtip .t-sql{font-family:SFMono-Regular,Consolas,monospace;font-size:.7rem;
+  white-space:pre-wrap;word-break:break-word;margin-top:.2rem;}
+
 @media (max-width:640px){
   body{padding:.75rem;}
   .file h2 .stats{display:none;}
   .count{margin-left:0;}
+  .graphrow{grid-template-columns:minmax(5rem,9rem) 1fr auto;}
 }

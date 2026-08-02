@@ -28,15 +28,15 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 RES = ROOT / "plugin/src/main/resources"
 OUT = ROOT / "docs/demo-report.html"
 
-PROJECT = "brewhaus-api"
+PROJECT = "example-api"
 SRC_ROOT = "src/main/java"
 
 # --------------------------------------------------------------------------- sources ---
 # Full source of each traced file. Line numbers below are 1-based indices into these.
 
 SOURCES = {
-    "com.brewhaus.order.OrderController": ("OrderController.java", """\
-package com.brewhaus.order;
+    "com.example.order.OrderController": ("OrderController.java", """\
+package com.example.order;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,13 +65,13 @@ public class OrderController {
     }
 }
 """),
-    "com.brewhaus.order.OrderService": ("OrderService.java", """\
-package com.brewhaus.order;
+    "com.example.order.OrderService": ("OrderService.java", """\
+package com.example.order;
 
-import com.brewhaus.loyalty.LoyaltyService;
-import com.brewhaus.menu.MenuRepository;
-import com.brewhaus.pricing.DiscountPolicy;
-import com.brewhaus.pricing.PriceCalculator;
+import com.example.loyalty.LoyaltyService;
+import com.example.menu.MenuRepository;
+import com.example.pricing.DiscountPolicy;
+import com.example.pricing.PriceCalculator;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -97,8 +97,8 @@ public class OrderService {
     }
 }
 """),
-    "com.brewhaus.menu.MenuRepository": ("MenuRepository.java", """\
-package com.brewhaus.menu;
+    "com.example.menu.MenuRepository": ("MenuRepository.java", """\
+package com.example.menu;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -116,12 +116,12 @@ public class MenuRepository {
     }
 }
 """),
-    "com.brewhaus.pricing.PriceCalculator": ("PriceCalculator.java", """\
-package com.brewhaus.pricing;
+    "com.example.pricing.PriceCalculator": ("PriceCalculator.java", """\
+package com.example.pricing;
 
-import com.brewhaus.menu.Drink;
-import com.brewhaus.order.Order;
-import com.brewhaus.order.OrderLine;
+import com.example.menu.Drink;
+import com.example.order.Order;
+import com.example.order.OrderLine;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -147,10 +147,10 @@ public class PriceCalculator {
     }
 }
 """),
-    "com.brewhaus.pricing.DiscountPolicy": ("DiscountPolicy.java", """\
-package com.brewhaus.pricing;
+    "com.example.pricing.DiscountPolicy": ("DiscountPolicy.java", """\
+package com.example.pricing;
 
-import com.brewhaus.loyalty.LoyaltyService;
+import com.example.loyalty.LoyaltyService;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -171,8 +171,8 @@ public class DiscountPolicy {
     }
 }
 """),
-    "com.brewhaus.loyalty.LoyaltyService": ("LoyaltyService.java", """\
-package com.brewhaus.loyalty;
+    "com.example.loyalty.LoyaltyService": ("LoyaltyService.java", """\
+package com.example.loyalty;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -197,8 +197,8 @@ public class LoyaltyService {
     }
 }
 """),
-    "com.brewhaus.order.OrderRepository": ("OrderRepository.java", """\
-package com.brewhaus.order;
+    "com.example.order.OrderRepository": ("OrderRepository.java", """\
+package com.example.order;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -218,8 +218,8 @@ public class OrderRepository {
     }
 }
 """),
-    "com.brewhaus.order.OrderDto": ("OrderDto.java", """\
-package com.brewhaus.order;
+    "com.example.order.OrderDto": ("OrderDto.java", """\
+package com.example.order;
 
 import java.util.List;
 
@@ -235,8 +235,8 @@ public record OrderDto(long orderId, String currency, int totalPence, List<Order
     }
 }
 """),
-    "com.brewhaus.order.OrderLineDto": ("OrderLineDto.java", """\
-package com.brewhaus.order;
+    "com.example.order.OrderLineDto": ("OrderLineDto.java", """\
+package com.example.order;
 
 public record OrderLineDto(String drink, int pricePence) {
 
@@ -252,7 +252,7 @@ public record OrderLineDto(String drink, int pricePence) {
 # The first tuple of each method also carries the method's inclusive/self total.
 
 COVERAGE = {
-    "com.brewhaus.order.OrderController": [
+    "com.example.order.OrderController": [
         ("placeOrder", 47900, 560, [
             (20, "FULL", None, None, 3),
             (22, "PARTIAL", 1, 2, 41),
@@ -261,7 +261,7 @@ COVERAGE = {
             (26, "FULL", None, None, 12),
         ]),
     ],
-    "com.brewhaus.order.OrderService": [
+    "com.example.order.OrderService": [
         ("place", 47340, 350, [
             (21, "FULL", None, None, 18),
             (22, "FULL", 2, 2, 9),
@@ -273,12 +273,12 @@ COVERAGE = {
             (29, "FULL", None, None, 310),
         ]),
     ],
-    "com.brewhaus.menu.MenuRepository": [
+    "com.example.menu.MenuRepository": [
         ("findByName", 12650, 190, [
             (13, "FULL", None, None, 12650),
         ]),
     ],
-    "com.brewhaus.pricing.PriceCalculator": [
+    "com.example.pricing.PriceCalculator": [
         ("total", 640, 90, [
             (15, "FULL", None, None, 11),
             (16, "FULL", 2, 2, 14),
@@ -292,7 +292,7 @@ COVERAGE = {
             (26, "FULL", None, None, 115),
         ]),
     ],
-    "com.brewhaus.pricing.DiscountPolicy": [
+    "com.example.pricing.DiscountPolicy": [
         ("apply", 3980, 70, [
             (13, "FULL", None, None, 9),
             (14, "PARTIAL", 1, 2, 3910),
@@ -302,7 +302,7 @@ COVERAGE = {
             (20, "FULL", None, None, 12),
         ]),
     ],
-    "com.brewhaus.loyalty.LoyaltyService": [
+    "com.example.loyalty.LoyaltyService": [
         ("isMember", 3910, 50, [
             (13, "FULL", None, None, 3860),
             (16, "FULL", 2, 2, 14),
@@ -312,14 +312,14 @@ COVERAGE = {
             (21, "FULL", None, None, 2150),
         ]),
     ],
-    "com.brewhaus.order.OrderRepository": [
+    "com.example.order.OrderRepository": [
         ("save", 27200, 200, [
             (12, "FULL", None, None, 3100),
             (14, "FULL", 2, 2, 21),
             (15, "FULL", None, None, 23900),
         ]),
     ],
-    "com.brewhaus.order.OrderDto": [
+    "com.example.order.OrderDto": [
         ("of", 310, 120, [
             (9, "FULL", None, None, 14),
             (10, "FULL", None, None, 9),
@@ -328,14 +328,14 @@ COVERAGE = {
             (13, "FULL", None, None, 190),
         ]),
     ],
-    "com.brewhaus.order.OrderLineDto": [
+    "com.example.order.OrderLineDto": [
         ("of", 190, 190, [
             (6, "FULL", None, None, 190),
         ]),
     ],
 }
 
-EXCLUDED = ["com.brewhaus.order.OrderDto", "com.brewhaus.order.OrderLineDto"]
+EXCLUDED = ["com.example.order.OrderDto", "com.example.order.OrderLineDto"]
 
 DRINKS = ["Flat White", "Latte", "Cortado", "Mocha", "Espresso"]
 
@@ -409,35 +409,35 @@ class Trace:
 
 def build_calls():
     t = Trace()
-    root = t.call("com.brewhaus.order.OrderController", "placeOrder", -1, None, 47900)
-    place = t.call("com.brewhaus.order.OrderService", "place", root, 25, 47340)
+    root = t.call("com.example.order.OrderController", "placeOrder", -1, None, 47900)
+    place = t.call("com.example.order.OrderService", "place", root, 25, 47340)
 
     # Five consecutive identical lookups: the report folds the run after three.
     for micros in (8120, 1180, 1090, 1150, 1110):
-        find = t.call("com.brewhaus.menu.MenuRepository", "findByName", place, 23, micros)
+        find = t.call("com.example.menu.MenuRepository", "findByName", place, 23, micros)
         t.sql(SQL_DRINK, find, 13, micros - 120)
 
-    total = t.call("com.brewhaus.pricing.PriceCalculator", "total", place, 25, 640)
+    total = t.call("com.example.pricing.PriceCalculator", "total", place, 25, 640)
     for micros in (140, 96, 92, 94, 90):
-        t.call("com.brewhaus.pricing.PriceCalculator", "priceOf", total, 17, micros)
+        t.call("com.example.pricing.PriceCalculator", "priceOf", total, 17, micros)
 
-    apply_ = t.call("com.brewhaus.pricing.DiscountPolicy", "apply", place, 26, 3980)
-    member = t.call("com.brewhaus.loyalty.LoyaltyService", "isMember", apply_, 14, 3910)
+    apply_ = t.call("com.example.pricing.DiscountPolicy", "apply", place, 26, 3980)
+    member = t.call("com.example.loyalty.LoyaltyService", "isMember", apply_, 14, 3910)
     t.sql(SQL_MEMBER, member, 13, 3860)
 
-    award = t.call("com.brewhaus.loyalty.LoyaltyService", "award", place, 27, 2210)
+    award = t.call("com.example.loyalty.LoyaltyService", "award", place, 27, 2210)
     t.sql(SQL_POINTS, award, 21, 2150)
 
-    save = t.call("com.brewhaus.order.OrderRepository", "save", place, 28, 27200)
+    save = t.call("com.example.order.OrderRepository", "save", place, 28, 27200)
     t.sql(SQL_ORDER, save, 12, 3100)
     # The N+1: one insert per order line, on the hot path.
     for micros in (4900, 4780, 4760, 4740, 4720):
         t.sql(SQL_LINE, save, 15, micros)
 
     # Everything below here is excluded, so the report rolls the whole subtree into one row.
-    dto = t.call("com.brewhaus.order.OrderDto", "of", place, 29, 310)
+    dto = t.call("com.example.order.OrderDto", "of", place, 29, 310)
     for micros in (52, 36, 34, 34, 34):
-        t.call("com.brewhaus.order.OrderLineDto", "of", dto, 13, micros)
+        t.call("com.example.order.OrderLineDto", "of", dto, 13, micros)
 
     return t.calls
 
@@ -450,15 +450,15 @@ def data_uri(path):
 
 def main():
     model = {
-        "target": "com.brewhaus.order.OrderController#placeOrder",
+        "target": "com.example.order.OrderController#placeOrder",
         "startedAtIso": "2026-07-31T09:24:18.221Z",
         "durationMs": 48,
         "projectName": PROJECT,
         "files": build_files(),
         "calls": build_calls(),
         "callsTruncated": False,
-        "agentVersion": "1.3.0",
-        "pluginVersion": "1.3.0",
+        "agentVersion": "2.0.1",
+        "pluginVersion": "2.0.1",
         "excludedClasses": EXCLUDED,
         # The demo ships the full document so every feature is visible; the plugin's
         # Export dialog offers an "Essential" variant that omits this source.
