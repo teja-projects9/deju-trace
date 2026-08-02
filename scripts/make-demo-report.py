@@ -457,8 +457,8 @@ def main():
         "files": build_files(),
         "calls": build_calls(),
         "callsTruncated": False,
-        "agentVersion": "2.0.1",
-        "pluginVersion": "2.0.1",
+        "agentVersion": "2.0.2",
+        "pluginVersion": "2.0.2",
         "excludedClasses": EXCLUDED,
         # The demo ships the full document so every feature is visible; the plugin's
         # Export dialog offers an "Essential" variant that omits this source.

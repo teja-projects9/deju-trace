@@ -85,9 +85,12 @@ tasks.named<ShadowJar>("shadowJar") {
     }
 }
 
-// `./gradlew :agent:build` should produce the runnable fat agent jar.
+// `./gradlew :agent:build` should produce the runnable fat agent jar, and the
+// version-stamped copy of it that a release is published from. Both, on an ordinary
+// build: an asset that only appears when someone remembers an extra task is an asset that
+// is missing from the release nobody checked.
 tasks.named("build") {
-    dependsOn("shadowJar")
+    dependsOn("shadowJar", "releaseAgentJar")
 }
 
 /**
