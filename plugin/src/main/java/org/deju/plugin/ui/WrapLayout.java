@@ -23,22 +23,74 @@ import javax.swing.SwingUtilities;
  */
 public final class WrapLayout extends FlowLayout {
 
+    /**
+     * Width the last measurement was taken against, so {@link #layoutContainer} can tell when
+     * the height it already handed to its parent was computed for a different width.
+     */
+    private int measuredWidth = -1;
+
     public WrapLayout(int align, int hgap, int vgap) {
         super(align, hgap, vgap);
     }
 
     @Override
     public Dimension preferredLayoutSize(Container target) {
+        measuredWidth = availableWidth(target);
         return layoutSize(target, true);
     }
 
+    /**
+     * The narrowest this row can ever be: its widest single child, because everything else
+     * can wrap onto a line of its own.
+     *
+     * <p>Measuring against the container's <em>current</em> width instead, as this used to,
+     * makes the answer depend on the width it is meant to help decide, and a scroll pane
+     * asking "can this fit?" gets back whatever it happens to be showing right now.
+     */
     @Override
     public Dimension minimumLayoutSize(Container target) {
-        Dimension minimum = layoutSize(target, false);
-        // Signals to the scroll pane that this panel can be made narrower, which is what
-        // stops it from forcing a horizontal scrollbar.
-        minimum.width -= (getHgap() + 1);
-        return minimum;
+        synchronized (target.getTreeLock()) {
+            Insets insets = target.getInsets();
+            int widest = 0;
+            int stacked = 0;
+            for (int i = 0; i < target.getComponentCount(); i++) {
+                java.awt.Component c = target.getComponent(i);
+                if (!c.isVisible()) {
+                    continue;
+                }
+                Dimension d = c.getMinimumSize();
+                widest = Math.max(widest, d.width);
+                stacked += d.height + getVgap();
+            }
+            return new Dimension(widest + insets.left + insets.right + getHgap() * 2,
+                    stacked + insets.top + insets.bottom + getVgap());
+        }
+    }
+
+    /**
+     * Re-measures once the container is given a width different from the one its reported
+     * height was computed for.
+     *
+     * <p>{@link Container} caches its preferred size while it is valid and {@code BoxLayout}
+     * caches its size requirements, so a height measured before the real width arrived
+     * survives until something invalidates it. Until this existed, only dragging the tool
+     * window's edge did, which is why the panel opened with rows stretched far taller than
+     * their contents and snapped straight on the first resize.
+     */
+    @Override
+    public void layoutContainer(Container target) {
+        super.layoutContainer(target);
+        int width = target.getWidth();
+        if (width > 0 && width != measuredWidth) {
+            measuredWidth = width;
+            // Posted rather than run here: invalidating a container in the middle of laying
+            // it out re-enters the very pass we are inside. The width-changed guard is what
+            // stops this from cycling.
+            SwingUtilities.invokeLater(() -> {
+                target.invalidate();
+                target.revalidate();
+            });
+        }
     }
 
     private Dimension layoutSize(Container target, boolean preferred) {
@@ -85,17 +137,20 @@ public final class WrapLayout extends FlowLayout {
         }
     }
 
-    /** Width to wrap against: the container's own, or its scroll viewport's once realised. */
+    /** Width to wrap against: the container's own, or the nearest ancestor's once realised. */
     private static int availableWidth(Container target) {
-        Container parent = target.getParent();
         int width = target.getWidth();
-        if (width == 0 && parent != null) {
-            width = parent.getWidth();
+        // Zero means "not laid out yet". Negative means an ancestor has already subtracted
+        // its insets from a width it does not have either, which is what a BorderLayout with
+        // a border does on the very first pass. Neither is a width to wrap against, and
+        // letting a negative one through wraps every child onto a line of its own.
+        for (Container p = target.getParent(); width <= 0 && p != null; p = p.getParent()) {
+            width = p.getWidth();
         }
         // Before the first layout pass nothing has a width yet; Integer.MAX_VALUE makes the
         // first measurement behave exactly like plain FlowLayout, and the next pass, once
         // real widths exist, wraps properly.
-        return width == 0 ? Integer.MAX_VALUE : width;
+        return width <= 0 ? Integer.MAX_VALUE : width;
     }
 
     private void addRow(Dimension size, int rowWidth, int rowHeight) {

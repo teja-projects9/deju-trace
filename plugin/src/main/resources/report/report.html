@@ -38,7 +38,7 @@ __STYLES__
   <div class="seg" id="tabSeg" role="tablist">
     <button class="segbtn on" id="tabTrace" type="button" role="tab" title="Line coverage and the call tree">Code Trace</button>
     <button class="segbtn" id="tabGraph" type="button" role="tab" title="Where the time went, per file">Graph</button>
-    <button class="segbtn" id="tabFlow" type="button" role="tab" title="The call flow from start to end">Flow Chart</button>
+    <button class="segbtn" id="tabFlow" type="button" role="tab" title="The call flow from start to end">Flow Graph</button>
   </div>
 
   <!-- display:contents, so these stay direct flex children of the toolbar and the
@@ -137,7 +137,7 @@ Press Enter to apply, Esc to cancel.">
 
   <span class="ctlgroup" id="flowControls" hidden>
     <button class="toggle on" id="flowSqlBtn" type="button" title="Show or hide SQL steps">SQL</button>
-    <button class="toggle on" id="flowGroupBtn" type="button"
+    <button class="toggle" id="flowGroupBtn" type="button"
             title="Fold a run of identical sibling calls into one box marked with its count">Group repeats</button>
     <button class="toggle" id="flowHotBtn" type="button"
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
@@ -184,7 +184,7 @@ Press Enter to apply, Esc to cancel.">
 <section id="flowPanel" hidden>
   <p class="panelnote" id="flowNote"></p>
   <div class="flowcrumb" id="flowCrumb" hidden></div>
-  <div class="flowwrap" id="flowWrap"><canvas id="flowCanvas"></canvas></div>
+  <div class="flowwrap" id="flowWrap"></div>
   <div class="flowtip" id="flowTip" hidden></div>
   <div class="empty" id="flowEmpty" hidden>This run recorded no call tree.</div>
 </section>
@@ -215,7 +215,7 @@ Press Enter to apply, Esc to cancel.">
     totals would count the same microseconds once per stack frame. Turning <b>Include
     SQL</b> off leaves only your own code, which is what you want when the question is
     which method to optimise rather than which query.</p>
-    <h3>Flow Chart</h3>
+    <h3>Flow Graph</h3>
     <p>The call tree drawn start to end, top to bottom in execution order, indented by
     depth. Each box is one invocation; the bar inside it is that call's total time relative
     to the whole run. Hover for the full signature and timing. It is the same data as the

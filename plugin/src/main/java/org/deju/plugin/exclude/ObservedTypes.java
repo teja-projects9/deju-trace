@@ -13,6 +13,8 @@ import org.deju.plugin.contract.DejuPayload;
 import org.deju.plugin.contract.FileCoverage;
 import org.deju.plugin.contract.LineCoverage;
 import org.deju.plugin.history.DejuHistoryStore;
+import org.deju.plugin.history.ExecutionEntry;
+import org.deju.plugin.paint.PaintPlan;
 
 /**
  * The classes seen in this project's stored recordings, with enough shape information for
@@ -27,6 +29,9 @@ import org.deju.plugin.history.DejuHistoryStore;
  */
 public final class ObservedTypes {
 
+    /** A class that did not appear in the most recent run, so it has no position in it. */
+    public static final int NO_ORDER = 0;
+
     /** One class, as observed across the stored runs. */
     public static final class Type {
         public final String fqName;
@@ -35,12 +40,23 @@ public final class ObservedTypes {
         public final boolean everCalls;
         /** True when every recorded method on this class looks like an accessor. */
         public final boolean onlyAccessors;
+        /**
+         * 1-based position in the most recent run's execution order, or {@link #NO_ORDER}.
+         *
+         * <p>Scoped to one run because execution order is a property of a run, not of a
+         * class: the same DTO can be 3rd in one request and 7th in another. The most recent
+         * is the one whose editor tabs the user was last looking at, which is what makes the
+         * number worth cross-referencing.
+         */
+        public final int executionOrder;
 
-        Type(String fqName, int invocations, boolean everCalls, boolean onlyAccessors) {
+        Type(String fqName, int invocations, boolean everCalls, boolean onlyAccessors,
+             int executionOrder) {
             this.fqName = fqName;
             this.invocations = invocations;
             this.everCalls = everCalls;
             this.onlyAccessors = onlyAccessors;
+            this.executionOrder = executionOrder;
         }
 
         /**
@@ -60,7 +76,14 @@ public final class ObservedTypes {
     private ObservedTypes() {
     }
 
-    /** Reads every stored run and summarises the classes in them, busiest first. */
+    /**
+     * Reads every stored run and summarises the classes in them.
+     *
+     * <p>Ordered the way the most recent run executed, so the dialog reads top-to-bottom like
+     * the report and the editor tabs do. Classes that run never touched keep the old
+     * busiest-first ranking and sort after it, rather than being scattered through an order
+     * they took no part in.
+     */
     public static List<Type> scan(Project project) {
         Map<String, int[]> invocations = new LinkedHashMap<>();   // fq -> {count, everCalls}
         Map<String, boolean[]> accessorOnly = new LinkedHashMap<>(); // fq -> {seenMethod, allAccessors}
@@ -74,6 +97,7 @@ public final class ObservedTypes {
             collectCalls(payload, invocations);
             collectMethods(payload, accessorOnly);
         }
+        Map<String, Integer> order = executionOrderOfLatestRun(store);
 
         // Union of both sources: a run recorded by an agent too old to send a call tree has
         // covered files and no calls[], and those classes must still be offered.
@@ -94,10 +118,39 @@ public final class ObservedTypes {
             out.add(new Type(fq,
                     calls == null ? 0 : calls[0],
                     calls != null && calls[1] == 1,
-                    onlyAccessors));
+                    onlyAccessors,
+                    order.getOrDefault(fq, NO_ORDER)));
         }
-        out.sort(Comparator.comparingInt((Type t) -> -t.invocations).thenComparing(t -> t.fqName));
+        // Numbered rows first and in order; everything else keeps the busiest-first ranking
+        // it had before, behind them.
+        out.sort(Comparator.comparingInt((Type t) -> t.executionOrder == NO_ORDER ? 1 : 0)
+                .thenComparingInt(t -> t.executionOrder == NO_ORDER ? 0 : t.executionOrder)
+                .thenComparingInt(t -> -t.invocations)
+                .thenComparing(t -> t.fqName));
         return out;
+    }
+
+    /**
+     * Maps each class in the most recent run to its 1-based execution position.
+     *
+     * <p>Empty when there is no stored run, which leaves every row unnumbered and the list
+     * ranked busiest-first exactly as it was before.
+     */
+    private static Map<String, Integer> executionOrderOfLatestRun(DejuHistoryStore store) {
+        List<ExecutionEntry> entries = store.entries();
+        if (entries.isEmpty()) {
+            return Map.of();
+        }
+        // entries() is most-recent-first.
+        DejuPayload latest = store.load(entries.get(0).slot);
+        if (latest == null) {
+            return Map.of();
+        }
+        Map<String, Integer> order = new LinkedHashMap<>();
+        for (String fq : PaintPlan.classNamesInExecutionOrder(latest)) {
+            order.putIfAbsent(fq, order.size() + 1);
+        }
+        return order;
     }
 
     private static void collectCalls(DejuPayload payload, Map<String, int[]> invocations) {

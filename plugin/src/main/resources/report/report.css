@@ -121,6 +121,10 @@ h1{font-size:1.05rem;margin:0;}
 .toggle:hover{background:var(--control-hover);border-color:var(--border);}
 .toggle:active{transform:translateY(.5px);}
 .toggle.on{border-color:var(--accent);background:var(--heat);}
+/* Present but inert: the control still belongs on the toolbar, there is just nothing for
+   it to act on right now. Muted rather than removed, so it does not read as a glitch. */
+.toggle:disabled{opacity:.45;cursor:default;}
+.toggle:disabled:hover{background:var(--control);border-color:var(--hairline);}
 
 /* ------------------------------------------------------------------ files --- */
 /* No overflow on .file: an overflow value here would make it the nearest scroll
@@ -407,7 +411,11 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 
 .flowwrap{position:relative;overflow:auto;max-height:78vh;border:1px solid var(--hairline);
   border-radius:var(--radius);background:var(--panel);}
-#flowCanvas{display:block;}
+/* The spacer carries the full diagram's size so the scrollbar is honest, while the canvas
+   itself is only ever as big as the visible area and is re-pinned to it on every scroll.
+   A canvas the height of the whole trace stops being drawable past 65535px. */
+#flowSpacer{position:relative;}
+#flowCanvas{display:block;position:absolute;top:0;left:0;}
 .flowtip{position:fixed;z-index:20;pointer-events:none;max-width:32rem;
   background:var(--control);color:var(--fg);border:1px solid var(--border);
   border-radius:var(--radius-sm);box-shadow:var(--elev);padding:.45rem .6rem;

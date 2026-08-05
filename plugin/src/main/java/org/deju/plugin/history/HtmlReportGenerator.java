@@ -224,21 +224,72 @@ public final class HtmlReportGenerator {
      * per node; the source file name and the lines themselves are looked up by class name
      * against the {@code files} array, so nothing is duplicated per invocation.
      */
-    private static List<Map<String, Object>> callModel(DejuPayload payload) {
-        List<Map<String, Object>> calls = new ArrayList<>();
-        for (CallNode node : payload.getCalls()) {
-            Map<String, Object> callModel = new LinkedHashMap<>();
-            callModel.put("seq", node.getSeq());
-            callModel.put("parentSeq", node.getParentSeq());
-            callModel.put("className", node.getClassName());
-            callModel.put("methodName", node.getMethodName());
-            callModel.put("callSiteLine", node.getCallSiteLine());
-            callModel.put("totalMicros", node.getTotalMicros());
+    /**
+     * The call list, column by column, with the repeated strings pulled into tables.
+     *
+     * <p>One object per call spends its bytes on the same words over and over: the key names
+     * are re-spelled for every entry, and a class name is re-spelled for every invocation of
+     * it. A 200,000-call run is around 30 MB written that way, and only a few hundred
+     * distinct class names and statements are in it. Columns remove the repeated keys and the
+     * tables remove the repeated strings; the same run comes out near 4 MB, with nothing
+     * dropped, which is the difference between a report you can send someone and one you
+     * cannot.
+     *
+     * <p>{@code seq} is not stored. It is the position in the columns, and the reader
+     * restores it from there.
+     */
+    private static Map<String, Object> callModel(DejuPayload payload) {
+        List<CallNode> nodes = payload.getCalls();
+        List<String> classes = new ArrayList<>();
+        List<String> methods = new ArrayList<>();
+        List<String> statements = new ArrayList<>();
+        Map<String, Integer> classIx = new LinkedHashMap<>();
+        Map<String, Integer> methodIx = new LinkedHashMap<>();
+        Map<String, Integer> sqlIx = new LinkedHashMap<>();
+
+        List<Integer> parent = new ArrayList<>(nodes.size());
+        List<Integer> cls = new ArrayList<>(nodes.size());
+        List<Integer> mth = new ArrayList<>(nodes.size());
+        List<Integer> sql = new ArrayList<>(nodes.size());
+        List<Object> site = new ArrayList<>(nodes.size());
+        List<Object> total = new ArrayList<>(nodes.size());
+
+        for (CallNode node : nodes) {
+            parent.add(node.getParentSeq());
+            cls.add(intern(node.getClassName(), classIx, classes));
+            mth.add(intern(node.getMethodName(), methodIx, methods));
             // Present only on query nodes; the report uses it to tell a query from a call.
-            callModel.put("sql", node.getSql());
-            calls.add(callModel);
+            sql.add(intern(node.getSql(), sqlIx, statements));
+            site.add(node.getCallSiteLine());
+            total.add(node.getTotalMicros());
         }
-        return calls;
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("n", nodes.size());
+        out.put("classTable", classes);
+        out.put("methodTable", methods);
+        out.put("sqlTable", statements);
+        out.put("parentSeq", parent);
+        out.put("className", cls);
+        out.put("methodName", mth);
+        out.put("sql", sql);
+        out.put("callSiteLine", site);
+        out.put("totalMicros", total);
+        return out;
+    }
+
+    /** Index of {@code value} in its table, adding it if new. {@code -1} stands for absent. */
+    private static int intern(String value, Map<String, Integer> index, List<String> table) {
+        if (value == null) {
+            return -1;
+        }
+        Integer at = index.get(value);
+        if (at != null) {
+            return at;
+        }
+        index.put(value, table.size());
+        table.add(value);
+        return table.size() - 1;
     }
 
     @Nullable

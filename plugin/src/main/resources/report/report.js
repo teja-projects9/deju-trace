@@ -19,7 +19,42 @@
 
   var data = JSON.parse(document.getElementById('deju-data').textContent);
   var files = data.files || [];
-  var calls = data.calls || [];
+  var calls = expandCalls(data.calls);
+
+  /**
+   * Restores the call list from the column-and-table form the exporter writes.
+   *
+   * <p>The wire form spends no bytes repeating key names or class names; this turns it back
+   * into the plain objects the rest of the report reads, so nothing below has to know which
+   * form the file was written in. {@code seq} comes from the position, which is why the
+   * exporter does not store it.
+   *
+   * <p>An array is passed straight through: reports exported before this encoding existed
+   * still carry one, and they have to keep opening.
+   */
+  function expandCalls(src) {
+    if (!src) return [];
+    if (Object.prototype.toString.call(src) === '[object Array]') return src;
+    var out = new Array(src.n);
+    var ct = src.classTable || [];
+    var mt = src.methodTable || [];
+    var qt = src.sqlTable || [];
+    for (var i = 0; i < src.n; i++) {
+      var ci = src.className[i];
+      var mi = src.methodName[i];
+      var qi = src.sql[i];
+      out[i] = {
+        seq: i,
+        parentSeq: src.parentSeq[i],
+        className: ci < 0 ? null : ct[ci],
+        methodName: mi < 0 ? null : mt[mi],
+        callSiteLine: src.callSiteLine[i],
+        totalMicros: src.totalMicros[i],
+        sql: qi < 0 ? null : qt[qi]
+      };
+    }
+    return out;
+  }
 
   // Classes the project excludes, already resolved from globs to concrete names by the
   // plugin at export time, so this is a plain set lookup, with no second glob engine
@@ -40,11 +75,15 @@
   var sqlOn = true;
   /* Same reason as sqlOn: applyTreeFilters reads it long before its button is wired. */
   var rollupOn = true;
+  var rollupAvailable = 0;   // roll-up rows the current filters leave on screen
 
   var AUTO_COLLAPSE_ABOVE = 15;   // file count past which the Files view starts collapsed
   var AUTO_EXPAND_TOP = 5;        // slowest N left open in that case
   var FOLD_RUN_AFTER = 3;         // identical consecutive sibling calls shown before folding
-  var MAX_TREE_ROWS = 20000;      // ceiling on rendered tree rows
+  // Rows are virtualised now, so this is a guard on how much the tree walk will build,
+  // not on what gets laid out. It sits above the agent's own 200k call ceiling so an
+  // ordinary run is never truncated by the viewer.
+  var MAX_TREE_ROWS = 400000;
 
   // ---------------------------------------------------------------- helpers ---
 
@@ -512,7 +551,9 @@
       if (current) current.rows.push(rec);
     });
 
-    scroll.appendChild(table);
+    // The table is left detached until the file is near the viewport. Building it costs
+    // little; laying out every line of every file the moment the Files view opens is what
+    // used to cost, and a run touching a few hundred files never has them all on screen.
     box.appendChild(scroll);
     root.appendChild(box);
 
@@ -572,6 +613,7 @@
       // Fall back to payload position when there is no call tree to order by.
       order: firstSeq === undefined ? 1e9 + idx : firstSeq,
       payloadIdx: idx, caret: caret, generated: generated,
+      table: table, scroll: scroll, attached: false,
       name: displayName, lower: displayName.toLowerCase(),
       path: f.absPath || f.path || null
     };
@@ -585,6 +627,59 @@
   });
 
   ordered = entries.slice();
+
+  /**
+   * Puts a file's rows into the document the first time they are wanted.
+   *
+   * <p>Everything the filters and counts read lives on the row objects, which are built up
+   * front and are cheap; only the layout is deferred, so a file that is never scrolled to
+   * is never laid out.
+   */
+  function attachEntry(e) {
+    if (e.attached) return;
+    e.attached = true;
+    e.scroll.appendChild(e.table);
+  }
+
+  /**
+   * Attaches every file whose header is within reach of the viewport.
+   *
+   * <p>Driven from the view switch, the filters and scrolling rather than from an
+   * IntersectionObserver: the observer reports asynchronously, and a file that has not been
+   * told to attach yet shows an empty section, so what the reader sees would depend on
+   * whether a callback had run. This runs before the frame is shown, every time.
+   *
+   * <p>Rects are read for all candidates before any of them is attached. Attaching moves
+   * everything below it, so measuring and mutating in one pass would force a layout per
+   * file, which is the cost this exists to avoid.
+   */
+  function attachVisibleFiles() {
+    if (view !== 'files') return;
+    var reach = (window.innerHeight || 800) + 800;
+    var pending = [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e.attached || e.box.hidden) continue;
+      var r = e.box.getBoundingClientRect();
+      // Attaching pushes later files down, so anything already past the reach stays for a
+      // later pass; scrolling towards it is what brings it in.
+      if (r.top < reach) pending.push(e);
+      else break;
+    }
+    pending.forEach(attachEntry);
+    // Each file attached pushes the next ones down, so one pass only reaches the first
+    // screenful. Asking for another frame lets it settle without blocking this one.
+    if (pending.length) queueAttach();
+  }
+
+  var attachQueued = false;
+  function queueAttach() {
+    if (attachQueued) return;
+    attachQueued = true;
+    requestAnimationFrame(function () { attachQueued = false; attachVisibleFiles(); });
+  }
+  window.addEventListener('scroll', queueAttach, { passive: true });
+  window.addEventListener('resize', queueAttach);
 
   // --------------------------------------------------------- tree view build ---
 
@@ -732,6 +827,8 @@
     var lines = linesByMethod[node.className + '#' + node.methodName] || [];
     var foldable = kids.length > 0 || lines.length > 0;
 
+    var r = { kind: 'frame', depth: depth, node: node, tr: null, parent: parentRow, vis: true };
+    r.build = function () {
     var tr = el('tr', 'frame' + (hotOn && hotSeqs[node.seq] ? ' hot' : ''));
     var td = el('td', 'tframe');
     td.colSpan = 3;
@@ -779,11 +876,21 @@
         refreshTree();
       });
     }
-    return { kind: 'frame', depth: depth, node: node, tr: tr, parent: parentRow, vis: true };
+    return tr;
+    };
+    return r;
   }
 
   function codeRow(lineModel, file, depth, parentRow) {
     var st = lineModel.status || 'NONE';
+    var text0 = lineModel.code != null ? lineModel.code : '';
+    // Everything the filters read is computed now; only the row's DOM waits until the row
+    // is actually near the viewport.
+    var r = {
+      kind: 'line', depth: depth, tr: null, parent: parentRow, status: st,
+      text: text0.toLowerCase(), line: lineModel.line, file: file, vis: true
+    };
+    r.build = function () {
     var tr = el('tr', st);
     var tm = el('td', 'time');
     if (lineModel.timeMicros != null) {
@@ -801,16 +908,19 @@
     tr.appendChild(tm);
     tr.appendChild(lineCell(file, lineModel.line));
     tr.appendChild(code);
-    return {
-      kind: 'line', depth: depth, tr: tr, parent: parentRow, status: st,
-      text: text.toLowerCase(), line: lineModel.line, file: file, vis: true
+    return tr;
     };
+    return r;
   }
 
   function foldRow(nodes, depth, parentRow, foldId) {
     var first = nodes[0];
     var total = 0;
     nodes.forEach(function (n) { total += (n.totalMicros || 0); });
+    // A folded run of identical queries is still SQL, so it hides with the rest.
+    var r = { kind: 'fold', sql: first.sql != null, depth: depth, tr: null,
+      parent: parentRow, vis: true };
+    r.build = function () {
     var tr = el('tr', 'fold');
     var td = el('td', 'tframe');
     td.colSpan = 3;
@@ -836,9 +946,9 @@
       expandedFolds[foldId] = true;
       refreshTree();
     });
-    // A folded run of identical queries is still SQL, so it hides with the rest.
-    return { kind: 'fold', sql: first.sql != null, depth: depth, tr: tr,
-      parent: parentRow, vis: true };
+    return tr;
+    };
+    return r;
   }
 
   /**
@@ -872,6 +982,8 @@
     }
     var shownNames = names.slice(0, 3).join(', ') + (names.length > 3 ? ', +' + (names.length - 3) : '');
 
+    var r = { kind: 'fold', rollup: true, depth: depth, tr: null, parent: parentRow, vis: true };
+    r.build = function () {
     var tr = el('tr', 'fold rollup');
     var td = el('td', 'tframe');
     td.colSpan = 3;
@@ -897,7 +1009,9 @@
       // than one that plainly is not.
       tr.style.cursor = 'default';
     }
-    return { kind: 'fold', rollup: true, depth: depth, tr: tr, parent: parentRow, vis: true };
+    return tr;
+    };
+    return r;
   }
 
   /**
@@ -1001,9 +1115,99 @@
     var timeOk = currentTimeFilter();
     roots.forEach(function (r) { emitFrame(r, 0, null, honourCollapse, timeOk); });
 
+  }
+
+  /** The row's element, built the first time it is actually needed and kept after that. */
+  function rowEl(r) {
+    if (!r.tr) r.tr = r.build();
+    return r.tr;
+  }
+
+  // ------------------------------------------------------- virtual tree rows ---
+
+  /**
+   * Renders only the rows near the viewport.
+   *
+   * <p>A recording of any size used to become that many table rows, each with a dozen
+   * elements under it, and the browser was asked to lay all of them out before the report
+   * would show anything. Twenty thousand rows took the better part of a minute. Now the
+   * table holds a screenful plus a margin, and two spacer rows stand in for the height of
+   * everything above and below, so the scrollbar still describes the whole run.
+   *
+   * <p>Row heights are not uniform, a query occupies its clause lines, so measured heights
+   * replace the estimate as rows are rendered and the offsets are recomputed from those.
+   */
+  var TREE_ROW_EST = 21;         // starting guess, replaced by measurement
+  var TREE_OVERSCAN = 12;        // rows rendered beyond each edge, so scrolling is not bare
+  var visRows = [];              // rows passing the filters, in order
+  var rowHeights = [];           // measured height per visRows index, 0 until seen
+  var rowOffsets = null;         // running sum of heights; rowOffsets[i] is the top of row i
+  var treeWrapEl = null;
+  var padTop = null;
+  var padBot = null;
+
+  function ensurePads() {
+    if (padTop) return;
+    treeWrapEl = treeTable.parentNode;
+    padTop = el('tr', 'vpad');
+    padBot = el('tr', 'vpad');
+    padTop.appendChild(el('td'));
+    padBot.appendChild(el('td'));
+    padTop.firstChild.colSpan = 3;
+    padBot.firstChild.colSpan = 3;
+    treeWrapEl.addEventListener('scroll', renderTreeWindow);
+  }
+
+  function rebuildOffsets() {
+    var n = visRows.length;
+    rowOffsets = new Float64Array(n + 1);
+    for (var i = 0; i < n; i++) {
+      rowOffsets[i + 1] = rowOffsets[i] + (rowHeights[i] || TREE_ROW_EST);
+    }
+  }
+
+  /** First row whose bottom is past {@code y}. */
+  function rowAt(y) {
+    var lo = 0;
+    var hi = visRows.length;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (rowOffsets[mid + 1] <= y) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  function renderTreeWindow() {
+    if (!padTop) return;
+    var n = visRows.length;
+    var top = treeWrapEl.scrollTop;
+    var h = treeWrapEl.clientHeight || 600;
+    var from = Math.max(0, rowAt(top) - TREE_OVERSCAN);
+    var to = Math.min(n, rowAt(top + h) + 1 + TREE_OVERSCAN);
+
     var frag = document.createDocumentFragment();
-    treeRows.forEach(function (r) { frag.appendChild(r.tr); });
+    frag.appendChild(padTop);
+    for (var i = from; i < to; i++) frag.appendChild(rowEl(visRows[i]));
+    frag.appendChild(padBot);
+    padTop.firstChild.style.height = rowOffsets[from] + 'px';
+    padBot.firstChild.style.height = Math.max(0, rowOffsets[n] - rowOffsets[to]) + 'px';
+    treeTable.textContent = '';
     treeTable.appendChild(frag);
+
+    // Measure what was just laid out. Heights only ever become more accurate, so a change
+    // means the rows below have moved and the offsets have to be redone; doing it once
+    // after the pass rather than per row keeps this to a single extra reflow.
+    var changed = false;
+    for (var k = from; k < to; k++) {
+      var hh = visRows[k].tr.offsetHeight;
+      if (hh && rowHeights[k] !== hh) { rowHeights[k] = hh; changed = true; }
+    }
+    if (changed) {
+      rebuildOffsets();
+      padTop.firstChild.style.height = rowOffsets[from] + 'px';
+      padBot.firstChild.style.height = Math.max(0, rowOffsets[n] - rowOffsets[to]) + 'px';
+    }
     syncSqlClamps();
   }
 
@@ -1029,8 +1233,10 @@
     var q = searchEl.value.trim().toLowerCase();
     var active = filtering();
     var shownLines = 0, shownFrames = 0;
+    var rollupTotal = 0;
 
     treeRows.forEach(function (r) {
+      if (r.rollup) rollupTotal++;
       if ((r.sql && !sqlOn) || (r.rollup && !rollupOn)) {
         r.vis = false;   // hidden outright, and never revived by parent propagation
       } else if (r.kind === 'line') {
@@ -1048,12 +1254,28 @@
         }
       });
     }
+    // The visible rows become a list rather than a display flag on every row: the window
+    // below indexes into it, and rows that never come near the viewport cost one array
+    // slot instead of a table row nobody will look at.
+    visRows = [];
+    rowHeights = [];
     treeRows.forEach(function (r) {
-      r.tr.style.display = r.vis ? '' : 'none';
       if (!r.vis) return;
+      r.vi = visRows.length;
+      visRows.push(r);
+      rowHeights.push(r.tr ? r.tr.offsetHeight : 0);
       if (r.kind === 'line') shownLines++;
       else if (r.kind === 'frame') shownFrames++;
     });
+    // A filter hides every fold row, so there is nothing for the toggle to act on then.
+    // Deciding from the rows themselves is what keeps the control honest: it used to be
+    // derived from why roll-ups might exist, and was wrong in both directions.
+    rollupAvailable = active ? 0 : rollupTotal;
+    syncRollupBtn();
+    ensurePads();
+    rebuildOffsets();
+    treeWrapEl.scrollTop = 0;
+    renderTreeWindow();
 
     // Counted in calls, not lines: a method invoked twice renders its lines twice, so
     // "x of totalLines" would be meaningless here.
@@ -1061,7 +1283,7 @@
       + ' call(s) · ' + shownLines + ' line(s)'
       + (hiddenFrameCount ? ' · ' + hiddenFrameCount + ' folded into excluded types' : '');
     treeEmpty.hidden = shownFrames !== 0 || shownLines !== 0;
-    if (cursor && (cursor.tr.style.display === 'none' || !cursor.tr.isConnected)) clearCursor();
+    if (cursor && !cursor.vis) clearCursor();
   }
 
   function refreshTree() {
@@ -1102,6 +1324,7 @@
       e.box.hidden = !anyVisible;
       if (anyVisible) shownFiles++;
     });
+    attachVisibleFiles();
     countEl.textContent = 'Showing ' + shownLines + ' of ' + totalLines
       + ' line(s) · ' + shownFiles + ' file(s)';
     emptyEl.hidden = shownLines !== 0 && shownFiles !== 0;
@@ -1110,6 +1333,10 @@
 
   function applyFilters() {
     if (view === 'tree') refreshTree(); else applyFileFilters();
+    // The Flow Graph reads the same file selection, so it has to follow it too. Only once
+    // it exists: before the tab is first opened there is nothing to redraw, which is the
+    // point of building it lazily.
+    if (flowBuilt) drawFlow();
   }
 
   searchEl.addEventListener('input', applyFilters);
@@ -1181,7 +1408,13 @@
     var canFold = hasExclusions && !excludedOmitted;
     detailSeg.hidden = !tree || !canFold;
     // Roll-up rows only exist in Essential, so the control that hides them does too.
-    rollupBtn.hidden = !tree || !canFold || detailFull;
+    //
+    // Deliberately NOT tied to canFold. An export that omitted excluded source cannot offer
+    // Full, because there would be nothing to expand into, but it still draws the roll-up
+    // rows, and hiding their control along with the detail switch left those rows on screen
+    // with no way to turn them off.
+    rollupBtn.hidden = !tree || !hasExclusions || detailFull;
+    syncRollupBtn();
     // Derived from the select rather than tracked separately: every path that leaves the
     // custom entry already puts the select back to a real value.
     var custom = tree && minTime.value === 'custom';
@@ -1474,15 +1707,31 @@
      already accepted that the excluded types are not interesting. */
   var rollupBtn = document.getElementById('rollupBtn');
 
+  /**
+   * Puts the button in the state the tree is actually in.
+   *
+   * <p>Greyed rather than hidden when a filter has taken the roll-up rows away: a control
+   * that disappears while you type reads as a glitch, and one that stays lit while doing
+   * nothing reads as broken. This says plainly that there is nothing to act on.
+   */
+  function syncRollupBtn() {
+    if (!rollupBtn) return;      // called once during setup, before the lookup below runs
+    rollupBtn.classList.toggle('on', rollupOn);
+    rollupBtn.disabled = rollupAvailable === 0;
+    rollupBtn.title = rollupAvailable === 0
+      ? 'No "N excluded calls" rows to hide while a filter is narrowing the tree'
+      : (rollupOn ? 'Hide the "N excluded calls" summary rows'
+                  : 'Show the "N excluded calls" summary rows again');
+  }
+
   function setRollups(on) {
     rollupOn = on;
-    rollupBtn.classList.toggle('on', on);
-    rollupBtn.title = on
-      ? 'Hide the "N excluded calls" summary rows'
-      : 'Show the "N excluded calls" summary rows again';
-    applyTreeFilters();
+    applyTreeFilters();      // recounts, then repaints the button through syncRollupBtn
   }
-  rollupBtn.addEventListener('click', function () { setRollups(!rollupOn); });
+  rollupBtn.addEventListener('click', function () {
+    if (rollupAvailable === 0) return;
+    setRollups(!rollupOn);
+  });
 
   // --------------------------------------------------------------- generated ---
 
@@ -1567,13 +1816,24 @@
   var fileIdx = -1;
 
   function clearCursor() {
-    if (cursor) cursor.tr.classList.remove('cursor');
+    if (cursor && cursor.tr) cursor.tr.classList.remove('cursor');
     cursor = null;
   }
 
   function setCursor(rec) {
     clearCursor();
     cursor = rec;
+    // A tree row outside the window has no element yet, so the list is scrolled to it
+    // first and the row exists by the time there is something to mark.
+    if (view === 'tree' && rec.vi != null && rowOffsets) {
+      var mid = rowOffsets[rec.vi] - (treeWrapEl.clientHeight || 600) / 2;
+      treeWrapEl.scrollTop = Math.max(0, mid);
+      renderTreeWindow();
+      if (!rec.tr) return;
+      rec.tr.classList.add('cursor');
+      return;
+    }
+    if (rec.entry) attachEntry(rec.entry);
     rec.tr.classList.add('cursor');
     rec.tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
@@ -1668,7 +1928,7 @@
       case '?': e.preventDefault(); help.hidden = false; break;
       case 'o': {
         e.preventDefault();
-        var link = cursor && cursor.tr.querySelector('td.ln a');
+        var link = cursor && cursor.tr && cursor.tr.querySelector('td.ln a');
         if (link) link.click();
         break;
       }
@@ -2026,7 +2286,7 @@
     renderGraph();
   });
 
-  // ------------------------------------------------------------ flow chart ---
+  // ------------------------------------------------------------ flow graph ---
 
   var FLOW_ROW = 26;           // vertical pitch of one call
   var FLOW_BOX = 20;           // box height inside that pitch
@@ -2045,7 +2305,7 @@
   var ZOOM_STEP = 1.25;
 
   var flowWrap = document.getElementById('flowWrap');
-  var flowCanvas = document.getElementById('flowCanvas');
+  var flowCanvas = null;      // created on first open of the tab, not on load
   var flowEmpty = document.getElementById('flowEmpty');
   var flowNote = document.getElementById('flowNote');
   var flowTip = document.getElementById('flowTip');
@@ -2059,6 +2319,10 @@
   var flowInBtn = document.getElementById('flowInBtn');
   var flowPngBtn = document.getElementById('flowPngBtn');
 
+  var flowSpacer = null;       // sized to the whole diagram; the canvas is not
+  var flowContentW = 0;        // diagram size in its own coordinates, pre-scale
+  var flowContentH = 0;
+  var drawnBySeq = {};         // seq -> drawn node, for connectors to reach an off-screen parent
   var flowNodes = [];          // every call, pre-order, with subtree spans
   var flowBySeq = {};          // seq -> node, for walking back up the zoom trail
   var flowVisible = [];        // what survives the SQL, fold and group filters
@@ -2067,7 +2331,7 @@
   var flameRoot = null;        // seq the flame view is zoomed into, null for the whole run
   var collapsedFlow = {};      // seq -> true, subtree folded away by a click
   var flowSql = true;
-  var flowGroup = true;
+  var flowGroup = false;
   var flowHot = false;
   var flowFlame = false;
   var flowFit = false;
@@ -2115,6 +2379,9 @@
         // Who the box belongs to, which is what its colour is derived from. A query is
         // charged to its caller so a repository and its statements share a hue.
         owner: c.className || (nodeBySeq[c.parentSeq] && nodeBySeq[c.parentSeq].className) || '',
+        // The class as the Files picker knows it, kept raw for the selection test. A query
+        // has none of its own; it lives or dies with the frame that issued it.
+        cname: c.sql ? null : (c.className || null),
         // Identity for "these two frames are the same call made twice".
         key: c.sql ? ('q:' + String(c.sql).replace(/\s+/g, ' ').trim())
           : ('m:' + (c.className || '') + '#' + (c.methodName || '')),
@@ -2148,16 +2415,44 @@
       return Math.max(m, x.totalMicros || 0);
     }, 0);
 
-    var bits = [flowNodes.length + ' steps in execution order'];
-    if (data.callsTruncated) {
-      bits.push('the recording truncated the call list, so the tail is missing');
-    }
-    flowNote.textContent = bits.join(' · ') + '. Click a step to fold its calls away.';
+    // The canvas is made here rather than shipped in the markup. A report that is never
+    // opened on this tab should not carry the element, and one opened on it pays for the
+    // element once; either way the exported file is that much smaller.
+    //
+    // The spacer sits between the two: it is sized to the whole diagram so the scrollbar
+    // describes the real thing, while the canvas stays the size of the visible area.
+    flowSpacer = document.createElement('div');
+    flowSpacer.id = 'flowSpacer';
+    flowCanvas = document.createElement('canvas');
+    flowCanvas.id = 'flowCanvas';
+    flowSpacer.appendChild(flowCanvas);
+    flowWrap.appendChild(flowSpacer);
+    flowWrap.addEventListener('scroll', paintFlow);
 
     flowCanvas.addEventListener('mousemove', onFlowMove);
     flowCanvas.addEventListener('mouseleave', hideFlowTip);
     flowCanvas.addEventListener('click', onFlowClick);
     flowWrap.addEventListener('scroll', hideFlowTip);
+  }
+
+  /**
+   * The line above the diagram, rewritten on every draw.
+   *
+   * It has to be, now that the file picker can remove steps: a count fixed at build time
+   * would keep claiming the whole run while the reader looks at a filtered slice of it, and
+   * a number that disagrees with what is on screen is worse than no number.
+   */
+  function updateFlowNote() {
+    var shown = flowVisible.length;
+    // Deliberately not naming a cause: SQL, grouping, a fold and the file picker can each
+    // take steps out, often at the same time, and guessing which would sometimes be wrong.
+    var bits = [shown === flowNodes.length
+      ? shown + ' steps in execution order'
+      : shown + ' of ' + flowNodes.length + ' steps shown'];
+    if (data.callsTruncated) {
+      bits.push('the recording truncated the call list, so the tail is missing');
+    }
+    flowNote.textContent = bits.join(' · ') + '. Click a step to fold its calls away.';
   }
 
   /** First few words of a statement: enough to tell queries apart in a small box. */
@@ -2169,7 +2464,8 @@
   /**
    * Decides what is on screen: one pass over the pre-order array.
    *
-   * Three things can remove a node. Hiding SQL drops those leaves; a collapsed node keeps
+   * Four things can remove a node. An unticked file takes its frame and everything under
+   * it, exactly as the Tree view does; hiding SQL drops those leaves; a collapsed node keeps
    * itself but skips its subtree; and grouping folds a run of identical siblings into the
    * first of them. Repeats are worth folding because the shape they make, the same call
    * five times over, is exactly the shape of an N+1, and five near-identical boxes say it
@@ -2180,6 +2476,10 @@
     var i = 0;
     while (i < flowNodes.length) {
       var n = flowNodes[i];
+      // Unticking a file hides its calls and everything they went on to do, which is what
+      // the same picker already means in the Tree. Dropping the frame but keeping its
+      // children would leave callees floating under a caller that is no longer drawn.
+      if (n.cname && !classSelected(n.cname)) { i += n.span; continue; }
       if (!flowSql && n.isSql) { i += n.span; continue; }
 
       var reps = 1;
@@ -2351,8 +2651,22 @@
   }
 
   function drawFlow() {
-    if (!treeAvailable || flowNodes.length === 0) return;
+    if (!treeAvailable || flowNodes.length === 0 || !flowCanvas) return;
     flowVisible = computeFlowVisible();
+    updateFlowNote();
+
+    // Filtering can empty the diagram completely, and unticking the entry point alone does
+    // it, since its subtree is the whole run. A blank canvas looks like a broken report, so
+    // say what happened and how to undo it.
+    if (flowVisible.length === 0) {
+      flowEmpty.textContent = 'Every step is filtered out.'
+        + ' Re-tick files in the Files picker, or turn SQL back on.';
+      flowEmpty.hidden = false;
+      flowWrap.hidden = true;
+      return;
+    }
+    flowEmpty.hidden = true;
+    flowWrap.hidden = false;
     flowByDepth = {};
     var maxDepth = 0;
     flowVisible.forEach(function (n) { if (n.depth > maxDepth) maxDepth = n.depth; });
@@ -2410,6 +2724,7 @@
         (flowByDepth[d] || (flowByDepth[d] = [])).push(n);
       });
       flowDrawn = drawn;
+      indexDrawn();
       flameSpan = span;
       flameTotal = total;
       contentW = FLOW_PAD * 2 + span;
@@ -2428,6 +2743,7 @@
         y += n.h + FLOW_GAP;
       });
       flowDrawn = flowVisible;
+      indexDrawn();
       contentW = FLOW_PAD + maxDepth * FLOW_INDENT + flowBoxW + FLOW_PAD;
       contentH = y - FLOW_GAP + FLOW_PAD;
     }
@@ -2437,48 +2753,138 @@
       : (flowFit && contentW > avail ? avail / contentW : flowZoom);
     renderCrumb();
 
-    var dpr = window.devicePixelRatio || 1;
-    var cssW = Math.ceil(contentW * flowScale);
-    var cssH = Math.ceil(contentH * flowScale);
-    flowCanvas.style.width = cssW + 'px';
-    flowCanvas.style.height = cssH + 'px';
-    flowCanvas.width = Math.ceil(cssW * dpr);
-    flowCanvas.height = Math.ceil(cssH * dpr);
-
-    var ctx = flowCanvas.getContext('2d');
-    ctx.setTransform(dpr * flowScale, 0, 0, dpr * flowScale, 0, 0);
-    var c = flowColors();
-    // Painted rather than cleared: a transparent canvas exports to a PNG that is
-    // unreadable on anything but the theme it was taken in.
-    ctx.fillStyle = c.bg;
-    ctx.fillRect(0, 0, contentW, contentH);
-
-    ctx.font = '12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-    ctx.textBaseline = 'middle';
-
-    if (flowFlame) drawRuler(ctx, c, flameSpan, flameTotal, contentH);
-    else drawConnectors(ctx, c);
-
-    for (var j = 0; j < flowDrawn.length; j++) {
-      drawNode(ctx, c, flowDrawn[j]);
-    }
+    flowContentW = contentW;
+    flowContentH = contentH;
+    // The scrollbar has to describe the whole diagram even though the canvas never is it.
+    flowSpacer.style.width = Math.ceil(contentW * flowScale) + 'px';
+    flowSpacer.style.height = Math.ceil(contentH * flowScale) + 'px';
 
     // The count sits in the trace-point row, which is outside the panels and so stays on
     // screen across tabs. Every view has to keep it true, or it would describe whichever
     // tab was opened last.
     countEl.textContent = 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
       + (flowNodes.length === 1 ? ' step' : ' steps');
+
+    paintFlow();
   }
 
-  function drawConnectors(ctx, c) {
-    var visBySeq = {};
-    flowDrawn.forEach(function (n) { visBySeq[n.seq] = n; });
+  /**
+   * Paints the part of the diagram that is actually on screen.
+   *
+   * <p>Split from the layout above because the two run at very different rates: layout
+   * changes when a filter or a fold does, painting happens on every scroll and every hover.
+   * Re-deriving 200,000 node positions to move a highlight was affordable at 36 steps and
+   * is not at 200,000.
+   *
+   * <p>It is also the only way the diagram can exist at that size at all. A canvas is capped
+   * at 65535px in each direction, which at one 26px row per step is about 2,500 steps, or
+   * half that on a retina display where every CSS pixel is two device pixels. Past it the
+   * browser accepts the size and hands back a canvas that silently draws nothing. Sizing to
+   * the viewport instead keeps the canvas a few hundred pixels tall however long the run is.
+   */
+  function paintFlow() {
+    if (!flowCanvas || flowContentH === 0) return;
+
+    var viewW = flowWrap.clientWidth || 1;
+    var viewH = flowWrap.clientHeight || 1;
+    var sx = flowWrap.scrollLeft;
+    var sy = flowWrap.scrollTop;
+
+    // Pinned back over the viewport it just scrolled away from.
+    flowCanvas.style.left = sx + 'px';
+    flowCanvas.style.top = sy + 'px';
+
+    var dpr = window.devicePixelRatio || 1;
+    var needW = Math.ceil(viewW * dpr);
+    var needH = Math.ceil(viewH * dpr);
+    // Assigning width/height clears the canvas, so it is only done when it really changed.
+    if (flowCanvas.width !== needW || flowCanvas.height !== needH) {
+      flowCanvas.width = needW;
+      flowCanvas.height = needH;
+      flowCanvas.style.width = viewW + 'px';
+      flowCanvas.style.height = viewH + 'px';
+    }
+
+    var ctx = flowCanvas.getContext('2d');
+    // The scroll offset lives in the transform, so everything below still draws in the
+    // diagram's own coordinates and knows nothing about scrolling.
+    ctx.setTransform(dpr * flowScale, 0, 0, dpr * flowScale,
+                     -sx * dpr, -sy * dpr);
+    renderFlow(ctx, sx / flowScale, sy / flowScale,
+               (sx + viewW) / flowScale, (sy + viewH) / flowScale);
+  }
+
+  /**
+   * Draws the diagram between two content rows onto whatever context is handed in.
+   *
+   * <p>Shared by the on-screen paint, which passes the viewport, and the PNG export, which
+   * passes the whole thing. One renderer, so the image saved is the image seen.
+   */
+  function renderFlow(ctx, x0, y0, x1, y1) {
+    var c = flowColors();
+    // Painted rather than cleared: a transparent canvas exports to a PNG that is
+    // unreadable on anything but the theme it was taken in.
+    ctx.fillStyle = c.bg;
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+
+    ctx.font = '12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ctx.textBaseline = 'middle';
+
+    if (flowFlame) drawRuler(ctx, c, flameSpan, flameTotal, flowContentH);
+    else drawConnectors(ctx, c, y0, y1);
+
+    var slice = visibleSlice(y0, y1);
+    for (var j = slice.from; j < slice.to; j++) {
+      var n = flowDrawn[j];
+      if (n.y > y1 || n.y + n.h < y0) continue;
+      drawNode(ctx, c, n);
+    }
+  }
+
+  /**
+   * The index range of {@link flowDrawn} that can appear between two content rows.
+   *
+   * <p>Tree mode stacks rows in order, so the range is found by bisection. Flame mode packs
+   * every node of a depth onto one row and the array is not sorted by y at all, so there the
+   * honest answer is the whole array and the per-node test below does the rejecting; that
+   * costs one comparison per node, against re-laying-out all of them.
+   */
+  function visibleSlice(y0, y1) {
+    if (flowFlame) return { from: 0, to: flowDrawn.length };
+    var lo = 0;
+    var hi = flowDrawn.length;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (flowDrawn[mid].y + flowDrawn[mid].h < y0) lo = mid + 1;
+      else hi = mid;
+    }
+    var from = lo;
+    hi = flowDrawn.length;
+    while (lo < hi) {
+      var m2 = (lo + hi) >> 1;
+      if (flowDrawn[m2].y <= y1) lo = m2 + 1;
+      else hi = m2;
+    }
+    return { from: from, to: lo };
+  }
+
+  /** seq -> drawn node. Built once per layout, not once per paint. */
+  function indexDrawn() {
+    drawnBySeq = {};
+    for (var i = 0; i < flowDrawn.length; i++) drawnBySeq[flowDrawn[i].seq] = flowDrawn[i];
+  }
+
+  function drawConnectors(ctx, c, y0, y1) {
     ctx.strokeStyle = c.line;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (var i = 0; i < flowDrawn.length; i++) {
+    // Elbows are drawn for the rows on screen, but a parent well above the fold still owns
+    // the line coming down to its child, so the parent is looked up rather than scanned to.
+    var slice = visibleSlice(y0, y1);
+    for (var i = slice.from; i < slice.to; i++) {
       var n = flowDrawn[i];
-      var parent = visBySeq[n.parentSeq];
+      if (n.y > y1 || n.y + n.h < y0) continue;
+      var parent = drawnBySeq[n.parentSeq];
       // Anchored to the real parent, not to the row above: the second and later children
       // of a call are separated from it by their siblings' whole subtrees, so a spine
       // drawn one row up would sprout from an unrelated box.
@@ -2662,9 +3068,12 @@
   }
 
   function flowHit(e) {
+    // The canvas covers the viewport, not the diagram, so its own top-left is wherever the
+    // wrap happens to be scrolled to. Adding the scroll offset puts the pointer back into
+    // the diagram's coordinates, which is what every node position is expressed in.
     var r = flowCanvas.getBoundingClientRect();
-    var x = (e.clientX - r.left) / flowScale;
-    var y = (e.clientY - r.top) / flowScale;
+    var x = (e.clientX - r.left + flowWrap.scrollLeft) / flowScale;
+    var y = (e.clientY - r.top + flowWrap.scrollTop) / flowScale;
     var list;
     if (flowFlame) {
       // One row per depth there, so the band narrows the search to a single level.
@@ -2763,7 +3172,7 @@
       // Repaint only on a change of box. Every pixel of movement would otherwise redraw
       // the whole canvas, and the highlight is the only thing that differs.
       flowHover = n.seq;
-      drawFlow();
+      paintFlow();
     }
     flowCanvas.style.cursor = (flowFlame || (n.hasKids && n.reps === 1))
       ? 'pointer' : 'default';
@@ -2798,7 +3207,7 @@
 
   function hideFlowTip() {
     flowTip.hidden = true;
-    if (flowHover !== null) { flowHover = null; if (flowBuilt) drawFlow(); }
+    if (flowHover !== null) { flowHover = null; if (flowBuilt) paintFlow(); }
   }
 
   function flowToggle(btn, get, set) {
@@ -2828,10 +3237,35 @@
   flowOutBtn.addEventListener('click', function () { zoomBy(1 / ZOOM_STEP); });
   flowInBtn.addEventListener('click', function () { zoomBy(ZOOM_STEP); });
 
+  /**
+   * Largest canvas edge worth attempting for an export.
+   *
+   * <p>Chrome tops out at 65535px and hands back a silently blank canvas past it; Safari
+   * gives up sooner. 32767 is the value every engine in use manages, and a diagram past it
+   * is exported as the visible region rather than as a blank PNG.
+   */
+  var CANVAS_MAX = 32767;
+
   flowPngBtn.addEventListener('click', function () {
+    if (!flowCanvas || flowContentH === 0) return;   // nothing drawn yet
+    var dpr = window.devicePixelRatio || 1;
+    var w = Math.ceil(flowContentW * flowScale * dpr);
+    var h = Math.ceil(flowContentH * flowScale * dpr);
+    var src = flowCanvas;
+    // The on-screen canvas is only the viewport now, so a full-diagram PNG is rendered
+    // again into an off-screen one. Only when the result can actually hold it.
+    if (w <= CANVAS_MAX && h <= CANVAS_MAX) {
+      var off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      var octx = off.getContext('2d');
+      octx.setTransform(dpr * flowScale, 0, 0, dpr * flowScale, 0, 0);
+      renderFlow(octx, 0, 0, flowContentW, flowContentH);
+      src = off;
+    }
     var a = document.createElement('a');
     a.download = 'deju-flow.png';
-    a.href = flowCanvas.toDataURL('image/png');
+    a.href = src.toDataURL('image/png');
     a.click();
   });
 

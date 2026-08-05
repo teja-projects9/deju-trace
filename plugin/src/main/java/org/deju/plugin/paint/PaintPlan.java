@@ -116,27 +116,45 @@ public final class PaintPlan {
             }
         }
         List<FileCoverage> ordered = new ArrayList<>(byClass.size());
+        for (String name : classNamesInExecutionOrder(payload)) {
+            FileCoverage fc = byClass.get(name);
+            // A class may be called without ever being resolved to a file.
+            if (fc != null) {
+                ordered.add(fc);
+            }
+        }
+        return ordered;
+    }
+
+    /**
+     * The run's class names in the order the call tree first enters each one.
+     *
+     * <p>Shared with the exclusion dialog, which numbers its rows with the position a class
+     * has here. Two independent implementations of "execution order" that drifted apart would
+     * be worse than showing no number at all: the dialog would be labelling rows with
+     * positions that do not match the editor tabs or the report the user is comparing against.
+     *
+     * <p>Classes with coverage but no call node, and every class in a payload recorded by an
+     * agent too old to send a call tree, keep their original payload order at the end, so
+     * nothing is ever lost by having no frame.
+     */
+    public static List<String> classNamesInExecutionOrder(DejuPayload payload) {
         Set<String> placed = new LinkedHashSet<>();
         List<CallNode> calls = payload.getCalls();
         if (calls != null) {
             for (CallNode node : calls) {
                 String name = node.getClassName();
-                // A SQL node carries no class, and a class may be called before or without
-                // ever being resolved to a file.
-                if (name == null || !placed.add(name)) {
-                    continue;
-                }
-                FileCoverage fc = byClass.get(name);
-                if (fc != null) {
-                    ordered.add(fc);
+                // A SQL node carries no class of its own.
+                if (name != null) {
+                    placed.add(name);
                 }
             }
         }
-        for (Map.Entry<String, FileCoverage> e : byClass.entrySet()) {
-            if (!placed.contains(e.getKey())) {
-                ordered.add(e.getValue());
+        for (FileCoverage fc : payload.getFiles()) {
+            if (fc.getFqClassName() != null) {
+                placed.add(fc.getFqClassName());
             }
         }
-        return ordered;
+        return new ArrayList<>(placed);
     }
 }

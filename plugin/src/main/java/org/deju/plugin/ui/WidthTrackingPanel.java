@@ -1,10 +1,12 @@
 package org.deju.plugin.ui;
 
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.LayoutManager;
 import java.awt.Rectangle;
 
 import javax.swing.JPanel;
+import javax.swing.JViewport;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 
@@ -22,6 +24,11 @@ import com.intellij.util.ui.JBUI;
  * viewport impose its own width instead. Children are laid out in the space that actually
  * exists, so anything able to wrap does, and the page grows downwards rather than sideways.
  * Vertical tracking stays off: a long page still has to scroll somewhere.
+ *
+ * <p>That promise is kept only while it can be: a page narrowed past the width its content
+ * genuinely needs gets its scrollbar back. Promising unconditionally is worse than the
+ * scrollbar it removes, the form is squashed and clipped instead, and nothing will scroll to
+ * whatever was cut off.
  */
 public final class WidthTrackingPanel extends JPanel implements Scrollable {
 
@@ -46,7 +53,14 @@ public final class WidthTrackingPanel extends JPanel implements Scrollable {
 
     @Override
     public boolean getScrollableTracksViewportWidth() {
-        return true;
+        Container parent = getParent();
+        if (!(parent instanceof JViewport)) {
+            return true;
+        }
+        // Minimum, not preferred: the page is expected to be narrower than it would like,
+        // that is the whole point of wrapping. Only once it is narrower than the content can
+        // physically become does a horizontal scrollbar start being the lesser evil.
+        return parent.getWidth() >= getMinimumSize().width;
     }
 
     @Override

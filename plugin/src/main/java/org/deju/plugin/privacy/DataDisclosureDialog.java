@@ -25,6 +25,7 @@ import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.Nullable;
 
 import org.deju.plugin.ui.UiStyle;
+import org.deju.plugin.ui.WidthTrackingPanel;
 
 /**
  * A plain answer to "what is this plugin recording about me, and where does it go?"
@@ -55,9 +56,23 @@ public final class DataDisclosureDialog extends DialogWrapper {
         return new Action[]{getOKAction()};
     }
 
+    /**
+     * Dialog width, and the width the wrapping text inside it is measured against.
+     *
+     * <p>The text width is the dialog minus its borders and the vertical scrollbar; it is a
+     * fixed number because the labels need a fixed one to report a correct height, and the
+     * page would otherwise be as wide as its longest sentence.
+     */
+    private static final int DIALOG_WIDTH = 620;
+    private static final int TEXT_WIDTH = 560;
+    /** Path characters that fit on one line at {@link #TEXT_WIDTH} in the small font. */
+    private static final int PATH_CHARS = 62;
+
     @Override
     protected @Nullable JComponent createCenterPanel() {
-        JPanel column = new JPanel();
+        // Tracks the viewport width so a narrowed dialog reflows instead of scrolling
+        // sideways, and hands the scrollbar back once it is narrower than the content can go.
+        WidthTrackingPanel column = new WidthTrackingPanel(null);
         column.setLayout(new BoxLayout(column, BoxLayout.Y_AXIS));
         column.setBorder(JBUI.Borders.empty(4, 2, 2, 2));
 
@@ -85,7 +100,11 @@ public final class DataDisclosureDialog extends DialogWrapper {
                 JPanel row = new JPanel();
                 row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
                 row.setBorder(JBUI.Borders.emptyTop(2));
-                JBLabel where = help(item.path.toString());
+                // Shortened, with the whole thing on the tooltip: a cache path is long
+                // enough to set the width of the entire dialog on its own.
+                String full = item.path.toString();
+                JBLabel where = helpLine(UiStyle.ellipsisMiddle(full, PATH_CHARS));
+                where.setToolTipText(full);
                 row.add(where);
                 row.add(Box.createHorizontalStrut(JBUI.scale(6)));
                 Path target = item.exclusive ? item.path : item.path.getParent();
@@ -108,7 +127,7 @@ public final class DataDisclosureDialog extends DialogWrapper {
         scroll.getVerticalScrollBar().setUnitIncrement(JBUI.scale(16));
         JPanel root = new JPanel(new BorderLayout());
         root.add(scroll, BorderLayout.CENTER);
-        root.setPreferredSize(JBUI.size(620, 520));
+        root.setPreferredSize(JBUI.size(DIALOG_WIDTH, 520));
         return root;
     }
 
@@ -140,8 +159,17 @@ public final class DataDisclosureDialog extends DialogWrapper {
         return label;
     }
 
+    /** A wrapping help paragraph, measured so it reports the height its wrapping needs. */
     private static JBLabel help(String text) {
-        JBLabel label = new JBLabel(text);
+        return styleHelp(new JBLabel(UiStyle.wrappedAtWidth(text, JBUI.scale(TEXT_WIDTH))));
+    }
+
+    /** A help line that must stay on one line, e.g. a path sitting beside its Open button. */
+    private static JBLabel helpLine(String text) {
+        return styleHelp(new JBLabel(text));
+    }
+
+    private static JBLabel styleHelp(JBLabel label) {
         label.setForeground(UIUtil.getContextHelpForeground());
         label.setFont(JBUI.Fonts.smallFont());
         return label;

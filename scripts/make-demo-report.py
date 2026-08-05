@@ -407,6 +407,37 @@ class Trace:
         return seq
 
 
+def encode_calls(calls):
+    """Columns plus string tables, matching HtmlReportGenerator.callModel().
+
+    The demo has to be written the same way the plugin writes a real export, or it stops
+    being a test of the reader. `seq` is the position, so it is not stored.
+    """
+    tables, index = {"class": [], "method": [], "sql": []}, {}
+
+    def intern(kind, value):
+        if value is None:
+            return -1
+        key = (kind, value)
+        if key not in index:
+            index[key] = len(tables[kind])
+            tables[kind].append(value)
+        return index[key]
+
+    return {
+        "n": len(calls),
+        "classTable": tables["class"],
+        "methodTable": tables["method"],
+        "sqlTable": tables["sql"],
+        "parentSeq": [c["parentSeq"] for c in calls],
+        "className": [intern("class", c["className"]) for c in calls],
+        "methodName": [intern("method", c["methodName"]) for c in calls],
+        "sql": [intern("sql", c["sql"]) for c in calls],
+        "callSiteLine": [c["callSiteLine"] for c in calls],
+        "totalMicros": [c["totalMicros"] for c in calls],
+    }
+
+
 def build_calls():
     t = Trace()
     root = t.call("com.example.order.OrderController", "placeOrder", -1, None, 47900)
@@ -455,10 +486,10 @@ def main():
         "durationMs": 48,
         "projectName": PROJECT,
         "files": build_files(),
-        "calls": build_calls(),
+        "calls": encode_calls(build_calls()),
         "callsTruncated": False,
-        "agentVersion": "2.0.2",
-        "pluginVersion": "2.0.2",
+        "agentVersion": "2.0.3",
+        "pluginVersion": "2.0.3",
         "excludedClasses": EXCLUDED,
         # The demo ships the full document so every feature is visible; the plugin's
         # Export dialog offers an "Essential" variant that omits this source.
@@ -490,8 +521,8 @@ def main():
     OUT.write_text(html, encoding="utf-8")
     calls = model["calls"]
     print(f"wrote {OUT.relative_to(ROOT)}  ({len(html):,} bytes)")
-    print(f"  {len(model['files'])} files, {len(calls)} call nodes, "
-          f"{sum(1 for c in calls if c['sql'])} queries, {len(EXCLUDED)} excluded types")
+    print(f"  {len(model['files'])} files, {calls['n']} call nodes, "
+          f"{sum(1 for q in calls['sql'] if q >= 0)} queries, {len(EXCLUDED)} excluded types")
 
 
 if __name__ == "__main__":

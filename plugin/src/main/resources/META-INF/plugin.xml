@@ -35,6 +35,39 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.0.3</b>: reports that open at any size</p>
+        <ul>
+          <li><b>A large report used to be unopenable.</b> Every recorded call became a table
+          row before anything appeared, so a 200,000-call trace never finished loading. The
+          Tree and Files views now render only what is on screen: the same trace opens in
+          about half a second and holds a few dozen rows in the page instead of millions.</li>
+          <li><b>Fixed: the Flow Graph went blank on any sizeable run.</b> It sized its canvas
+          to the whole diagram, and a browser silently stops drawing past 65535 pixels, which
+          is roughly 1,300 steps on a retina display. It now draws only the visible region, so
+          length no longer has a limit.</li>
+          <li><b>Exported reports are around five times smaller.</b> The call list is written
+          as columns with the repeated class names and statements held in tables once each,
+          rather than as one object per call re-spelling every key. A run that produced a
+          30&nbsp;MB file now produces about 6&nbsp;MB, with nothing left out. Reports
+          exported by earlier versions still open.</li>
+          <li><b>Fixed: the Excluded rows control did nothing, or vanished.</b> It disappeared
+          entirely from reports exported with the source of excluded types omitted, which
+          still show the &ldquo;N excluded calls&rdquo; rows, and it stayed lit but inert
+          whenever a search or filter had already removed those rows. It now reflects what is
+          actually on screen.</li>
+          <li><b>Fixed: Suggest, All and None in Excluded types did nothing.</b> Each set
+          the selection and then immediately overwrote it with the
+          state of the checkboxes it had not yet updated.</li>
+          <li>Excluded types lists classes in execution order and numbers them, so the dialog
+          reads in the same order as the editor tabs and the report.</li>
+          <li>Flow Chart is now <b>Flow Graph</b>, follows the Files picker like the Tree
+          does, and starts with <b>Group repeats</b> off. Its canvas is created when the tab
+          is first opened rather than shipped in every export.</li>
+          <li>Fixed the tool window opening with its rows stretched far taller than their
+          contents until the panel was resized, a settings page that clipped controls with no
+          scrollbar to reach them, and a horizontal scrollbar across
+          <b>What Deju records&hellip;</b>.</li>
+        </ul>
         <p><b>2.0.2</b>: the agent ships as its own release asset</p>
         <ul>
           <li><b>Fixed: the standalone agent jar was never built.</b> Every release now
