@@ -223,16 +223,11 @@ public final class DejuConfigurable implements Configurable {
 
     /**
      * Wraps {@code text} in the {@code <div width>} that gives the label a finite preferred
-     * width. Short hints get a plain {@code <div>}: a width narrower than the text itself
-     * would wrap them for no reason.
+     * width. Shared with {@link DataDisclosureDialog}, which needs the same thing for the
+     * same reason.
      */
     private static String wrapAtMeasure(JBLabel label, String text) {
-        if (text.length() <= HINT_WRAP_CHARS) {
-            return "<html><body><div>" + text + "</div></body></html>";
-        }
-        int width = label.getFontMetrics(label.getFont())
-                .stringWidth(text.substring(0, HINT_WRAP_CHARS));
-        return "<html><body><div width=\"" + width + "\">" + text + "</div></body></html>";
+        return UiStyle.wrappedAtChars(label, text, HINT_WRAP_CHARS);
     }
 
     /** Aligns a hint under the checkbox it belongs to rather than the form's left edge. */

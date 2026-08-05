@@ -143,6 +143,46 @@ class PaintPlanTest {
         return plan.open.stream().map(FileCoverage::getFqClassName).collect(Collectors.toList());
     }
 
+    /**
+     * The exclusion dialog numbers its rows with a position from this list, so it has to
+     * agree with the tab order above. Two implementations that drifted apart would label
+     * rows with positions matching neither the editor tabs nor the report.
+     */
+    @Test
+    void classOrderMatchesTheOrderFilesAreOpenedIn() {
+        DejuPayload payload = payload(
+                files("com.example.Repo", "com.example.Controller", "com.example.Service"),
+                calls("com.example.Controller", "com.example.Service", "com.example.Repo"));
+
+        assertEquals(names(PaintPlan.of(payload, NOTHING_EXCLUDED, 0)),
+                PaintPlan.classNamesInExecutionOrder(payload),
+                "the numbered order and the tab order are the same order");
+    }
+
+    @Test
+    void classOrderKeepsClassesThatHaveNoFileOfTheirOwn() {
+        // A class can be called without ever resolving to a file; it has no tab, but it is
+        // still offered in the dialog and still occupies a position in the run.
+        DejuPayload payload = payload(
+                files("com.example.Controller"),
+                calls("com.example.Controller", "com.example.Untraced", "com.example.Repo"));
+
+        assertEquals(List.of("com.example.Controller", "com.example.Untraced", "com.example.Repo"),
+                PaintPlan.classNamesInExecutionOrder(payload));
+    }
+
+    @Test
+    void classOrderPutsFileOnlyClassesAfterTheCallTree() {
+        // A payload from an agent too old to send a call tree, or a file with coverage but no
+        // frame: kept, at the end, rather than lost for having no call node.
+        DejuPayload payload = payload(
+                files("com.example.Controller", "com.example.NoFrame"),
+                calls("com.example.Controller"));
+
+        assertEquals(List.of("com.example.Controller", "com.example.NoFrame"),
+                PaintPlan.classNamesInExecutionOrder(payload));
+    }
+
     private static DejuPayload payload(List<FileCoverage> files, List<CallNode> calls) {
         DejuPayload p = new DejuPayload();
         p.setFiles(files);
