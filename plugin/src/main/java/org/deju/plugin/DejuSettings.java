@@ -1,8 +1,5 @@
 package org.deju.plugin;
 
-import java.security.SecureRandom;
-import java.util.Base64;
-
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
@@ -14,9 +11,11 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Application-level connection settings for the agent socket.
  *
- * <p>TODO(deju): the token is a shared secret; for MVP it is stored in plain plugin
- * settings. A production build should keep it in the IDE {@code PasswordSafe} instead
- * of {@code DejuTrace.xml}.
+ * <p><b>The token is a fixed, published value</b>, {@link #DEFAULT_TOKEN}. It is therefore
+ * not a secret, and the only thing keeping the control socket private is that the agent
+ * binds to loopback. Anyone who can reach the port on a JVM started with
+ * {@code bind=0.0.0.0} can arm a trace on it, so that combination is for a machine you
+ * control, on a network you trust. See {@link #token}.
  */
 @State(name = "DejuTraceSettings", storages = @Storage("DejuTrace.xml"))
 public final class DejuSettings implements PersistentStateComponent<DejuSettings> {
@@ -24,10 +23,27 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
     // Defaults, also used by the "Reset to defaults" action in the settings page.
     public static final String DEFAULT_HOST = "127.0.0.1";
     public static final int DEFAULT_PORT = 7391;
+    /**
+     * The one token this plugin ever uses, so {@code token=dejutoken} in a hand-written
+     * {@code -javaagent} flag is always right and never has to be copied from a dialog.
+     *
+     * <p>Chosen for that convenience with the trade-off understood: it is printed in the
+     * source of a plugin anyone can download, so it authenticates nothing. Loopback is the
+     * boundary now.
+     */
+    public static final String DEFAULT_TOKEN = "dejutoken";
     public static final boolean DEFAULT_AUTO_ATTACH = false;
     public static final String DEFAULT_INCLUDES = "";
     public static final String DEFAULT_SOURCE_ROOTS = "";
-    public static final int DEFAULT_MAX_OPEN_FILES = 5;
+    /**
+     * One tab: the traced method's own file.
+     *
+     * <p>Deliberately the minimum. Every recorded file is painted whether or not it is
+     * opened, and the exclusion dialog can jump straight to any class in the run, so extra
+     * tabs buy nothing that is not one click away, while five of them reliably bury whatever
+     * the user had open before they pressed Show.
+     */
+    public static final int DEFAULT_MAX_OPEN_FILES = 1;
     public static final boolean DEFAULT_CONTAINER_OR_REMOTE_JVM = false;
 
     /**
@@ -38,14 +54,15 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
     /** Must match the agent's {@code port=} argument. */
     public int port = DEFAULT_PORT;
     /**
-     * Must match the agent's {@code token=} argument.
+     * Must match the agent's {@code token=} argument. Always {@link #DEFAULT_TOKEN}.
      *
-     * <p>Generated per installation rather than shipped as a fixed string. This token is the
-     * only thing standing between the control socket and anything else that can reach it,
-     * and with {@code bind=0.0.0.0} that can be the whole network. A default published in
-     * the source of a plugin anyone can download is not a secret, so there is none.
+     * <p>Kept as a field rather than read straight off the constant so the settings page can
+     * display it and {@code DejuTrace.xml} still round-trips; {@link #loadState} normalises
+     * whatever an older installation wrote there, including the random token earlier builds
+     * generated, so upgrading does not leave the plugin and a hand-written
+     * {@code -javaagent} flag disagreeing.
      */
-    public String token = newToken();
+    public String token = DEFAULT_TOKEN;
 
     /**
      * When {@code true}, the bundled agent is auto-attached (via {@code -javaagent}) to
@@ -108,27 +125,11 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
         return ApplicationManager.getApplication().getService(DejuSettings.class);
     }
 
-    /**
-     * A fresh random token: 128 bits, from {@link SecureRandom}, in the URL-safe alphabet so
-     * it survives being pasted into a VM option, a compose file or an env var unquoted.
-     */
-    public static String newToken() {
-        byte[] bytes = new byte[16];
-        new SecureRandom().nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    /**
-     * Restores every field, with a newly generated token.
-     *
-     * <p>The token is regenerated rather than preserved because this is also what "clear
-     * everything" calls, and leaving the previous secret in place would make a reset
-     * incomplete in exactly the field where that matters most.
-     */
+    /** Restores every field to the shipped defaults. */
     public synchronized void resetToDefaults() {
         host = DEFAULT_HOST;
         port = DEFAULT_PORT;
-        token = newToken();
+        token = DEFAULT_TOKEN;
         autoAttach = DEFAULT_AUTO_ATTACH;
         includes = DEFAULT_INCLUDES;
         sourceRoots = DEFAULT_SOURCE_ROOTS;
@@ -144,5 +145,9 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
     @Override
     public void loadState(@NotNull DejuSettings state) {
         XmlSerializerUtil.copyBean(state, this);
+        // Whatever is on disk, the token is the constant. Earlier builds generated a random
+        // one per installation and stored it here; leaving that in place after an upgrade
+        // would silently break every hand-written token=dejutoken flag.
+        token = DEFAULT_TOKEN;
     }
 }

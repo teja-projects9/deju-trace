@@ -85,9 +85,9 @@ public final class ClearDataDialog extends DialogWrapper {
         column.add(Box.createVerticalStrut(JBUI.scale(4)));
         column.add(left(includeAppData));
 
-        JBLabel caution = new JBLabel("<html>Resetting settings generates a new token, so any"
-                + " hand-written <code>-javaagent</code> flag will need the VM option copied"
-                + " again.</html>");
+        JBLabel caution = new JBLabel("<html>Resetting settings restores the host, port, Includes and source roots."
+                + " The token is a fixed value and does not change, so a hand-written"
+                + " <code>-javaagent</code> flag keeps working.</html>");
         caution.setForeground(UIUtil.getContextHelpForeground());
         caution.setFont(JBUI.Fonts.smallFont());
         caution.setBorder(JBUI.Borders.empty(2, 20, 0, 0));

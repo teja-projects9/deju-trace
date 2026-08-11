@@ -431,3 +431,87 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
   .count{margin-left:0;}
   .graphrow{grid-template-columns:minmax(5rem,9rem) 1fr auto;}
 }
+
+/* ------------------------------------------------------------------ findings --- */
+
+.tabbadge{display:inline-block;min-width:1.1em;margin-left:.35em;padding:0 .32em;
+  border-radius:999px;background:var(--badge-bg);color:var(--badge-ink);
+  font-size:.66rem;font-weight:700;line-height:1.5;text-align:center;vertical-align:baseline;}
+.segbtn.hasfindings .tabbadge{background:var(--none);}
+
+.finding{border:1px solid var(--border);border-left:3px solid var(--muted);
+  border-radius:var(--radius);background:var(--panel);padding:.6rem .8rem;margin:0 0 .5rem;}
+.finding.high{border-left-color:var(--none);}
+.finding.med{border-left-color:var(--partial);}
+.finding.info{border-left-color:var(--accent);}
+.finding .fsev{display:inline-block;font-size:.64rem;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted);}
+.finding.high .fsev{color:var(--none);}
+.finding.med .fsev{color:var(--partial);}
+.finding h4{margin:.15rem 0 .3rem;font-size:.92rem;font-weight:650;}
+.finding p{margin:0;color:var(--muted);font-size:.8rem;line-height:1.5;
+  white-space:normal;overflow-wrap:anywhere;}
+.finding .act{margin-top:.45rem;}
+
+/* ------------------------------------------------------------------ timeline --- */
+
+.tlruler{position:relative;height:1.1rem;margin:0 0 .25rem;
+  /* Same three columns as a row, so the ticks line up with the bars under them. */
+  padding-left:calc(22rem + .5rem);padding-right:7rem;}
+.tltick{position:absolute;top:0;transform:translateX(-50%);font-size:.66rem;color:var(--muted);
+  white-space:nowrap;}
+.tltick:first-child{transform:none;}
+.tltick:last-child{transform:translateX(-100%);}
+
+.tlrow{display:grid;grid-template-columns:22rem 1fr 7rem;gap:.5rem;align-items:center;
+  padding:.14rem .3rem;border-radius:var(--radius-sm);cursor:pointer;}
+.tlrow:hover{background:var(--control-hover);}
+.tlname{padding-left:calc(var(--depth,0) * .55rem);font-size:.76rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tlrow.sql .tlname{color:var(--sql-ink);font-family:SFMono-Regular,Consolas,monospace;
+  font-size:.7rem;}
+.tltrack{position:relative;height:.85rem;background:var(--panel);border-radius:3px;
+  overflow:hidden;}
+.tlbar{position:absolute;top:0;bottom:0;min-width:1px;border-radius:3px;
+  background:color-mix(in srgb, var(--accent) 26%, transparent);}
+.tlown{position:absolute;top:0;bottom:0;left:0;border-radius:3px;background:var(--accent);}
+.tlrow.sql .tlbar{background:color-mix(in srgb, var(--sql-ink) 26%, transparent);}
+.tlrow.sql .tlown{background:var(--sql-ink);}
+.tltime{text-align:right;font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;
+  white-space:nowrap;}
+.tltime b{color:var(--fg);}
+
+/* --------------------------------------------------------------- row copying --- */
+
+/* Hidden until the row is hovered or the button itself is focused, so a column of forty
+   frames is not a column of forty icons. Kept in the layout either way, so revealing it
+   never nudges the timing next to it. */
+.rowcopy{margin-left:.4rem;padding:0 .25rem;border:0;background:none;cursor:pointer;
+  color:var(--muted);font-size:.75rem;line-height:1;opacity:0;transition:opacity .12s;}
+tr:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
+.rowcopy:hover{color:var(--fg);}
+
+.fold.grouped .fcount{color:var(--accent);}
+
+@media (max-width:900px){
+  .tlrow{grid-template-columns:11rem 1fr 5.5rem;}
+  .tlruler{padding-left:calc(11rem + .5rem);padding-right:5.5rem;}
+}
+
+/* Printing. The tree is virtualised, so report.js swaps the full row list in on
+   beforeprint (up to a bounded size) and puts the window back afterwards; everything
+   here is about getting the chrome out of the way and not slicing rows in half. */
+@media print{
+  :root{--toolbarH:0px;}
+  body{padding:0;background:#fff;color:#000;}
+  header .headtools,.toolbar,.legend,.search,#fileMenu,.help,.act,
+  .zoomseg,#flowPngBtn{display:none !important;}
+  .meta,.summary{break-inside:avoid;}
+  .scroll,.treewrap,.flowwrap{overflow:visible !important;max-height:none !important;
+    border:none !important;}
+  tr,.file,.graphrow{break-inside:avoid;}
+  .file h2{break-after:avoid;}
+  a{text-decoration:none;color:inherit;}
+  /* A collapsed file prints as its header alone, which is what it looks like on screen. */
+  .file.collapsed .scroll{display:none;}
+}

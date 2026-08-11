@@ -156,10 +156,11 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
         traceRow.add(traceField);
         traceRow.add(trackButton);
         traceRow.add(excludeButton);
-        excludeButton.setToolTipText("Choose which types the report folds away and Show skips"
-                + " (entities, DTOs and other data classes). Patterns also live in Settings →"
-                + " Tools → Deju Trace. The report always keeps the full call tree, its"
-                + " “Full” detail level shows everything.");
+        excludeButton.setToolTipText("Choose which classes or packages the report folds away and"
+                + " Show skips (entities, DTOs and other data classes), or double-click one to"
+                + " open it at the method the run entered it through. Patterns also live in"
+                + " Settings → Tools → Deju Trace. The report always keeps the full call tree,"
+                + " its “Full” detail level shows everything.");
         excludeButton.addActionListener(e -> ExcludedTypesDialog.show(project));
         box.add(traceRow);
 
