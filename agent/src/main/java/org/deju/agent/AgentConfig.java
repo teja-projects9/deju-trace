@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Parses the {@code -javaagent} argument string, e.g.
- * <pre>port=7391,token=devtoken,includes=com.example.web:com.example.svc,arm=com.example.web.Api#handle</pre>
+ * <pre>port=7391,token=dejutoken,includes=com.example.web:com.example.svc,arm=com.example.web.Api#handle</pre>
  *
  * <ul>
  *   <li>{@code port}, socket port for the plugin (phase 3).</li>

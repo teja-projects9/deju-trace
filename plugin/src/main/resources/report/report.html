@@ -32,13 +32,16 @@ __STYLES__
      control on the page and the toolbar is already two lines deep on a laptop. CSS order
      puts it last, so the stats appended here by script still come first. -->
 <div id="summary" class="summary">
-  <input class="search" id="search" type="search" placeholder="Filter code&hellip; (press /)" autocomplete="off">
+  <input class="search" id="search" type="search" placeholder="Filter code&hellip; (press /)" autocomplete="off"
+         title="Matches source text and SQL in both views. In the Tree it also matches a frame's own class and method name.">
 </div>
 <div class="toolbar" id="toolbar">
   <div class="seg" id="tabSeg" role="tablist">
     <button class="segbtn on" id="tabTrace" type="button" role="tab" title="Line coverage and the call tree">Code Trace</button>
     <button class="segbtn" id="tabGraph" type="button" role="tab" title="Where the time went, per file">Graph</button>
     <button class="segbtn" id="tabFlow" type="button" role="tab" title="The call flow from start to end">Flow Graph</button>
+    <button class="segbtn" id="tabTimeline" type="button" role="tab" title="Where the wall clock actually went">Timeline</button>
+    <button class="segbtn" id="tabFindings" type="button" role="tab" title="Things in this run worth a look">Findings <span class="tabbadge" id="findingsBadge" hidden></span></button>
   </div>
 
   <!-- display:contents, so these stay direct flex children of the toolbar and the
@@ -96,6 +99,8 @@ Press Enter to apply, Esc to cancel.">
   <button class="toggle t-only" id="minTimeCustomApply" data-owns-visibility type="button" hidden>Apply</button>
   <button class="toggle t-only on" id="sqlBtn" type="button"
           title="Show or hide every SQL statement in the tree">SQL</button>
+  <button class="toggle t-only" id="treeGroupBtn" type="button"
+          title="Fold every repeat of the same call under one parent into a single row at its first occurrence. Everything else keeps exact execution order.">Group repeats</button>
   <button class="toggle t-only on" id="rollupBtn" data-owns-visibility type="button" hidden
           title="Show or hide the &quot;N excluded calls&quot; summary rows">Excluded rows</button>
 
@@ -135,10 +140,24 @@ Press Enter to apply, Esc to cancel.">
             title="Show every file rather than the slowest few">Show all files</button>
   </span>
 
+  <span class="ctlgroup" id="timelineControls" hidden>
+    <button class="toggle excl" id="timelineExcludedBtn" type="button" hidden
+            title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
+    <button class="toggle" id="timelineAllBtn" type="button"
+            title="Include steps too brief to matter as well as the ones that took the time">Show every step</button>
+    <button class="toggle" id="timelineCopyBtn" type="button" title="Copy this table as text">Copy</button>
+  </span>
+
+  <span class="ctlgroup" id="findingsControls" hidden>
+    <button class="toggle" id="findingsCopyBtn" type="button" title="Copy every finding as text">Copy all</button>
+  </span>
+
   <span class="ctlgroup" id="flowControls" hidden>
     <button class="toggle on" id="flowSqlBtn" type="button" title="Show or hide SQL steps">SQL</button>
     <button class="toggle" id="flowGroupBtn" type="button"
             title="Fold a run of identical sibling calls into one box marked with its count">Group repeats</button>
+    <button class="toggle excl" id="flowExcludedBtn" type="button" hidden
+            title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
     <button class="toggle" id="flowHotBtn" type="button"
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
     <button class="toggle" id="flowFlameBtn" type="button"
@@ -189,12 +208,25 @@ Press Enter to apply, Esc to cancel.">
   <div class="empty" id="flowEmpty" hidden>This run recorded no call tree.</div>
 </section>
 
+<section id="timelinePanel" hidden>
+  <p class="panelnote" id="timelineNote"></p>
+  <div class="tlruler" id="timelineRuler"></div>
+  <div id="timelineBody"></div>
+  <div class="empty" id="timelineEmpty" hidden>This run recorded no call tree.</div>
+</section>
+
+<section id="findingsPanel" hidden>
+  <p class="panelnote" id="findingsNote"></p>
+  <div id="findingsBody"></div>
+  <div class="empty" id="findingsEmpty" hidden>Nothing stood out in this run.</div>
+</section>
+
 <div class="help" id="help" hidden>
   <div class="card">
     <h3>Keyboard shortcuts</h3>
     <dl>
       <dt><kbd>v</kbd></dt><dd>Switch between Tree and Files</dd>
-      <dt><kbd>/</kbd></dt><dd>Focus the code filter</dd>
+      <dt><kbd>/</kbd></dt><dd>Focus the filter: source text, SQL, and (in Tree) class and method names</dd>
       <dt><kbd>n</kbd> / <kbd>p</kbd></dt><dd>Next / previous problem line</dd>
       <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous call frame (Tree) or file (Files)</dd>
       <dt><kbd>e</kbd> / <kbd>c</kbd></dt><dd>Expand all / collapse all</dd>
@@ -203,10 +235,28 @@ Press Enter to apply, Esc to cancel.">
       <dt><kbd>x</kbd></dt><dd>Toggle "Problems only"</dd>
       <dt><kbd>o</kbd></dt><dd>Open the current line in the IDE</dd>
       <dt><kbd>y</kbd></dt><dd>Copy the current file's path</dd>
+      <dt><kbd>Shift</kbd>+<kbd>C</kbd></dt><dd>Copy the current step as text</dd>
       <dt><kbd>t</kbd></dt><dd>Toggle light / dark theme</dd>
       <dt><kbd>?</kbd></dt><dd>This help</dd>
       <dt><kbd>Esc</kbd></dt><dd>Close help, or clear the filter</dd>
     </dl>
+    <h3>Findings</h3>
+    <p>A handful of rules run over this recording and name what stands out in it: the same
+    statement issued in a loop, one query that is most of the request, the frame that spent
+    the time in its own code rather than in what it called, a method invoked far more often
+    than the code suggests, and branches this request never took. Each card carries the
+    numbers it was derived from and links to the step it came from, so nothing has to be
+    taken on trust. The badge on the tab counts them.</p>
+    <h3>Timeline</h3>
+    <p>Where the wall clock went, in the order it went there. Each bar is one step: the
+    solid part is time in that step&rsquo;s <b>own</b> code, the faint part is time inside
+    the calls it made. That split is the one the other views cannot show you, and it is
+    what tells a slow method apart from a method that merely called something slow. Only
+    the steps that own a meaningful share are listed; <b>Show every step</b> lifts that.</p>
+    <p>One honest limit: the agent records how long each call took, not when it started, so
+    positions are derived by laying calls end to end in the order they ran. Durations and
+    ordering are exact; a gap where the request sat idle cannot be shown, because nothing in
+    the recording distinguishes it from work.</p>
     <h3>Graph</h3>
     <p>Time per file, slowest first. The bar has two parts: <b>own code</b> is the file's
     self time, the work its own lines did, and <b>SQL</b> is the time its queries spent in
@@ -214,7 +264,9 @@ Press Enter to apply, Esc to cancel.">
     measure here, a method's <i>total</i> time contains everything it called, so summing
     totals would count the same microseconds once per stack frame. Turning <b>Include
     SQL</b> off leaves only your own code, which is what you want when the question is
-    which method to optimise rather than which query.</p>
+    which method to optimise rather than which query. This tab deliberately ignores the
+    Files picker and your excluded types: it is an accounting of where the milliseconds
+    went, and dropping a file would silently remove real time from the totals.</p>
     <h3>Flow Graph</h3>
     <p>The call tree drawn start to end, top to bottom in execution order, indented by
     depth. Each box is one invocation; the bar inside it is that call's total time relative
@@ -237,12 +289,16 @@ Press Enter to apply, Esc to cancel.">
     so a getter that turns out to trigger a lazy load stays on screen along with the query it
     caused. <b>Excluded rows</b> in the toolbar hides those summary rows altogether, once
     you no longer need to be told what was folded away.
-    <i>Full</i> shows every recorded call. Choose the types in the IDE under
+    The <b>Flow Graph</b> and the <b>Timeline</b> fold the same types away by the same
+    rule, and both carry a <b>Show excluded</b> button to put them back.
+    <i>Full</i> shows every recorded call, repeats included: the
+    <b>&times;N more</b> folding that keeps an N+1 loop from flooding the default view is
+    lifted here too. Choose the types in the IDE under
     <b>Settings &rarr; Tools &rarr; Deju Trace</b>, or with <b>Excluded types&hellip;</b>
     in the Deju tool window; the recording itself is always complete, so nothing here is
     ever lost. A nested class follows the class it lives in, so excluding a wrapper also
-    excludes the builder generated inside it. In the Files view, excluded types simply start
-    unticked in the file picker.</p>
+    excludes the builder generated inside it. In the Files view, excluded types are
+    rendered like any other file but start folded shut.</p>
     <p>Exclusions are applied when a report is <i>written</i>, so this file is a snapshot of
     the rules at that moment, changing them later never alters an existing report.
     Re-export the same run to apply new rules. Nothing about exclusions reaches the agent,
@@ -252,19 +308,33 @@ Press Enter to apply, Esc to cancel.">
     recorded. A long statement is trimmed to three lines with <b>Show full query</b> to open
     it; the <b>SQL</b> button in the toolbar hides queries altogether when you want to read
     control flow on its own.</p>
-    <p><b>Files.</b> The <b>Files</b> dropdown works in both views. In the Files view it
-    chooses which files render; in the Tree it hides those calls and everything underneath
-    them, so you can strip a trace down to the layer you care about.</p>
+    <p><b>Files.</b> The <b>Files</b> dropdown works in both views and means the same thing
+    in each: unticking a file removes it from the Files view and hides its calls, and
+    everything underneath them, from the Tree, so you can strip a trace down to the layer
+    you care about. The traced method's own frame always stays, since hiding the entry point
+    would empty the diagram. Data classes and generated code start ticked but folded shut,
+    so the page opens on the code worth reading without anything being filtered out behind
+    your back.</p>
     <p><b>Open in IDE</b> uses <code>jetbrains://</code> links, which are handled by
     JetBrains Toolbox. If nothing happens when you click a line number, Toolbox is not
     installed, use <b>Copy path</b> in the Files view instead.</p>
+    <p><b>Sharing a spot.</b> The address bar follows what you are looking at, tab, view,
+    filter and the selected step, so the link in it opens this report where you are. The
+    copy button on a step (or <kbd>Shift</kbd>+<kbd>C</kbd>) puts that one frame on the
+    clipboard as plain text for a ticket or a chat.</p>
+    <p><b>Group repeats</b> folds every repeat of the same call under one parent into a
+    single row at its first occurrence. Unlike <b>&times;N more</b>, which only catches
+    repeats that happen to be adjacent, this catches a loop that alternates two calls and
+    issues each of them two hundred times. Everything that is not a repeat keeps its exact
+    position.</p>
     <p>This report is a single self-contained file: no network calls, no remote
-    resources, and no captured variable values.</p>
+    resources, and no captured variable values. A large one stores its data compressed and
+    unpacks it in the browser, which is why it opens a moment after it loads.</p>
     <button class="toggle close" type="button" id="helpClose">Close</button>
   </div>
 </div>
 
-<script type="application/json" id="deju-data">__PAYLOAD_JSON__</script>
+__PAYLOAD_BLOCK__
 <script>
 __SCRIPT__
 </script>

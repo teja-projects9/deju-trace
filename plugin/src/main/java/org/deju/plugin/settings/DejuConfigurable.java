@@ -90,6 +90,12 @@ public final class DejuConfigurable implements Configurable {
         hostField = new JBTextField();
         portField = new JBTextField();
         tokenField = new JBTextField();
+        // Fixed and published, so there is nothing here for the user to choose. Shown
+        // rather than hidden because a hand-written -javaagent flag needs token=<this>,
+        // and selectable so it can still be copied.
+        tokenField.setEditable(false);
+        tokenField.setToolTipText("Fixed value; pass token=" + DejuSettings.DEFAULT_TOKEN
+                + " to the agent");
         containerOrRemoteBox = new JBCheckBox("Traced JVM runs in a container or on another machine");
         autoAttachBox = new JBCheckBox("Auto-attach agent to Java run configurations the IDE launches");
         includesField = new JBTextField();
@@ -129,8 +135,10 @@ public final class DejuConfigurable implements Configurable {
 
         JComponent maxOpenFilesHint = hint(
                 "<html>How many files <b>Show</b> opens for one run, in execution order, the traced"
-                        + " method's own file first. Anything beyond the limit is named in a notification"
-                        + " and stays in the exported report. 0 = open every file.</html>");
+                        + " method's own file first. Anything beyond the limit is named in a notification,"
+                        + " is painted anyway, and stays in the exported report. Use"
+                        + " the button below to jump to any other class in the run."
+                        + " 0 = open every file.</html>");
 
         JButton resetButton = UiStyle.compact(new JButton("Reset to defaults", AllIcons.General.Reset));
         resetButton.setToolTipText("Restore every field on this page, including the exclusion patterns");
@@ -262,9 +270,12 @@ public final class DejuConfigurable implements Configurable {
                         + " <code>*</code> matches any run of characters, dots included.</html>");
 
         JButton perClassButton = UiStyle.compact(
-                new JButton("Per-class exclusions…", AllIcons.Actions.ListFiles));
-        perClassButton.setToolTipText("Pick individual classes seen in recorded runs, overriding the patterns above");
-        perClassButton.addActionListener(e -> ExcludedTypesDialog.show(project));
+                new JButton("Per-class & per-package exclusions…", AllIcons.Actions.ListFiles));
+        perClassButton.setToolTipText(
+                "Pick individual classes or whole packages seen in recorded runs, overriding the patterns above");
+        // Modal: this page is itself inside the modal Settings dialog, and a modeless child
+        // of one is a window the user cannot click on.
+        perClassButton.addActionListener(e -> ExcludedTypesDialog.show(project, true));
         JPanel perClassRow = new JPanel(new WrapLayout(FlowLayout.LEFT, 0, 0));
         perClassRow.add(perClassButton);
 
@@ -306,7 +317,6 @@ public final class DejuConfigurable implements Configurable {
         DejuSettings s = DejuSettings.getInstance();
         return !hostField.getText().trim().equals(nullToEmpty(s.host))
                 || !portField.getText().trim().equals(String.valueOf(s.port))
-                || !tokenField.getText().equals(s.token)
                 || containerOrRemoteBox.isSelected() != s.containerOrRemoteJvm
                 || autoAttachBox.isSelected() != s.autoAttach
                 || !includesField.getText().trim().equals(nullToEmpty(s.includes))
@@ -361,7 +371,7 @@ public final class DejuConfigurable implements Configurable {
         }
         s.host = host;
         s.port = parsedPort;
-        s.token = tokenField.getText();
+        s.token = DejuSettings.DEFAULT_TOKEN;
         s.containerOrRemoteJvm = containerOrRemoteBox.isSelected();
         s.autoAttach = autoAttachBox.isSelected();
         s.includes = includesField.getText().trim();
@@ -433,7 +443,7 @@ public final class DejuConfigurable implements Configurable {
     private void applyDefaultsToFields() {
         hostField.setText(DejuSettings.DEFAULT_HOST);
         portField.setText(String.valueOf(DejuSettings.DEFAULT_PORT));
-        tokenField.setText(DejuSettings.newToken());
+        tokenField.setText(DejuSettings.DEFAULT_TOKEN);
         containerOrRemoteBox.setSelected(DejuSettings.DEFAULT_CONTAINER_OR_REMOTE_JVM);
         autoAttachBox.setSelected(DejuSettings.DEFAULT_AUTO_ATTACH);
         includesField.setText(DejuSettings.DEFAULT_INCLUDES);

@@ -14,10 +14,68 @@
  * part is percent-encoded, so a hostile class name cannot produce a javascript: URI
  * or inject extra query parameters.
  */
-(function () {
+(function boot() {
   'use strict';
 
-  var data = JSON.parse(document.getElementById('deju-data').textContent);
+  /*
+   * A large payload is written gzipped and base64'd, so the report starts by unpacking it
+   * and then re-entering this same function with the JSON in hand. Re-entry rather than
+   * wrapping everything below in a callback: the bail-out is the first statement here, so
+   * nothing has run yet and there is nothing to undo, and the 3,000 lines underneath stay
+   * exactly as they are.
+   */
+  var payloadText = payloadJson();
+  if (payloadText === null) return;          // unpacking; boot() runs again when it lands
+
+  var data = JSON.parse(payloadText);
+  delete window.__dejuJson;
+
+  /** The payload as text, or null when it is being unpacked (or cannot be). */
+  function payloadJson() {
+    if (window.__dejuJson != null) return window.__dejuJson;
+    var plain = document.getElementById('deju-data');
+    if (plain) return plain.textContent;
+    var packed = document.getElementById('deju-data-gz');
+    if (!packed) {
+      cannotOpen('This report has no data in it. It was probably truncated in transit.');
+      return null;
+    }
+    inflate(packed.textContent, function (json) {
+      window.__dejuJson = json;
+      boot();
+    }, cannotOpen);
+    return null;
+  }
+
+  /** gzip -> text, via the platform's own decompressor; no library is shipped. */
+  function inflate(base64, ok, fail) {
+    if (typeof DecompressionStream !== 'function' || typeof Blob !== 'function') {
+      fail('This report stores its data compressed, and this browser cannot unpack it.'
+        + ' Open it in a current Chrome, Edge, Firefox or Safari.');
+      return;
+    }
+    try {
+      var bin = atob(base64.trim());
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      new Response(new Blob([bytes]).stream()
+        .pipeThrough(new DecompressionStream('gzip'))).text()
+        .then(ok, function () { fail('The data in this report could not be unpacked.'); });
+    } catch (e) {
+      fail('The data in this report could not be unpacked.');
+    }
+  }
+
+  /** Says so on the page. A blank report with an error only in the console helps nobody. */
+  function cannotOpen(message) {
+    var meta = document.getElementById('metaText');
+    if (meta) meta.textContent = 'Deju: this report could not be opened';
+    var notice = document.getElementById('notice');
+    if (notice) {
+      notice.textContent = message;
+      notice.hidden = false;
+    }
+  }
   var files = data.files || [];
   var calls = expandCalls(data.calls);
 
@@ -103,10 +161,19 @@
     return Math.floor(tm / 60) + 'h ' + (tm % 60) + 'm';
   }
 
+  /**
+   * The recording's start time, in the reader's own timezone.
+   *
+   * <p>The payload carries UTC. Rewriting only the date half of it produced
+   * "31-07-2026T09:24:18.221Z", which is neither a format anybody uses nor the time on the
+   * clock the developer was watching. The ISO string is kept on the element's title, so the
+   * exact recorded instant is still one hover away.
+   */
   function inDate(iso) {
     if (!iso) return '—';
-    var m = /^(\d{4})-(\d{2})-(\d{2})(.*)$/.exec(iso);
-    return m ? (m[3] + '-' + m[2] + '-' + m[1] + m[4]) : iso;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
   }
 
   function isGeneratedName(fq) {
@@ -401,10 +468,48 @@
     setTimeout(function () { btn.textContent = old; }, 1200);
   }
 
+  /**
+   * The small copy affordance that rides on a row.
+   *
+   * <p>Reading a trace usually ends in pasting one frame into a ticket or a chat, and the
+   * alternative was selecting across a table whose columns are separate cells. Built per
+   * rendered row rather than per recorded row, which is affordable now that only a
+   * screenful is ever in the document.
+   */
+  function copyButton(textOf) {
+    var b = el('button', 'rowcopy', '⧉');
+    b.type = 'button';
+    b.title = 'Copy this step as text';
+    b.setAttribute('aria-label', 'Copy this step as text');
+    b.addEventListener('click', function (ev) {
+      ev.stopPropagation();          // the row itself collapses on click
+      copyText(textOf(), function (ok) { flash(b, ok ? '✓' : '✕'); });
+    });
+    return b;
+  }
+
+  /** One frame as a line of text: what it was, how long it took, and who called it. */
+  function frameAsText(node) {
+    if (node.sql != null) {
+      return '#' + (node.seq + 1) + '  SQL  ' + fmt(node.totalMicros) + '\n' + node.sql;
+    }
+    var parent = nodeBySeq[node.parentSeq];
+    var parentFile = parent ? fileByClass[parent.className] : null;
+    var site = node.callSiteLine != null
+      ? '  (called at ' + ((parentFile && parentFile.sourceFileName) || simpleName(parent && parent.className) || '?')
+        + ':' + node.callSiteLine + ')'
+      : '';
+    return '#' + (node.seq + 1) + '  ' + (node.className || '?') + '.'
+      + methodLabel(node.methodName, node.className) + '()  '
+      + (node.totalMicros != null ? fmt(node.totalMicros) : '') + site;
+  }
+
   // Written to the left span, not to #meta itself: the count shares that row and a
   // textContent assignment on the parent would delete it.
-  document.getElementById('metaText').textContent =
+  var metaTextEl = document.getElementById('metaText');
+  metaTextEl.textContent =
     'Trace point: ' + (data.target || '—') + '   |   Started ' + inDate(data.startedAtIso);
+  if (data.startedAtIso) metaTextEl.title = 'Recorded at ' + data.startedAtIso;
 
   // ------------------------------------------------------------- file index ---
 
@@ -441,20 +546,21 @@
   var entryByClass = {};
 
   /**
-   * Whether a class is ticked in the Files dropdown, as the Tree view sees it.
+   * Whether a class is ticked in the Files dropdown.
    *
    * Unknown classes count as selected: a call can be recorded for a class whose source was
    * never resolved, and silently dropping those frames would hide real calls.
    *
-   * Boxes the user has never touched also count as selected here. Excluded and generated
-   * types open unticked so the Files view lands on the classes worth reading, but the Tree
-   * already has its own Essential/Full control for exactly those, and filtering them twice
-   * would leave Full with nothing extra to reveal.
+   * <p>The tick is the whole answer, in both views. It used to mean one thing in the Files
+   * view and another in the Tree, where an untouched box counted as ticked however it was
+   * drawn: the picker showed a class unticked while its frames were plainly on screen, and
+   * the same click produced different results depending on history the reader could not
+   * see. Excluded and generated files now open <i>collapsed</i> instead of unticked, which
+   * gets the Files view to the same clean landing without lying about what is filtered.
    */
   function classSelected(name) {
     var e = entryByClass[name];
-    if (!e) return true;
-    return e.checkbox.checked || !e.userToggled;
+    return e ? e.checkbox.checked : true;
   }
   var ordered = [];
   var totalLines = 0;
@@ -474,7 +580,6 @@
     box.appendChild(h);
 
     var scroll = el('div', 'scroll');
-    var table = el('table');
     var rows = [];
     var sections = [];
     var current = null;
@@ -483,6 +588,10 @@
     var red = 0;
     var partial = 0;
 
+    // Records only. Not one element is created here: a 37 MB export is a few hundred
+    // thousand lines, and syntax-colouring every one of them into a detached table cost
+    // the whole load whether or not the reader ever opened the Files view. The DOM for a
+    // file is built by buildFileTable() when the file first comes near the viewport.
     (f.lines || []).forEach(function (l) {
       var st = l.status || 'NONE';
       if (counts[st] !== undefined) counts[st]++;
@@ -490,70 +599,30 @@
       if (st === 'PARTIAL') partial++;
       totalLines++;
       if (l.timeMicros != null) selfWeight += l.timeMicros;
+      if (l.methodTotalMicros != null && l.methodTotalMicros > totalWeight) {
+        totalWeight = l.methodTotalMicros;
+      }
 
       var mname = l.methodName || null;
+      var startsSection = null;
       if (mname !== null && (current === null || current.name !== mname)) {
-        current = { name: mname, rows: [], declLine: l.line, total: null, collapsed: false };
+        current = { name: mname, rows: [], declLine: l.line, total: null, collapsed: false,
+          tr: null, caret: null, meta: null, vis: true };
         sections.push(current);
-
-        var mtr = el('tr', 'mrow');
-        var mtd = el('td');
-        mtd.colSpan = 3;
-        var head = el('div', 'mhead');
-        var mcaret = el('span', 'mcaret', '▾');
-        head.appendChild(mcaret);
-        head.appendChild(el('span', 'mname', methodLabel(mname, f.fqClassName)));
-        var kind = methodKind(mname);
-        if (kind) head.appendChild(el('span', 'mkind', kind));
-        var mmeta = el('span', 'mmeta');
-        head.appendChild(mmeta);
-        mtd.appendChild(head);
-        mtr.appendChild(mtd);
-        table.appendChild(mtr);
-
-        current.tr = mtr;
-        current.caret = mcaret;
-        current.meta = mmeta;
-
-        var sec = current;
-        mtr.addEventListener('click', function () {
-          sec.collapsed = !sec.collapsed;
-          sec.caret.textContent = sec.collapsed ? '▸' : '▾';
-          applyFilters();
-        });
+        startsSection = current;
       } else if (mname === null) {
         current = null;
       }
       if (current && l.methodStart) current.declLine = l.line;
       if (current && l.methodTotalMicros != null) current.total = l.methodTotalMicros;
 
-      var tr = el('tr', st);
-      var tm = el('td', 'time');
-      var micros = (l.methodTotalMicros != null) ? l.methodTotalMicros : l.timeMicros;
-      if (micros != null) {
-        if (l.methodTotalMicros != null && micros > totalWeight) totalWeight = micros;
-        tm.textContent = (l.methodTotalMicros != null ? '▸ ' : '') + fmt(micros);
-        tm.title = (l.methodTotalMicros != null ? 'method total' : 'line self time');
-      }
-      var code = el('td', 'code');
       var codeText = (l.code != null ? l.code : '');
-      paintCode(code, codeText);
-      if (l.branchesTotal) {
-        code.appendChild(el('span', 'br', '   (' + l.branchesCovered + '/' + l.branchesTotal + ' branches)'));
-      }
-      tr.appendChild(tm);
-      tr.appendChild(lineCell(f, l.line));
-      tr.appendChild(code);
-      table.appendChild(tr);
-
-      var rec = { tr: tr, status: st, text: codeText.toLowerCase(), line: l.line, section: current, entry: null };
+      var rec = { model: l, tr: null, status: st, text: codeText.toLowerCase(), line: l.line,
+        section: current, startsSection: startsSection, entry: null, vis: true };
       rows.push(rec);
       if (current) current.rows.push(rec);
     });
 
-    // The table is left detached until the file is near the viewport. Building it costs
-    // little; laying out every line of every file the moment the Files view opens is what
-    // used to cost, and a run touching a few hundred files never has them all on screen.
     box.appendChild(scroll);
     root.appendChild(box);
 
@@ -589,16 +658,15 @@
     var generated = isGeneratedName(f.fqClassName) || allBlank;
     if (generated) generatedCount++;
 
-    // Excluded types start unticked so the Files view opens on the classes worth reading.
-    // This is a starting selection, not a filter: the file is fully rendered and one click
-    // in this dropdown brings it back, which is why the Tree's Detail control does not
-    // reach in here and overwrite whatever the user has since chosen.
     var excluded = !!excludedClasses[f.fqClassName];
 
+    // Ticked, always. Excluded and generated files still open out of the way, but they do
+    // it by starting collapsed further down, so the tick keeps one meaning: what is
+    // filtered out. See classSelected().
     var label = el('label');
     var cb = el('input');
     cb.type = 'checkbox';
-    cb.checked = !generated && !excluded;
+    cb.checked = true;
     label.appendChild(cb);
     label.appendChild(el('span', 'mtxt', displayName));
     if (generated) label.appendChild(el('span', 'gen', '(generated)'));
@@ -608,37 +676,102 @@
 
     var firstSeq = firstSeqByClass[f.fqClassName];
     var entry = {
+      file: f,
       box: box, h: h, rows: rows, sections: sections, checkbox: cb, label: label,
       totalWeight: totalWeight, selfWeight: selfWeight, red: red, partial: partial,
       // Fall back to payload position when there is no call tree to order by.
       order: firstSeq === undefined ? 1e9 + idx : firstSeq,
-      payloadIdx: idx, caret: caret, generated: generated,
-      table: table, scroll: scroll, attached: false,
+      payloadIdx: idx, caret: caret, generated: generated, excluded: excluded,
+      table: null, scroll: scroll, attached: false,
       name: displayName, lower: displayName.toLowerCase(),
       path: f.absPath || f.path || null
     };
     entryByClass[f.fqClassName] = entry;
     rows.forEach(function (r) { r.entry = entry; });
-    sections.forEach(function (s) {
-      s.meta.textContent = (s.total != null ? fmt(s.total) + ' · ' : '')
-        + 'line ' + s.declLine + ' · ' + s.rows.length + (s.rows.length === 1 ? ' line' : ' lines');
-    });
     entries.push(entry);
   });
 
   ordered = entries.slice();
 
+  /** The clickable header for one method section, built with the rows it introduces. */
+  function sectionRow(section, fqClassName) {
+    var mtr = el('tr', 'mrow');
+    var mtd = el('td');
+    mtd.colSpan = 3;
+    var head = el('div', 'mhead');
+    var mcaret = el('span', 'mcaret', section.collapsed ? '▸' : '▾');
+    head.appendChild(mcaret);
+    head.appendChild(el('span', 'mname', methodLabel(section.name, fqClassName)));
+    var kind = methodKind(section.name);
+    if (kind) head.appendChild(el('span', 'mkind', kind));
+    var mmeta = el('span', 'mmeta',
+      (section.total != null ? fmt(section.total) + ' · ' : '')
+      + 'line ' + section.declLine + ' · ' + section.rows.length
+      + (section.rows.length === 1 ? ' line' : ' lines'));
+    head.appendChild(mmeta);
+    mtd.appendChild(head);
+    mtr.appendChild(mtd);
+
+    section.tr = mtr;
+    section.caret = mcaret;
+    section.meta = mmeta;
+    mtr.addEventListener('click', function () {
+      section.collapsed = !section.collapsed;
+      mcaret.textContent = section.collapsed ? '▸' : '▾';
+      applyFilters();
+    });
+    return mtr;
+  }
+
+  /** One source line: the timing cell, the line number, and the coloured code. */
+  function lineRow(rec, f) {
+    var l = rec.model;
+    var tr = el('tr', rec.status);
+    var tm = el('td', 'time');
+    var micros = (l.methodTotalMicros != null) ? l.methodTotalMicros : l.timeMicros;
+    if (micros != null) {
+      tm.textContent = (l.methodTotalMicros != null ? '▸ ' : '') + fmt(micros);
+      tm.title = (l.methodTotalMicros != null ? 'method total' : 'line self time');
+    }
+    var code = el('td', 'code');
+    paintCode(code, l.code != null ? l.code : '');
+    if (l.branchesTotal) {
+      code.appendChild(el('span', 'br',
+        '   (' + l.branchesCovered + '/' + l.branchesTotal + ' branches)'));
+    }
+    tr.appendChild(tm);
+    tr.appendChild(lineCell(f, l.line));
+    tr.appendChild(code);
+    rec.tr = tr;
+    return tr;
+  }
+
+  /** Puts whatever the filters last decided onto the rows of a file just built. */
+  function applyEntryVisibility(e) {
+    e.sections.forEach(function (s) { if (s.tr) s.tr.style.display = s.vis ? '' : 'none'; });
+    e.rows.forEach(function (r) { if (r.tr) r.tr.style.display = r.vis ? '' : 'none'; });
+  }
+
   /**
    * Puts a file's rows into the document the first time they are wanted.
    *
-   * <p>Everything the filters and counts read lives on the row objects, which are built up
-   * front and are cheap; only the layout is deferred, so a file that is never scrolled to
-   * is never laid out.
+   * <p>Everything the filters and counts read lives on the row records, which are built up
+   * front and are cheap. The elements are not: colouring a line of Java is the single most
+   * expensive thing this report does per line, so it waits until the file is near the
+   * viewport, and a file nobody scrolls to costs nothing at all.
    */
   function attachEntry(e) {
     if (e.attached) return;
     e.attached = true;
-    e.scroll.appendChild(e.table);
+    var table = el('table');
+    for (var i = 0; i < e.rows.length; i++) {
+      var r = e.rows[i];
+      if (r.startsSection) table.appendChild(sectionRow(r.startsSection, e.file.fqClassName));
+      table.appendChild(lineRow(r, e.file));
+    }
+    e.table = table;
+    e.scroll.appendChild(table);
+    applyEntryVisibility(e);
   }
 
   /**
@@ -697,8 +830,17 @@
   var hotOn = false;
   var treeTruncated = false;
   var treeAvailable = calls.length > 0;
+  // Queries are counted apart from invocations everywhere the report reports a total: a
+  // SQL node is in calls[] but it is not a call, and mixing the two made "Showing 2285 of
+  // 3000 call(s)" a number that could never add up against the rest of the row.
+  var sqlTotal = 0;
+  calls.forEach(function (c) { if (c.sql != null) sqlTotal++; });
+  var frameTotal = calls.length - sqlTotal;
   var detailFull = false;        // false = Essential, excluded types folded away
   var expandedRollups = {};
+  var expandedGroups = {};       // "parentSeq#key" -> repeats put back where they ran
+  var treeGroup = false;         // fold repeats of one call under their first occurrence
+  var revealPath = null;         // seq -> true for a jumped-to step and its ancestors
   var hiddenFrameCount = 0;
 
   calls.forEach(function (c) {
@@ -778,6 +920,16 @@
    * cannot become markup.
    */
   function sqlRow(node, depth, parentRow) {
+    // Deferred like every other row. This one used to build itself eagerly, so every
+    // refreshTree() re-tokenised and re-coloured every statement in the run, virtualised
+    // or not, and a repository-heavy trace paid that on each collapse and each keystroke.
+    var r = {
+      // Still a 'line' so it counts and propagates like one, but marked so the SQL
+      // toggle can hide queries without touching the code lines around them.
+      kind: 'line', sql: true, depth: depth, tr: null, parent: parentRow, status: 'FULL',
+      text: (node.sql || '').toLowerCase(), vis: true, node: node
+    };
+    r.build = function () {
     var tr = el('tr', 'sqlrow');
     var td = el('td', 'tframe');
     td.colSpan = 3;
@@ -804,6 +956,8 @@
     paintSql(code, node.sql);
     td.appendChild(code);
 
+    head.appendChild(copyButton(function () { return frameAsText(node); }));
+
     var more = el('button', 'sqlmore', 'Show full query');
     more.type = 'button';
     more.hidden = true;
@@ -813,12 +967,9 @@
     });
     td.appendChild(more);
     tr.appendChild(td);
-    return {
-      // Still a 'line' so it counts and propagates like one, but marked so the SQL
-      // toggle can hide queries without touching the code lines around them.
-      kind: 'line', sql: true, depth: depth, tr: tr, parent: parentRow, status: 'FULL',
-      text: (node.sql || '').toLowerCase(), vis: true
+    return tr;
     };
+    return r;
   }
 
   function frameRow(node, depth, parentRow) {
@@ -827,7 +978,10 @@
     var lines = linesByMethod[node.className + '#' + node.methodName] || [];
     var foldable = kids.length > 0 || lines.length > 0;
 
-    var r = { kind: 'frame', depth: depth, node: node, tr: null, parent: parentRow, vis: true };
+    // The signature is kept lower-cased on the record so the code filter can match a frame
+    // by class or method name, not only by the source text underneath it.
+    var r = { kind: 'frame', depth: depth, node: node, tr: null, parent: parentRow, vis: true,
+      text: ((node.className || '') + '.' + (node.methodName || '')).toLowerCase() };
     r.build = function () {
     var tr = el('tr', 'frame' + (hotOn && hotSeqs[node.seq] ? ' hot' : ''));
     var td = el('td', 'tframe');
@@ -865,6 +1019,7 @@
     var time = el('span', 'ftime', node.totalMicros != null ? fmt(node.totalMicros) : '');
     time.title = 'total (inclusive) time of this call';
     head.appendChild(time);
+    head.appendChild(copyButton(function () { return frameAsText(node); }));
 
     td.appendChild(head);
     tr.appendChild(td);
@@ -1015,6 +1170,83 @@
   }
 
   /**
+   * One summary row for the repeats of a call that were folded into their first occurrence.
+   *
+   * <p>Distinct from the {@code ×N more} run fold, which only ever catches repeats that
+   * happen to be adjacent. A loop that alternates two repositories produces no adjacent
+   * repeats at all and still issues the same call two hundred times, which is the shape
+   * this exists to make visible.
+   */
+  function groupRow(rep, depth, parentRow) {
+    var r = { kind: 'fold', group: true, depth: depth, tr: null, parent: parentRow, vis: true };
+    r.build = function () {
+      var tr = el('tr', 'fold grouped');
+      var td = el('td', 'tframe');
+      td.colSpan = 3;
+      td.style.setProperty('--depth', depth);
+      var head = el('div', 'foldhead');
+      head.appendChild(el('span', 'fcaret', '⊕'));
+      head.appendChild(el('span', 'fcount', '×' + (rep.n - 1) + ' more'));
+      head.appendChild(el('span', null,
+        ' of the same call, ' + fmt(rep.total) + ' total across all ' + rep.n
+        + '. Click to put them back where they ran.'));
+      td.appendChild(head);
+      tr.appendChild(td);
+      tr.addEventListener('click', function () {
+        expandedGroups[rep.id] = true;
+        refreshTree();
+      });
+      return tr;
+    };
+    return r;
+  }
+
+  /** Identity for "the same call, made again": the callee, not the call site. */
+  function repeatKey(kid) {
+    return kid.sql != null
+      ? 'q:' + String(kid.sql).replace(/\s+/g, ' ').trim()
+      : 'm:' + (kid.className || '') + '#' + (kid.methodName || '');
+  }
+
+  /** How often each call appears among one parent's children, and what it cost in total. */
+  function countRepeats(node, kids) {
+    var byKey = {};
+    for (var i = 0; i < kids.length; i++) {
+      var key = repeatKey(kids[i]);
+      var rep = byKey[key];
+      if (!rep) {
+        rep = byKey[key] = { id: node.seq + '#' + key, n: 0, total: 0, first: i,
+          hidden: 0, open: !!expandedGroups[node.seq + '#' + key] };
+      }
+      rep.n++;
+      rep.total += kids[i].totalMicros || 0;
+      if (i !== rep.first) rep.hidden += countSubtree([kids[i]]);
+      // A step somebody asked to be shown is never folded away underneath them.
+      if (onRevealPath(kids[i]) && i !== rep.first) rep.open = true;
+    }
+    return byKey;
+  }
+
+  /**
+   * Whether a call is the step the reader asked to see, or an ancestor of it.
+   *
+   * <p>Findings and the Timeline both jump to a step, and that step is routinely inside
+   * something the default view has folded away. Rather than have those views guess which
+   * folds to open, the walk simply refuses to fold anything on the path to the target.
+   */
+  function onRevealPath(kid) {
+    return revealPath !== null && revealPath[kid.seq] === true;
+  }
+
+  function anyOnRevealPath(kids, from, to) {
+    if (revealPath === null) return false;
+    for (var i = from; i < to; i++) {
+      if (revealPath[kids[i].seq] === true) return true;
+    }
+    return false;
+  }
+
+  /**
    * Emits one invocation and everything under it.
    *
    * Children are walked in sequence (execution) order and never reordered, which is the
@@ -1044,6 +1276,10 @@
       return k.sql != null || classSelected(k.className);
     });
 
+    // With grouping on, every repeat of one call under this parent is counted up front so
+    // the first occurrence can say how many followed it.
+    var repeats = treeGroup ? countRepeats(node, kids) : null;
+
     var li = 0;
     var ki = 0;
     while (ki < kids.length) {
@@ -1057,11 +1293,13 @@
       // Roll up a run of consecutive calls into excluded types. Checked before the
       // identical-run fold below because these runs are usually a mix of different
       // accessors (getId, getName, getPrice) that the identical-run rule would not catch.
-      if (!detailFull && foldableSeq[kid.seq] && !expandedRollups[kid.seq]) {
+      if (!detailFull && foldableSeq[kid.seq] && !expandedRollups[kid.seq]
+          && !onRevealPath(kid)) {
         var exEnd = ki;
         while (exEnd < kids.length
                && foldableSeq[kids[exEnd].seq]
-               && !expandedRollups[kids[exEnd].seq]) {
+               && !expandedRollups[kids[exEnd].seq]
+               && !onRevealPath(kids[exEnd])) {
           exEnd++;
         }
         var group = kids.slice(ki, exEnd);
@@ -1070,6 +1308,22 @@
         if (treeRows.length >= MAX_TREE_ROWS) { treeTruncated = true; return; }
         ki = exEnd;
         continue;
+      }
+
+      // Grouped repeats. The first occurrence stays exactly where it ran, and the ones
+      // after it are summarised on a row beneath it rather than scattered through the
+      // parent; everything that is not a repeat keeps its position untouched.
+      if (repeats) {
+        var rep = repeats[repeatKey(kid)];
+        if (rep && rep.n > 1 && !rep.open) {
+          if (rep.first !== ki) { ki++; continue; }   // already accounted for above
+          emitFrame(kid, depth + 1, row, honourCollapse, timeOk);
+          if (treeRows.length >= MAX_TREE_ROWS) { treeTruncated = true; return; }
+          hiddenFrameCount += rep.hidden;
+          treeRows.push(groupRow(rep, depth + 1, row));
+          ki++;
+          continue;
+        }
       }
 
       // Fold a run of identical consecutive calls so an N+1 loop cannot flood the page.
@@ -1082,7 +1336,12 @@
       }
       var runLen = runEnd - ki;
       var foldId = node.seq + ':' + ki;
-      var show = (runLen > FOLD_RUN_AFTER && !expandedFolds[foldId]) ? FOLD_RUN_AFTER : runLen;
+      // Full means full. The identical-run fold is there to stop an N+1 loop flooding the
+      // default view, but it was applying in Full too, so a control documented as showing
+      // every recorded call quietly kept hiding the repeats.
+      var foldable = !detailFull && !treeGroup && runLen > FOLD_RUN_AFTER
+        && !expandedFolds[foldId] && !anyOnRevealPath(kids, ki, runEnd);
+      var show = foldable ? FOLD_RUN_AFTER : runLen;
       for (var n = 0; n < show; n++) {
         emitFrame(kids[ki + n], depth + 1, row, honourCollapse, timeOk);
         if (treeRows.length >= MAX_TREE_ROWS) { treeTruncated = true; return; }
@@ -1145,6 +1404,9 @@
   var treeWrapEl = null;
   var padTop = null;
   var padBot = null;
+  var renderedFrom = -1;         // window currently in the document, so a scroll that
+  var renderedTo = -1;           // does not move it costs nothing
+  var renderDirty = true;        // set when the rows themselves changed under it
 
   function ensurePads() {
     if (padTop) return;
@@ -1155,7 +1417,40 @@
     padBot.appendChild(el('td'));
     padTop.firstChild.colSpan = 3;
     padBot.firstChild.colSpan = 3;
-    treeWrapEl.addEventListener('scroll', renderTreeWindow);
+    // The PAGE is what scrolls, so that is what the window has to follow. This used to
+    // listen on the wrapper and read its scrollTop, but the wrapper has no height limit and
+    // therefore never scrolls: scrollTop stayed 0, the event never fired, and the tree
+    // rendered exactly one 600px window at the top with the rest of the run standing as
+    // hundreds of thousands of pixels of blank space nothing could reveal.
+    window.addEventListener('scroll', onTreeScroll, { passive: true });
+    window.addEventListener('resize', onTreeScroll);
+  }
+
+  /**
+   * Painted straight from the scroll event, not behind a frame request.
+   *
+   * <p>The guard inside {@link renderTreeWindow} makes a scroll that does not move the
+   * window free, so there is nothing to throttle, and a deferred render is one more piece
+   * of state that can strand: a queue flag that is never cleared leaves the tree frozen on
+   * whatever screenful it last drew, which is indistinguishable from the bug this replaced.
+   */
+  function onTreeScroll() {
+    if (view !== 'tree' || tab !== 'trace') return;
+    renderTreeWindow();
+  }
+
+  /**
+   * The slice of the diagram's own coordinates that is currently on screen.
+   *
+   * <p>Measured from the wrapper's position in the viewport rather than from a scroll
+   * offset, so it is correct whether the tree starts below the fold, is scrolled past
+   * entirely, or is shorter than the window.
+   */
+  function treeBand() {
+    var rect = treeWrapEl.getBoundingClientRect();
+    var viewH = window.innerHeight || 800;
+    var top = Math.max(0, -rect.top);
+    return { top: top, bottom: top + viewH };
   }
 
   function rebuildOffsets() {
@@ -1178,13 +1473,34 @@
     return lo;
   }
 
+  /**
+   * Draws the rows the page is currently over, and settles the estimates behind them.
+   *
+   * <p>Rows are not a uniform height, so the offsets start as estimates and are corrected
+   * as rows are measured. Correcting them moves every row below, which can put a different
+   * set of rows under the viewport, so the pass repeats until it stops changing. Bounded at
+   * three: heights only ever become more accurate, so it converges immediately, and a cap
+   * means a pathological layout costs a wasted pass rather than a hung tab.
+   */
   function renderTreeWindow() {
-    if (!padTop) return;
+    for (var pass = 0; pass < 3; pass++) {
+      if (!paintTreeWindow()) return;
+    }
+  }
+
+  /** One pass. Returns true when measurement moved the rows and another pass is due. */
+  function paintTreeWindow() {
+    if (!padTop) return false;
     var n = visRows.length;
-    var top = treeWrapEl.scrollTop;
-    var h = treeWrapEl.clientHeight || 600;
-    var from = Math.max(0, rowAt(top) - TREE_OVERSCAN);
-    var to = Math.min(n, rowAt(top + h) + 1 + TREE_OVERSCAN);
+    var band = treeBand();
+    var from = Math.max(0, rowAt(band.top) - TREE_OVERSCAN);
+    var to = Math.min(n, rowAt(band.bottom) + 1 + TREE_OVERSCAN);
+    // Nothing moved and nothing changed: skip the DOM churn, which matters because this
+    // runs on every scroll event.
+    if (renderedFrom === from && renderedTo === to && !renderDirty) return false;
+    renderedFrom = from;
+    renderedTo = to;
+    renderDirty = false;
 
     var frag = document.createDocumentFragment();
     frag.appendChild(padTop);
@@ -1207,8 +1523,12 @@
       rebuildOffsets();
       padTop.firstChild.style.height = rowOffsets[from] + 'px';
       padBot.firstChild.style.height = Math.max(0, rowOffsets[n] - rowOffsets[to]) + 'px';
+      // Every row below just moved, so the band may map onto different rows than it did a
+      // moment ago; the caller runs another pass.
+      renderDirty = true;
     }
     syncSqlClamps();
+    return changed;
   }
 
   /**
@@ -1219,15 +1539,22 @@
    * another. Reading {@code scrollHeight} here forces one layout pass, which is why it is
    * done once for the whole table rather than per row as each is built.
    */
+  var sqlClampGeneration = 0;
   function syncSqlClamps() {
     var blocks = treeTable.querySelectorAll('pre.sqltext');
     Array.prototype.forEach.call(blocks, function (code) {
       var more = code.nextElementSibling;
       if (!more || more.className !== 'sqlmore') return;
+      // Reading scrollHeight forces layout, and this now runs behind every scroll frame.
+      // The answer only changes when the width does, so each block is measured once per
+      // resize rather than once per frame.
+      if (code.dejuClamped === sqlClampGeneration) return;
+      code.dejuClamped = sqlClampGeneration;
       var overflowing = code.scrollHeight > code.clientHeight + 1;
       more.hidden = !overflowing && code.classList.contains('clamped');
     });
   }
+  window.addEventListener('resize', function () { sqlClampGeneration++; });
 
   function applyTreeFilters() {
     var q = searchEl.value.trim().toLowerCase();
@@ -1237,19 +1564,26 @@
 
     treeRows.forEach(function (r) {
       if (r.rollup) rollupTotal++;
+      r.hit = false;
       if ((r.sql && !sqlOn) || (r.rollup && !rollupOn)) {
         r.vis = false;   // hidden outright, and never revived by parent propagation
       } else if (r.kind === 'line') {
         r.vis = statusOn[r.status] && (q === '' || r.text.indexOf(q) !== -1);
+        r.hit = r.vis;
       } else if (r.kind === 'fold') {
         r.vis = !active;
       } else {
-        r.vis = !active;   // frames light back up via propagation below
+        // A frame matches on its own signature. Searching a call tree for "OrderService"
+        // or "placeOrder" used to find nothing at all, because only source text was ever
+        // compared and a frame carries none: the one thing a reader is most likely to type
+        // was the one thing the filter could not answer.
+        r.hit = active && q !== '' && r.text.indexOf(q) !== -1;
+        r.vis = !active || r.hit;
       }
     });
     if (active) {
       treeRows.forEach(function (r) {
-        if (r.vis && r.kind !== 'frame') {
+        if (r.hit) {
           for (var p = r.parent; p; p = p.parent) p.vis = true;
         }
       });
@@ -1259,12 +1593,19 @@
     // slot instead of a table row nobody will look at.
     visRows = [];
     rowHeights = [];
+    var shownSql = 0;
     treeRows.forEach(function (r) {
       if (!r.vis) return;
       r.vi = visRows.length;
       visRows.push(r);
-      rowHeights.push(r.tr ? r.tr.offsetHeight : 0);
-      if (r.kind === 'line') shownLines++;
+      // Only rows still in the document have a height worth keeping. The parentNode test
+      // matters: after a rebuild every row is detached, and asking a detached row for its
+      // offsetHeight forces a layout of an empty table, which makes the browser clamp the
+      // page scroll to zero — that was what threw the reader back to the top of the run
+      // every time a frame was collapsed.
+      rowHeights.push(r.tr && r.tr.parentNode ? r.tr.offsetHeight : 0);
+      if (r.sql && r.kind === 'line') shownSql++;
+      else if (r.kind === 'line') shownLines++;
       else if (r.kind === 'frame') shownFrames++;
     });
     // A filter hides every fold row, so there is nothing for the toggle to act on then.
@@ -1274,21 +1615,73 @@
     syncRollupBtn();
     ensurePads();
     rebuildOffsets();
-    treeWrapEl.scrollTop = 0;
+    // Deliberately does NOT scroll anywhere. This used to snap to the top on every
+    // refresh, which meant collapsing a frame or expanding a fold five hundred rows down
+    // threw the reader back to the start of the run.
+    renderDirty = true;
     renderTreeWindow();
 
     // Counted in calls, not lines: a method invoked twice renders its lines twice, so
-    // "x of totalLines" would be meaningless here.
-    countEl.textContent = 'Showing ' + shownFrames + ' of ' + calls.length
-      + ' call(s) · ' + shownLines + ' line(s)'
+    // "x of totalLines" would be meaningless here. Queries are counted apart from both,
+    // because they are neither: totting them into the call denominator made the three
+    // numbers irreconcilable.
+    countEl.textContent = 'Showing ' + shownFrames + ' of ' + frameTotal
+      + (frameTotal === 1 ? ' call' : ' calls')
+      + (sqlTotal ? ' · ' + shownSql + ' of ' + sqlTotal
+          + (sqlTotal === 1 ? ' query' : ' queries') : '')
+      + ' · ' + shownLines + (shownLines === 1 ? ' line' : ' lines')
       + (hiddenFrameCount ? ' · ' + hiddenFrameCount + ' folded into excluded types' : '');
-    treeEmpty.hidden = shownFrames !== 0 || shownLines !== 0;
+    treeEmpty.hidden = shownFrames !== 0 || shownLines !== 0 || shownSql !== 0;
     if (cursor && !cursor.vis) clearCursor();
   }
 
+  /**
+   * Where the reader is, expressed as something that survives the rows being rebuilt.
+   *
+   * <p>A step number, plus how far it sits below the top of the viewport. Collapsing a
+   * frame or expanding a fold throws away every row object and makes new ones, so an index
+   * or a pixel offset would both point somewhere else afterwards; the step is the same step
+   * before and after.
+   */
+  function treeAnchor() {
+    if (!padTop || !rowOffsets || visRows.length === 0) return null;
+    var band = treeBand();
+    for (var k = rowAt(band.top); k < visRows.length; k++) {
+      var r = visRows[k];
+      if (r.kind === 'frame' && r.node) {
+        return { seq: r.node.seq, gap: rowOffsets[k] - band.top };
+      }
+    }
+    return null;
+  }
+
+  function restoreTreeAnchor(a) {
+    if (!a || !rowOffsets || !treeWrapEl) return;
+    var at = -1;
+    for (var k = 0; k < visRows.length; k++) {
+      var r = visRows[k];
+      if (r.kind === 'frame' && r.node && r.node.seq === a.seq) { at = k; break; }
+    }
+    if (at < 0) return;   // the anchor was folded away by whatever just happened
+    var rect = treeWrapEl.getBoundingClientRect();
+    var pageTop = (window.pageYOffset || document.documentElement.scrollTop || 0) + rect.top;
+    window.scrollTo(0, Math.max(0, pageTop + rowOffsets[at] - a.gap));
+    renderDirty = true;
+    renderTreeWindow();
+  }
+
+  var lastRefreshQuery = null;
+
   function refreshTree() {
+    // Held across the rebuild only while the filter text is unchanged. Typing is a fresh
+    // question and the answer belongs at the top; collapsing a frame is not, and used to
+    // dump the reader back to the start of the trace.
+    var sameQuery = lastRefreshQuery === searchEl.value;
+    lastRefreshQuery = searchEl.value;
+    var anchor = sameQuery ? treeAnchor() : null;
     buildTree();
     applyTreeFilters();
+    restoreTreeAnchor(anchor);
     updateNotice();
   }
 
@@ -1308,18 +1701,20 @@
       if (!e.checkbox.checked) { e.box.hidden = true; return; }
       var anyVisible = false;
       e.rows.forEach(function (r) {
-        var vis = statusOn[r.status]
+        r.vis = statusOn[r.status]
           && (q === '' || r.text.indexOf(q) !== -1)
           && !(r.section && r.section.collapsed);
-        r.tr.style.display = vis ? '' : 'none';
-        if (vis) { anyVisible = true; shownLines++; }
+        // The element only exists once the file has been attached; the record is the
+        // truth either way, and attachEntry() replays it onto the rows it builds.
+        if (r.tr) r.tr.style.display = r.vis ? '' : 'none';
+        if (r.vis) { anyVisible = true; shownLines++; }
       });
       e.sections.forEach(function (s) {
-        var anyMatch = s.rows.some(function (r) {
+        s.vis = s.rows.some(function (r) {
           return statusOn[r.status] && (q === '' || r.text.indexOf(q) !== -1);
         });
-        s.tr.style.display = anyMatch ? '' : 'none';
-        if (anyMatch) anyVisible = true;
+        if (s.tr) s.tr.style.display = s.vis ? '' : 'none';
+        if (s.vis) anyVisible = true;
       });
       e.box.hidden = !anyVisible;
       if (anyVisible) shownFiles++;
@@ -1327,8 +1722,15 @@
     attachVisibleFiles();
     countEl.textContent = 'Showing ' + shownLines + ' of ' + totalLines
       + ' line(s) · ' + shownFiles + ' file(s)';
-    emptyEl.hidden = shownLines !== 0 && shownFiles !== 0;
-    if (cursor && (cursor.tr.style.display === 'none' || cursor.entry.box.hidden)) clearCursor();
+    // Keyed on files, not lines: collapsing every method section leaves the files on
+    // screen with no lines under them, and "No lines match the current filters" printed
+    // over a page full of file headers reads as a bug in the report.
+    emptyEl.hidden = shownFiles !== 0;
+    updateNotice();
+    if (cursor && cursor.tr
+        && (cursor.tr.style.display === 'none' || (cursor.entry && cursor.entry.box.hidden))) {
+      clearCursor();
+    }
   }
 
   function applyFilters() {
@@ -1339,7 +1741,7 @@
     if (flowBuilt) drawFlow();
   }
 
-  searchEl.addEventListener('input', applyFilters);
+  searchEl.addEventListener('input', function () { applyFilters(); rememberUrlState(); });
 
   // ------------------------------------------------------------------ legend ---
 
@@ -1393,6 +1795,7 @@
     syncToolbarExtras();
     foldBtn.textContent = 'Collapse all';
     applyFilters();
+    rememberUrlState();
   }
 
   /**
@@ -1672,6 +2075,45 @@
      reading pure control flow, where a chatty repository drowns the calls around it. */
   var sqlBtn = document.getElementById('sqlBtn');
 
+  /**
+   * Opens the Code Trace on one step, whatever is currently folded over it.
+   *
+   * <p>The entry point for every "show me" link in Findings and the Timeline. Turning the
+   * filters off is deliberate: a link that lands on a blank tree because a time filter was
+   * still narrowing it would read as broken, and the reader asked for this step, not for
+   * their previous question.
+   */
+  function goToStep(seq) {
+    var node = nodeBySeq[seq];
+    if (!node) return;
+    revealPath = {};
+    for (var cur = node; cur; cur = nodeBySeq[cur.parentSeq]) {
+      revealPath[cur.seq] = true;
+      delete collapsedSeqs[cur.seq];
+      expandedRollups[cur.seq] = true;
+    }
+    if (searchEl.value !== '') { searchEl.value = ''; }
+    setTab('trace');
+    if (view !== 'tree') setView('tree');
+    else refreshTree();
+
+    for (var i = 0; i < treeRows.length; i++) {
+      var r = treeRows[i];
+      if (r.node && r.node.seq === seq && r.vis) { setCursor(r); break; }
+    }
+    // Held only for the build that just ran; leaving it set would quietly disable folding
+    // for the rest of the session.
+    revealPath = null;
+  }
+
+  var treeGroupBtn = document.getElementById('treeGroupBtn');
+  treeGroupBtn.addEventListener('click', function () {
+    treeGroup = !treeGroup;
+    treeGroupBtn.classList.toggle('on', treeGroup);
+    expandedGroups = {};
+    refreshTree();
+  });
+
   function setSql(on) {
     sqlOn = on;
     sqlBtn.classList.toggle('on', on);
@@ -1696,6 +2138,7 @@
     expandedRollups = {};
     syncToolbarExtras();
     refreshTree();
+    rememberUrlState();
   }
   detailEssentialBtn.addEventListener('click', function () { setDetail(false); });
   detailFullBtn.addEventListener('click', function () { setDetail(true); });
@@ -1738,9 +2181,12 @@
   if (generatedCount > 0) {
     var genToggle = document.getElementById('genToggle');
     document.getElementById('genCount').textContent = '(' + generatedCount + ')';
+    // Opens and closes them rather than filtering them away. Generated files are never
+    // hidden from the Tree or from the counts, they are just folded shut so the Files view
+    // is not eight screens of MapperImpl before the first line anybody wants to read.
     genToggle.addEventListener('change', function () {
       entries.forEach(function (e) {
-        if (e.generated) { e.checkbox.checked = genToggle.checked; e.userToggled = true; }
+        if (e.generated) setCollapsed(e, !genToggle.checked);
       });
       applyFilters();
     });
@@ -1748,10 +2194,29 @@
 
   // ------------------------------------------------------------------- theme ---
 
+  /* Remembered across reopenings. A report is a file you come back to, and re-picking the
+     theme every time is a small annoyance repeated forever. Wrapped because a page on
+     file:// may have no storage at all, in which case the toggle simply stops persisting
+     rather than throwing. */
+  var THEME_KEY = 'deju.report.theme';
+  function storedTheme(value) {
+    try {
+      if (value === undefined) return window.localStorage.getItem(THEME_KEY);
+      window.localStorage.setItem(THEME_KEY, value);
+    } catch (e) { /* private mode, or no storage for this origin */ }
+    return null;
+  }
+
   function toggleTheme() {
     var cur = document.documentElement.getAttribute('data-theme');
     var dark = cur ? cur === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+    var next = dark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    storedTheme(next);
+  }
+  var savedTheme = storedTheme();
+  if (savedTheme === 'dark' || savedTheme === 'light') {
+    document.documentElement.setAttribute('data-theme', savedTheme);
   }
   document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
@@ -1820,20 +2285,35 @@
     cursor = null;
   }
 
+  /**
+   * Brings a virtualised tree row on screen and returns its element.
+   *
+   * <p>The page is the scroller, so the row's position is its offset inside the table plus
+   * wherever the table happens to sit on the page. Rendering after the scroll is what makes
+   * the element exist: a row outside the window has no {@code tr} until it is asked for.
+   */
+  function scrollTreeToRow(rec) {
+    if (rec.vi == null || !rowOffsets || !treeWrapEl) return rec.tr;
+    var rect = treeWrapEl.getBoundingClientRect();
+    var pageTop = (window.pageYOffset || document.documentElement.scrollTop || 0) + rect.top;
+    var target = pageTop + rowOffsets[rec.vi] - (window.innerHeight || 800) / 2;
+    window.scrollTo(0, Math.max(0, target));
+    renderDirty = true;
+    renderTreeWindow();
+    return rec.tr;
+  }
+
   function setCursor(rec) {
     clearCursor();
     cursor = rec;
-    // A tree row outside the window has no element yet, so the list is scrolled to it
-    // first and the row exists by the time there is something to mark.
-    if (view === 'tree' && rec.vi != null && rowOffsets) {
-      var mid = rowOffsets[rec.vi] - (treeWrapEl.clientHeight || 600) / 2;
-      treeWrapEl.scrollTop = Math.max(0, mid);
-      renderTreeWindow();
-      if (!rec.tr) return;
-      rec.tr.classList.add('cursor');
+    if (view === 'tree') {
+      var tr = scrollTreeToRow(rec);
+      if (tr) tr.classList.add('cursor');
+      rememberUrlState();
       return;
     }
     if (rec.entry) attachEntry(rec.entry);
+    if (!rec.tr) return;
     rec.tr.classList.add('cursor');
     rec.tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
@@ -1887,8 +2367,14 @@
       : (fileIdx + delta + list.length) % list.length;
     if (fileIdx >= list.length) fileIdx = list.length - 1;
     var s = list[fileIdx];
-    (view === 'tree' ? s.tr : s.h).scrollIntoView({ block: 'start', behavior: 'smooth' });
     clearCursor();
+    if (view === 'tree') {
+      // Never s.tr directly: a frame outside the rendered window has no element, and
+      // reaching for scrollIntoView on it threw a TypeError on every j and k press.
+      scrollTreeToRow(s);
+      return;
+    }
+    s.h.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
 
   function isTyping(t) {
@@ -1930,6 +2416,16 @@
         e.preventDefault();
         var link = cursor && cursor.tr && cursor.tr.querySelector('td.ln a');
         if (link) link.click();
+        break;
+      }
+      case 'C': {
+        e.preventDefault();
+        var node = cursor && cursor.node;
+        if (node) {
+          copyText(frameAsText(node), function (ok) {
+            flash(problemsBtn, ok ? 'Step copied' : 'Copy failed');
+          });
+        }
         break;
       }
       case 'y': {
@@ -2035,6 +2531,13 @@
     entries.forEach(function (e) { setCollapsed(e, true); });
     hottest.forEach(function (e) { setCollapsed(e, false); });
   }
+  // Data classes and generated code fold shut on arrival, whatever the file count. This is
+  // what the file picker used to do by starting them unticked, moved somewhere it cannot be
+  // mistaken for a filter: the header, the line counts and the timings all stay on screen,
+  // and one click on the header opens the file.
+  entries.forEach(function (e) {
+    if (e.generated || e.excluded) setCollapsed(e, true);
+  });
 
   // ============================================================ tab panels ===
   //
@@ -2047,15 +2550,23 @@
   var tabTrace = document.getElementById('tabTrace');
   var tabGraph = document.getElementById('tabGraph');
   var tabFlow = document.getElementById('tabFlow');
+  var tabTimeline = document.getElementById('tabTimeline');
+  var tabFindings = document.getElementById('tabFindings');
   var tracePanel = document.getElementById('tracePanel');
   var graphPanel = document.getElementById('graphPanel');
   var flowPanel = document.getElementById('flowPanel');
+  var timelinePanel = document.getElementById('timelinePanel');
+  var findingsPanel = document.getElementById('findingsPanel');
   var traceControls = document.getElementById('traceControls');
   var graphControls = document.getElementById('graphControls');
   var flowControls = document.getElementById('flowControls');
+  var timelineControls = document.getElementById('timelineControls');
+  var findingsControls = document.getElementById('findingsControls');
   var tab = 'trace';
   var graphBuilt = false;
   var flowBuilt = false;
+  var timelineBuilt = false;
+  var findingsBuilt = false;
 
   function setTab(next) {
     if (next === tab) return;
@@ -2063,12 +2574,18 @@
     tabTrace.classList.toggle('on', next === 'trace');
     tabGraph.classList.toggle('on', next === 'graph');
     tabFlow.classList.toggle('on', next === 'flow');
+    tabTimeline.classList.toggle('on', next === 'timeline');
+    tabFindings.classList.toggle('on', next === 'findings');
     tracePanel.hidden = next !== 'trace';
     graphPanel.hidden = next !== 'graph';
     flowPanel.hidden = next !== 'flow';
+    timelinePanel.hidden = next !== 'timeline';
+    findingsPanel.hidden = next !== 'findings';
     traceControls.hidden = next !== 'trace';
     graphControls.hidden = next !== 'graph';
     flowControls.hidden = next !== 'flow';
+    timelineControls.hidden = next !== 'timeline';
+    findingsControls.hidden = next !== 'findings';
     // The filter lives in the stats row, which is outside the panels and so survives a
     // tab change. It only filters code, so it goes away where there is no code to filter.
     searchEl.hidden = next !== 'trace';
@@ -2079,14 +2596,455 @@
     } else if (next === 'flow') {
       if (!flowBuilt) { flowBuilt = true; buildFlow(); }
       drawFlow();
+    } else if (next === 'timeline') {
+      if (!timelineBuilt) { timelineBuilt = true; buildTimeline(); }
+      renderTimeline();
+    } else if (next === 'findings') {
+      if (!findingsBuilt) { findingsBuilt = true; buildFindings(); }
+      renderFindings();
     } else {
       applyFilters();   // restores the trace view's own count in the toolbar
     }
+    rememberUrlState();
   }
 
   tabTrace.addEventListener('click', function () { setTab('trace'); });
   tabGraph.addEventListener('click', function () { setTab('graph'); });
   tabFlow.addEventListener('click', function () { setTab('flow'); });
+  tabTimeline.addEventListener('click', function () { setTab('timeline'); });
+  tabFindings.addEventListener('click', function () { setTab('findings'); });
+
+  // ------------------------------------------------------------- timeline ---
+  //
+  // Where the wall clock actually went, as a waterfall in execution order.
+  //
+  // The Graph answers "which file", the Flow Graph answers "what called what". Neither
+  // answers "what was the request doing at 300 ms", and that is the question you ask when
+  // something is slow. Each row is one step, positioned along the run and split into the
+  // time it spent in its own code and the time it spent inside the calls it made.
+  //
+  // HONEST LIMIT: the agent records how long each call took, not when it started, so a
+  // step's position is derived by laying siblings end to end in the order they ran. That
+  // is exact for the durations and for the ordering, and it cannot show a gap where the
+  // request was idle between two calls, because nothing in the payload records one. Time
+  // a frame did not spend in its children shows up as its own work, which is where the
+  // useful answer usually is anyway.
+
+  var TIMELINE_MAX_ROWS = 600;     // beyond this the page stops being a waterfall
+  var TIMELINE_MIN_ROWS = 12;      // below this the threshold has told the reader nothing
+  var TIMELINE_FALLBACK_ROWS = 60; // the biggest steps, when no threshold separates them
+  var timelineBody = document.getElementById('timelineBody');
+  var timelineRuler = document.getElementById('timelineRuler');
+  var timelineEmpty = document.getElementById('timelineEmpty');
+  var timelineNote = document.getElementById('timelineNote');
+  var timelineAllBtn = document.getElementById('timelineAllBtn');
+  var timelineRows = [];
+  var timelineSpan = 0;
+  var timelineAll = false;
+
+  function buildTimeline() {
+    if (!treeAvailable) {
+      timelineEmpty.hidden = false;
+      return;
+    }
+    var childTotal = {};
+    calls.forEach(function (c) {
+      if (c.parentSeq >= 0) {
+        childTotal[c.parentSeq] = (childTotal[c.parentSeq] || 0) + (c.totalMicros || 0);
+      }
+    });
+
+    // Pre-order with the same end-to-end packing the flame view uses, so the two agree
+    // about where a step sits in the run.
+    var cursor = [0];
+    var stack = [];
+    for (var i = roots.length - 1; i >= 0; i--) stack.push({ call: roots[i], depth: 0 });
+    while (stack.length) {
+      var it = stack.pop();
+      var c = it.call;
+      var d = it.depth;
+      if (cursor[d] == null) cursor[d] = 0;
+      var total = c.totalMicros || 0;
+      timelineRows.push({
+        seq: c.seq, depth: d, t0: cursor[d], total: total,
+        own: Math.max(0, total - (childTotal[c.seq] || 0)),
+        isSql: c.sql != null,
+        // The class this step is filtered by. A query has none of its own, so it takes its
+        // caller's and lives or dies with it. The Tree and the Flow Graph get that for free
+        // by hiding whole subtrees; a flat list has to be told, and without this a hidden
+        // repository left its five queries stranded on the timeline.
+        cname: c.className || (nodeBySeq[c.parentSeq] && nodeBySeq[c.parentSeq].className) || null,
+        excluded: !!foldableSeq[c.seq]
+          || (c.sql != null && !!foldableSeq[c.parentSeq]),
+        label: c.sql != null ? sqlLabel(c.sql)
+          : (simpleName(c.className) + '.' + methodLabel(c.methodName, c.className) + '()'),
+        sub: c.sql != null ? String(c.sql).replace(/\s+/g, ' ').trim()
+          : (c.className || '')
+      });
+      cursor[d] = cursor[d] + total;
+      cursor[d + 1] = timelineRows[timelineRows.length - 1].t0;
+      var ch = childrenBySeq[c.seq] || [];
+      for (var k = ch.length - 1; k >= 0; k--) stack.push({ call: ch[k], depth: d + 1 });
+    }
+    timelineSpan = 0;
+    timelineRows.forEach(function (r) {
+      if (r.t0 + r.total > timelineSpan) timelineSpan = r.t0 + r.total;
+    });
+  }
+
+  function renderTimeline() {
+    if (!treeAvailable || timelineRows.length === 0) {
+      timelineEmpty.hidden = false;
+      return;
+    }
+    timelineEmpty.hidden = true;
+    timelineAllBtn.classList.toggle('on', timelineAll);
+    syncExcludedButtons();
+
+    // The file picker and the excluded types apply here too. They used to not, which made
+    // this the one view that answered a question nobody had asked: the whole recording,
+    // whatever you had told the report to leave out.
+    var eligible = timelineRows.filter(function (r) {
+      if (r.cname && !classSelected(r.cname)) return false;
+      return showExcluded || !r.excluded;
+    });
+    // Only the steps that own a slice of the clock, unless asked otherwise. A waterfall of
+    // sixty thousand rows is not a waterfall, and the 4 µs accessors in it are noise.
+    var floor = timelineAll ? 0 : Math.max(100, timelineSpan * 0.005);
+    var shown = eligible.filter(function (r) { return r.own >= floor; });
+    var topped = false;
+    // A run with no single expensive step, thousands of small ones adding up, would leave
+    // this blank, which reads as "no data" rather than "evenly spread". Fall back to the
+    // biggest handful, still in execution order.
+    if (!timelineAll && shown.length < TIMELINE_MIN_ROWS) {
+      shown = eligible.slice()
+        .sort(function (a, b) { return b.own - a.own; })
+        .slice(0, TIMELINE_FALLBACK_ROWS)
+        .filter(function (r) { return r.own > 0; })
+        .sort(function (a, b) { return a.t0 - b.t0 || a.depth - b.depth; });
+      topped = true;
+    }
+    var trimmed = shown.length > TIMELINE_MAX_ROWS;
+    if (trimmed) shown = shown.slice(0, TIMELINE_MAX_ROWS);
+
+    timelineNote.textContent = 'Steps laid out in the order they ran, over '
+      + fmt(timelineSpan) + '. The solid part of each bar is time in that step\'s own '
+      + 'code; the faint part is time inside the calls it made. '
+      + (timelineAll ? ''
+        : topped ? 'No single step dominates this run, so these are the '
+            + shown.length + ' that own the most. '
+        : 'Steps owning less than ' + fmt(floor) + ' are left out. ')
+      + (trimmed ? 'Showing the first ' + TIMELINE_MAX_ROWS + '. ' : '')
+      + 'Positions are derived from durations, so an idle gap cannot be shown.';
+    timelineNote.hidden = false;
+
+    var frag = document.createDocumentFragment();
+    shown.forEach(function (r) {
+      var row = el('div', 'tlrow' + (r.isSql ? ' sql' : ''));
+
+      var name = el('div', 'tlname');
+      name.style.setProperty('--depth', Math.min(r.depth, 12));
+      name.appendChild(document.createTextNode(r.label));
+      name.title = r.sub + '\nstep ' + (r.seq + 1) + ' · starts at ' + fmt(r.t0)
+        + ' · total ' + fmt(r.total) + ' · own ' + fmt(r.own);
+      row.appendChild(name);
+
+      var track = el('div', 'tltrack');
+      var bar = el('i', 'tlbar');
+      bar.style.left = pct(r.t0, timelineSpan);
+      bar.style.width = pct(Math.max(r.total, timelineSpan / 2000), timelineSpan);
+      var ownBar = el('i', 'tlown');
+      ownBar.style.width = r.total > 0
+        ? (Math.min(100, (r.own / r.total) * 100)).toFixed(3) + '%' : '100%';
+      bar.appendChild(ownBar);
+      track.appendChild(bar);
+      row.appendChild(track);
+
+      var time = el('div', 'tltime');
+      time.appendChild(el('b', null, fmt(r.own)));
+      time.appendChild(document.createTextNode(' of ' + fmt(r.total)));
+      row.appendChild(time);
+
+      row.addEventListener('click', function () { goToStep(r.seq); });
+      frag.appendChild(row);
+    });
+
+    // A scale the eye can read the bars against, at quarters of the run.
+    timelineRuler.textContent = '';
+    for (var q = 0; q <= 4; q++) {
+      var tick = el('span', 'tltick', fmt(timelineSpan * q / 4));
+      tick.style.left = (q * 25) + '%';
+      timelineRuler.appendChild(tick);
+    }
+
+    timelineBody.textContent = '';
+    timelineBody.appendChild(frag);
+    countEl.textContent = shown.length + ' of ' + timelineRows.length
+      + (timelineRows.length === 1 ? ' step' : ' steps');
+  }
+
+  function pct(value, span) {
+    return span > 0 ? ((value / span) * 100).toFixed(4) + '%' : '0%';
+  }
+
+  function timelineAsText() {
+    return timelineRows.filter(function (r) { return r.own > 0; })
+      .map(function (r) {
+        return fmt(r.t0) + '\t' + fmt(r.own) + ' own\t' + fmt(r.total) + ' total\t'
+          + new Array(r.depth + 1).join('  ') + r.label;
+      }).join('\n');
+  }
+
+  timelineAllBtn.addEventListener('click', function () {
+    timelineAll = !timelineAll;
+    renderTimeline();
+  });
+  document.getElementById('timelineCopyBtn').addEventListener('click', function () {
+    var btn = this;
+    copyText(timelineAsText(), function (ok) { flash(btn, ok ? 'Copied' : 'Failed'); });
+  });
+
+  // ------------------------------------------------------------- findings ---
+  //
+  // The report shows you everything and leaves you to spot the problem. This tab does the
+  // spotting: a handful of rules over the same payload, each one naming a concrete thing
+  // in this run and linking to the step it happened at. Nothing here is a judgement about
+  // your code, only an observation about what the recording contains, which is why every
+  // card carries the numbers it was derived from.
+
+  var findingsBody = document.getElementById('findingsBody');
+  var findingsEmpty = document.getElementById('findingsEmpty');
+  var findingsNote = document.getElementById('findingsNote');
+  var findingsBadge = document.getElementById('findingsBadge');
+  var findings = [];
+
+  /** Repeats of one call worth mentioning, and queries worth mentioning, start here. */
+  var FIND_REPEAT_CALLS = 20;      // same method this many times over
+  var FIND_N_PLUS_ONE = 3;         // identical statements from one file
+  var FIND_SHARE = 0.15;           // a step must own this share of the run to be "hot"
+
+  function addFinding(sev, title, detail, seq) {
+    findings.push({ sev: sev, title: title, detail: detail, seq: seq == null ? null : seq });
+  }
+
+  function buildFindings() {
+    var runMicros = (data.durationMs || 0) * 1000;
+    findNPlusOne();
+    findSlowQueries(runMicros);
+    findOwnTime(runMicros);
+    findRepeatedCalls();
+    findCoverageGaps();
+    findRecordingLimits();
+    // Worst first, and within a severity the order the rules ran, which is roughly the
+    // order a reader would want to act in.
+    var rank = { high: 0, med: 1, info: 2 };
+    findings.sort(function (a, b) { return rank[a.sev] - rank[b.sev]; });
+  }
+
+  /** The same statement issued over and over from one file: a query inside a loop. */
+  function findNPlusOne() {
+    var groups = {};
+    calls.forEach(function (c) {
+      if (c.sql == null) return;
+      var parent = nodeBySeq[c.parentSeq];
+      var owner = parent && parent.className ? simpleName(parent.className) : 'an unknown caller';
+      var key = owner + '\u0001' + String(c.sql).replace(/\s+/g, ' ').trim().toLowerCase();
+      var g = groups[key] || (groups[key] = { owner: owner, n: 0, micros: 0, first: c.seq,
+        sql: String(c.sql).replace(/\s+/g, ' ').trim() });
+      g.n++;
+      g.micros += c.totalMicros || 0;
+    });
+    Object.keys(groups).map(function (k) { return groups[k]; })
+      .filter(function (g) { return g.n >= FIND_N_PLUS_ONE; })
+      .sort(function (a, b) { return b.micros - a.micros; })
+      .slice(0, 5)
+      .forEach(function (g) {
+        addFinding(g.n >= 10 ? 'high' : 'med',
+          g.n + ' identical queries from ' + g.owner,
+          'The same statement ran ' + g.n + ' times and cost ' + fmt(g.micros)
+          + ' altogether. That is the shape of a query inside a loop; fetching the set in '
+          + 'one statement would replace all ' + g.n + '.\n' + shorten(g.sql, 240),
+          g.first);
+      });
+  }
+
+  /** One query that is a large share of the whole request on its own. */
+  function findSlowQueries(runMicros) {
+    var worst = null;
+    calls.forEach(function (c) {
+      if (c.sql == null) return;
+      if (!worst || (c.totalMicros || 0) > (worst.totalMicros || 0)) worst = c;
+    });
+    if (!worst || !worst.totalMicros) return;
+    var share = runMicros > 0 ? worst.totalMicros / runMicros : 0;
+    if (share < FIND_SHARE && worst.totalMicros < 50000) return;
+    addFinding(share >= 0.3 ? 'high' : 'med',
+      'One query took ' + fmt(worst.totalMicros),
+      (runMicros > 0 ? 'That is ' + Math.round(share * 100) + '% of the whole request. ' : '')
+      + 'Worth an execution plan before anything else in this trace.\n'
+      + shorten(String(worst.sql).replace(/\s+/g, ' ').trim(), 240),
+      worst.seq);
+  }
+
+  /**
+   * A frame whose own code, not the calls it made, is where the time went.
+   *
+   * <p>Total time always favours whatever sits nearest the entry point, so it names the
+   * controller in every trace and is useless. The gap between a frame's total and the sum
+   * of its children is the part that is actually attributable to it.
+   */
+  function findOwnTime(runMicros) {
+    var childTotal = {};
+    calls.forEach(function (c) {
+      if (c.parentSeq >= 0) {
+        childTotal[c.parentSeq] = (childTotal[c.parentSeq] || 0) + (c.totalMicros || 0);
+      }
+    });
+    var worst = null;
+    calls.forEach(function (c) {
+      if (c.sql != null) return;
+      var own = (c.totalMicros || 0) - (childTotal[c.seq] || 0);
+      if (own <= 0) return;
+      if (!worst || own > worst.own) worst = { node: c, own: own };
+    });
+    if (!worst) return;
+    var share = runMicros > 0 ? worst.own / runMicros : 0;
+    if (share < FIND_SHARE && worst.own < 20000) return;
+    addFinding(share >= 0.4 ? 'high' : 'med',
+      fmt(worst.own) + ' spent inside ' + simpleName(worst.node.className) + '.'
+      + methodLabel(worst.node.methodName, worst.node.className) + '()',
+      'Time this frame spent in its own code rather than in anything it called'
+      + (runMicros > 0 ? ', ' + Math.round(share * 100) + '% of the request' : '')
+      + '. If you are looking for something to optimise, it is here, not in the callers '
+      + 'above it whose totals merely contain it.',
+      worst.node.seq);
+  }
+
+  /** One method called far more often than a reader would guess from the code. */
+  function findRepeatedCalls() {
+    var byMethod = {};
+    calls.forEach(function (c) {
+      if (c.sql != null || !c.className) return;
+      var key = c.className + '#' + c.methodName;
+      var m = byMethod[key] || (byMethod[key] = { n: 0, micros: 0, first: c.seq, node: c });
+      m.n++;
+      m.micros += c.totalMicros || 0;
+    });
+    Object.keys(byMethod).map(function (k) { return byMethod[k]; })
+      .filter(function (m) { return m.n >= FIND_REPEAT_CALLS; })
+      .sort(function (a, b) { return b.micros - a.micros; })
+      .slice(0, 3)
+      .forEach(function (m) {
+        addFinding(m.n >= 200 ? 'med' : 'info',
+          simpleName(m.node.className) + '.'
+          + methodLabel(m.node.methodName, m.node.className) + '() ran ' + m.n + ' times',
+          'Costing ' + fmt(m.micros) + ' in total. One request making the same call '
+          + m.n + ' times is usually a loop that could hoist it, or a cache that is not '
+          + 'being hit. Turn on <b>Group repeats</b> to see them folded together.',
+          m.first);
+      });
+  }
+
+  /** Branches never taken and lines never reached, in the code this request touched. */
+  function findCoverageGaps() {
+    if (counts.PARTIAL > 0) {
+      addFinding('info', counts.PARTIAL + ' branch'
+        + (counts.PARTIAL === 1 ? '' : 'es') + ' only went one way',
+        'These lines ran, but at least one of their branches did not. In the code this '
+        + 'request executed, that is the part no test of this path covers. Press '
+        + '<b>x</b> for Problems only.', null);
+    }
+    if (counts.NONE > 0) {
+      addFinding('info', counts.NONE + ' line'
+        + (counts.NONE === 1 ? '' : 's') + ' inside executed methods never ran',
+        'The method was entered and these lines were skipped, so they are guards, error '
+        + 'paths, or dead code on this route.', null);
+    }
+  }
+
+  /** Anything that makes the numbers above a lower bound rather than the truth. */
+  function findRecordingLimits() {
+    if (data.callsTruncated) {
+      addFinding('high', 'The recording hit the agent\'s cap',
+        'Later invocations were dropped, so every total on this page is a lower bound. '
+        + 'Narrow Includes, or put the trace point deeper in, and record again.', null);
+    }
+    if (data.excludedOmitted) {
+      addFinding('info', 'Excluded types were exported without their source',
+        'Their frames are still counted in the timings, but there is no code to expand '
+        + 'them into. Re-export without "Essential" if you need to read them.', null);
+    }
+    var mismatch = agentMismatch();
+    if (mismatch) addFinding('med', 'Agent and plugin versions differ', mismatch, null);
+  }
+
+  /** Trims a statement for a card. Named apart from the flow renderer's own clip(). */
+  function shorten(text, n) {
+    return text.length <= n ? text : text.slice(0, n - 1) + '…';
+  }
+
+  function renderFindings() {
+    findingsBadge.textContent = String(findings.length);
+    findingsBadge.hidden = findings.length === 0;
+    findingsEmpty.hidden = findings.length > 0;
+    findingsNote.textContent = findings.length === 0 ? ''
+      : 'Derived from this recording alone. Each one links to the step it came from.';
+    findingsNote.hidden = findings.length === 0;
+
+    var frag = document.createDocumentFragment();
+    findings.forEach(function (f) {
+      var card = el('div', 'finding ' + f.sev);
+      card.appendChild(el('span', 'fsev', f.sev === 'high' ? 'Look here'
+        : (f.sev === 'med' ? 'Worth a look' : 'For information')));
+      card.appendChild(el('h4', null, f.title));
+      // The detail carries <b> from a couple of rules and a statement from others, so it
+      // is split on the tags we emit ourselves and everything else is a text node. Traced
+      // SQL never reaches innerHTML.
+      var p = el('p');
+      appendRich(p, f.detail);
+      card.appendChild(p);
+      if (f.seq != null) {
+        var go = el('button', 'act', 'Show the step');
+        go.type = 'button';
+        go.addEventListener('click', function () { goToStep(f.seq); });
+        card.appendChild(go);
+      }
+      frag.appendChild(card);
+    });
+    findingsBody.textContent = '';
+    findingsBody.appendChild(frag);
+    countEl.textContent = findings.length
+      + (findings.length === 1 ? ' finding' : ' findings');
+  }
+
+  /**
+   * Writes text that may contain the two tags the rules above emit, and nothing else.
+   *
+   * <p>Everything between them is a text node, so a class name or a statement that happens
+   * to look like markup stays text, exactly as it does everywhere else in this report.
+   */
+  function appendRich(into, text) {
+    String(text).split(/(<b>|<\/b>|\n)/).forEach(function (part) {
+      if (part === '<b>') { into.appendChild(document.createElement('b')); return; }
+      if (part === '</b>' || part === '') return;
+      if (part === '\n') { into.appendChild(document.createElement('br')); return; }
+      var last = into.lastChild;
+      var target = (last && last.tagName === 'B' && !last.firstChild) ? last : into;
+      target.appendChild(document.createTextNode(part));
+    });
+  }
+
+  function findingsAsText() {
+    return findings.map(function (f) {
+      return '[' + f.sev.toUpperCase() + '] ' + f.title + '\n'
+        + f.detail.replace(/<\/?b>/g, '') + '\n';
+    }).join('\n');
+  }
+
+  document.getElementById('findingsCopyBtn').addEventListener('click', function () {
+    var btn = this;
+    copyText(findingsAsText(), function (ok) { flash(btn, ok ? 'Copied' : 'Failed'); });
+  });
 
   // ---------------------------------------------------------------- graph ---
 
@@ -2333,6 +3291,42 @@
   var flowSql = true;
   var flowGroup = false;
   var flowHot = false;
+  /* Shared by the Flow Graph and the Timeline, so the two never disagree about whether the
+     data classes are on screen. Off by default: excluding a type is a statement that it is
+     noise, and a diagram is where noise costs the most. */
+  var showExcluded = false;
+  var flowExcludedBtn = document.getElementById('flowExcludedBtn');
+  var timelineExcludedBtn = document.getElementById('timelineExcludedBtn');
+
+  /**
+   * Keeps both copies of the control saying the same thing.
+   *
+   * <p>Hidden outright when this project excludes nothing, for the same reason the Tree's
+   * Essential/Full pair is: a switch between two identical views is a switch worth not
+   * having. Also hidden when the export dropped the excluded source, since the frames are
+   * still countable but there is nothing behind them to read.
+   */
+  function syncExcludedButtons() {
+    [flowExcludedBtn, timelineExcludedBtn].forEach(function (b) {
+      if (!b) return;
+      b.hidden = !hasExclusions;
+      b.classList.toggle('on', showExcluded);
+      b.title = showExcluded
+        ? 'Hide the types you excluded again'
+        : 'Include the types you excluded (entities, DTOs and other data classes)';
+    });
+  }
+
+  function setShowExcluded(on) {
+    showExcluded = on;
+    syncExcludedButtons();
+    if (flowBuilt) drawFlow();
+    if (timelineBuilt && tab === 'timeline') renderTimeline();
+  }
+
+  [flowExcludedBtn, timelineExcludedBtn].forEach(function (b) {
+    if (b) b.addEventListener('click', function () { setShowExcluded(!showExcluded); });
+  });
   var flowFlame = false;
   var flowFit = false;
   var flowHover = null;        // seq under the cursor, for the highlight
@@ -2449,6 +3443,9 @@
     var bits = [shown === flowNodes.length
       ? shown + ' steps in execution order'
       : shown + ' of ' + flowNodes.length + ' steps shown'];
+    if (!showExcluded && hasExclusions) {
+      bits.push('excluded types are folded away');
+    }
     if (data.callsTruncated) {
       bits.push('the recording truncated the call list, so the tail is missing');
     }
@@ -2480,6 +3477,11 @@
       // the same picker already means in the Tree. Dropping the frame but keeping its
       // children would leave callees floating under a caller that is no longer drawn.
       if (n.cname && !classSelected(n.cname)) { i += n.span; continue; }
+      // Excluded types, on the same terms the Tree's Essential view folds them: only when
+      // the whole subtree is excluded, so a getter that turned out to trigger a lazy load
+      // stays on the diagram along with the query it caused. Whole subtrees, so nothing is
+      // ever left hanging under a caller that is no longer drawn.
+      if (!showExcluded && foldableSeq[n.seq]) { i += n.span; continue; }
       if (!flowSql && n.isSql) { i += n.span; continue; }
 
       var reps = 1;
@@ -2667,6 +3669,7 @@
     }
     flowEmpty.hidden = true;
     flowWrap.hidden = false;
+    syncExcludedButtons();
     flowByDepth = {};
     var maxDepth = 0;
     flowVisible.forEach(function (n) { if (n.depth > maxDepth) maxDepth = n.depth; });
@@ -2760,10 +3763,13 @@
     flowSpacer.style.height = Math.ceil(contentH * flowScale) + 'px';
 
     // The count sits in the trace-point row, which is outside the panels and so stays on
-    // screen across tabs. Every view has to keep it true, or it would describe whichever
-    // tab was opened last.
-    countEl.textContent = 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
-      + (flowNodes.length === 1 ? ' step' : ' steps');
+    // screen across tabs. Only the tab actually in front may write to it: drawFlow also
+    // runs whenever a file filter changes, so once the Flow tab had been opened the Code
+    // Trace counter was overwritten with a step count on every keystroke.
+    if (tab === 'flow') {
+      countEl.textContent = 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
+        + (flowNodes.length === 1 ? ' step' : ' steps');
+    }
 
     paintFlow();
   }
@@ -3278,6 +4284,94 @@
     if (tab === 'flow' && flowBuilt) drawFlow();
   });
 
+  // ------------------------------------------------------------ url state ---
+  //
+  // The address bar describes what you are looking at, so "look at step 4312" is something
+  // you can send to somebody instead of describing. Written with replaceState so scrolling
+  // through a trace does not fill the back button with history.
+
+  var urlStateReady = false;
+  var applyingUrlState = false;
+
+  function rememberUrlState() {
+    if (!urlStateReady || applyingUrlState) return;
+    var parts = [];
+    if (tab !== 'trace') parts.push('tab=' + tab);
+    if (tab === 'trace' && view !== 'tree') parts.push('view=' + view);
+    if (detailFull) parts.push('detail=full');
+    var q = searchEl.value.trim();
+    if (q !== '') parts.push('q=' + encodeURIComponent(q));
+    if (tab === 'trace' && cursor && cursor.node) parts.push('step=' + (cursor.node.seq + 1));
+    var hash = parts.length ? '#' + parts.join('&') : '';
+    if (location.hash === hash || (hash === '' && location.hash === '')) return;
+    try {
+      history.replaceState(null, '', location.pathname + location.search + hash);
+    } catch (e) {
+      // Some browsers refuse replaceState on file://. The hash still works, it just
+      // leaves history entries behind, which is the lesser problem.
+      applyingUrlState = true;
+      location.hash = hash;
+      applyingUrlState = false;
+    }
+  }
+
+  function applyUrlState() {
+    var raw = location.hash.replace(/^#/, '');
+    if (!raw) return;
+    var q = {};
+    raw.split('&').forEach(function (kv) {
+      var at = kv.indexOf('=');
+      if (at > 0) {
+        try { q[kv.slice(0, at)] = decodeURIComponent(kv.slice(at + 1)); } catch (e) { /* junk */ }
+      }
+    });
+    applyingUrlState = true;
+    try {
+      if (q.q) searchEl.value = q.q;
+      if (q.detail === 'full' && hasExclusions && !excludedOmitted) setDetail(true);
+      if (q.view === 'files' && treeAvailable) setView('files');
+      else if (q.q) applyFilters();
+      var wanted = q.tab || 'trace';
+      if (wanted !== 'trace' && document.getElementById('tab' + capitalise(wanted))) {
+        setTab(wanted);
+      } else if (q.step) {
+        var step = parseInt(q.step, 10) - 1;
+        if (step >= 0 && nodeBySeq[step]) goToStep(step);
+      }
+    } finally {
+      applyingUrlState = false;
+    }
+  }
+
+  function capitalise(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  /**
+   * Puts the whole tree in the document while the page is being printed.
+   *
+   * <p>Virtualisation and printing are natural enemies: the printer asks for the document,
+   * and the document only ever holds a screenful. Bounded, because rendering a 200,000-row
+   * trace into a print job would hang the browser, and a run that long is not something
+   * anybody meant to put on paper.
+   */
+  var PRINT_ROW_LIMIT = 5000;
+  window.addEventListener('beforeprint', function () {
+    if (!padTop || view !== 'tree' || tab !== 'trace') return;
+    if (visRows.length === 0 || visRows.length > PRINT_ROW_LIMIT) return;
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < visRows.length; i++) frag.appendChild(rowEl(visRows[i]));
+    treeTable.textContent = '';
+    treeTable.appendChild(frag);
+    renderedFrom = -1;
+    renderedTo = -1;
+  });
+  window.addEventListener('afterprint', function () {
+    if (!padTop) return;
+    renderDirty = true;
+    renderTreeWindow();
+  });
+
   if (!treeAvailable) {
     // Payload from an agent with no call tree: neither the Tree view nor the flow
     // diagram has anything to draw, so both are taken out of reach.
@@ -3292,4 +4386,19 @@
   }
   applySort();
   updateNotice();
+
+  // Counted at startup, not on first open: the badge is how the reader learns the tab has
+  // anything in it, and a badge that only appears once you have already looked is useless.
+  if (treeAvailable || files.length > 0) {
+    findingsBuilt = true;
+    buildFindings();
+    findingsBadge.textContent = String(findings.length);
+    findingsBadge.hidden = findings.length === 0;
+    tabFindings.classList.toggle('hasfindings', findings.some(function (f) {
+      return f.sev === 'high';
+    }));
+  }
+
+  urlStateReady = true;
+  applyUrlState();
 })();

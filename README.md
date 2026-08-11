@@ -45,15 +45,17 @@ newer.
 ## Use
 
 1. Attach the agent to the JVM you want to trace. *Settings, Tools, Deju Trace,*
-   **Copy agent VM option** gives you the full `-javaagent` argument with a token.
+   **Copy agent VM option** gives you the full `-javaagent` argument. The token is always
+   `dejutoken`, so you can also write the flag by hand.
 2. Start your app, then connect from the Deju tool window.
 3. Put a **deju point** on a controller or entry method.
 4. Hit the endpoint.
 5. **Show** paints the executed lines in the editor. **Export** writes the HTML report.
 
 The agent listens on loopback only by default. Reaching it from a container or another
-machine takes an explicit `bind=`, and it refuses to start on a non-loopback address
-unless a token is set.
+machine takes an explicit `bind=`. The token is the fixed string `dejutoken`, published
+here and in the plugin source, so it is not a secret: the loopback binding is what keeps
+the control socket private. Open it wider only on a machine and network you trust.
 
 ## Build
 

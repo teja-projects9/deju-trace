@@ -1,5 +1,6 @@
 package org.deju.plugin.history;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -10,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.zip.GZIPOutputStream;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.intellij.openapi.application.ReadAction;
@@ -78,9 +80,7 @@ public final class HtmlReportGenerator {
      */
     public String generate(DejuPayload payload, boolean omitExcluded) throws IOException {
         Map<String, Object> model = buildModel(payload, omitExcluded);
-        String json = MAPPER.writeValueAsString(model);
-        // Prevent the JSON from closing the embedding <script> element.
-        String safeJson = json.replace("</", "<\\/");
+        String payloadBlock = payloadBlock(MAPPER.writeValueAsString(model));
 
         String logo = logoDataUri();
         String favicon = logo.isEmpty() ? "" : "<link rel=\"icon\" type=\"image/png\" href=\"" + logo + "\">";
@@ -94,7 +94,40 @@ public final class HtmlReportGenerator {
                 .replace("__SCRIPT__", resource(JS_RESOURCE))
                 .replace("__FAVICON_LINK__", favicon)
                 .replace("__LOGO_IMG__", logoImg)
-                .replace("__PAYLOAD_JSON__", safeJson);
+                .replace("__PAYLOAD_BLOCK__", payloadBlock);
+    }
+
+    /**
+     * Payloads at or above this size are gzipped into the file instead of embedded as text.
+     *
+     * <p>Below it the compression is not worth what it costs: base64 gives back a third of
+     * what gzip saves, and reading a compressed report needs {@code DecompressionStream},
+     * which an older browser may not have. A small report should open anywhere; a 40 MB one
+     * has a size problem worth trading for.
+     */
+    private static final int GZIP_ABOVE_BYTES = 256 * 1024;
+
+    /**
+     * The {@code <script>} element carrying the payload, compressed when it is large enough
+     * to matter.
+     *
+     * <p>Two forms, and exactly one is ever written, because an empty element of the other
+     * kind would be indistinguishable from a payload that is genuinely empty. Base64 uses
+     * only {@code A-Za-z0-9+/=}, so the compressed form cannot close the element it sits in
+     * and needs no escaping; the plain form still does.
+     */
+    private static String payloadBlock(String json) throws IOException {
+        byte[] utf8 = json.getBytes(StandardCharsets.UTF_8);
+        if (utf8.length < GZIP_ABOVE_BYTES) {
+            return "<script type=\"application/json\" id=\"deju-data\">"
+                    + json.replace("</", "<\\/") + "</script>";
+        }
+        ByteArrayOutputStream packed = new ByteArrayOutputStream(utf8.length / 4);
+        try (GZIPOutputStream gz = new GZIPOutputStream(packed)) {
+            gz.write(utf8);
+        }
+        return "<script type=\"application/octet-stream\" id=\"deju-data-gz\">"
+                + Base64.getEncoder().encodeToString(packed.toByteArray()) + "</script>";
     }
 
     /** Reads a bundled report resource as UTF-8. Missing means a broken build, not bad input. */

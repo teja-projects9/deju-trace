@@ -23,9 +23,12 @@
         <br/><br/>
         The companion agent is attached by you via <code>-javaagent</code>. It listens on
         loopback only by default; reaching it from a container or another host takes an
-        explicit <code>bind=</code>, and the agent refuses to start on any non-loopback
-        address unless a token is set. The plugin generates that token for you when it
-        writes the VM option. <b>No variable values are captured.</b> SQL statement text is recorded
+        explicit <code>bind=</code>. The connection token is a fixed value,
+        <code>dejutoken</code>, so a hand-written agent flag never has to be kept in step
+        with the IDE. It is published here and is therefore not a secret: what keeps the
+        control socket private is the default loopback binding, so open it up only on a
+        machine and network you trust.
+        <b>No variable values are captured.</b> SQL statement text is recorded
         so queries appear in the call tree, but bound parameters are never read and stay as
         <code>?</code> placeholders. There is no telemetry.
         <br/><br/>
@@ -35,6 +38,45 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.1.0</b>: the report tells you where to look</p>
+        <ul>
+          <li><b>Action needed: the token is now always <code>dejutoken</code>.</b> If you
+          start your app with a hand-written <code>-javaagent</code> flag, change
+          <code>token=</code> to <code>dejutoken</code> and restart it. Or copy the VM
+          option again from Settings.</li>
+          <li><b>Fixed: Code Trace showed only the first screenful.</b> Everything below it
+          was blank, however far you scrolled. Any run longer than about 30 steps was
+          affected. Scrolling now works.</li>
+          <li><b>New: a Findings tab.</b> It reads the run for you and says what stands out:
+          the same query run in a loop, one query eating the request, the method that really
+          spent the time, calls repeated far more often than you would expect. Each one
+          links to the step it came from.</li>
+          <li><b>New: a Timeline tab.</b> One bar per step, in the order they ran. The solid
+          part is time the step spent in its own code, the faint part is time inside what it
+          called, so you can tell a slow method from one that merely called something
+          slow.</li>
+          <li><b>Search now finds a class or a method.</b> Typing a name used to match only
+          the code lines, never the calls themselves.</li>
+          <li><b>Group repeats</b> folds every repeat of the same call into one row, so a
+          loop that ran two hundred times takes one line instead of two hundred.</li>
+          <li><b>Copy a step, or link to it.</b> Each step has a copy button, and the
+          address bar follows where you are, so you can send someone a link that opens on
+          the same step.</li>
+          <li><b>Reports are much smaller.</b> A big report is now packed inside the file
+          and unpacked when you open it: 6.8&nbsp;MB becomes under 900&nbsp;KB. Small
+          reports are unchanged. Very old browsers cannot open the packed ones.</li>
+          <li><b>Excluded types works by package too</b>, and double-clicking a class opens
+          it in the editor, at the method the run went through.</li>
+          <li><b>The Flow Graph and Timeline now hide your excluded types too</b>, like the
+          Code Trace already did. Before, they drew every class whatever you had excluded.
+          <b>Show excluded</b> puts them back.</li>
+          <li><b>Show</b> opens one file, the traced method's own, instead of five. The rest
+          are still coloured, and you can jump to any of them from Excluded types.</li>
+          <li>Also fixed: <b>Full</b> now really shows every call; the counts add up; the
+          date reads as a normal local date; your light/dark choice is remembered;
+          <kbd>j</kbd> and <kbd>k</kbd> no longer break; the file picker means the same
+          thing in both views; and reports print.</li>
+        </ul>
         <p><b>2.0.3</b>: reports that open at any size</p>
         <ul>
           <li><b>A large report used to be unopenable.</b> Every recorded call became a table

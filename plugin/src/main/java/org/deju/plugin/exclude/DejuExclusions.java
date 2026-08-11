@@ -36,6 +36,15 @@ public final class DejuExclusions implements PersistentStateComponent<DejuExclus
         public String customPatterns = "";
         /** Individually ticked classes, by fully-qualified name. */
         public List<String> excludedClasses = new ArrayList<>();
+        /**
+         * Whole packages ticked in the dialog's "By package" tab, as dotted names.
+         *
+         * <p>Stored as package names rather than as the {@code com.acme.dto.*} globs they
+         * compile to, so the tab can show the tick it produced. A glob folded into
+         * {@link #customPatterns} would be indistinguishable from something the user typed,
+         * and unticking the package would then have to edit their text box.
+         */
+        public List<String> excludedPackages = new ArrayList<>();
         /** Classes explicitly kept visible; these outrank any matching pattern. */
         public List<String> keptClasses = new ArrayList<>();
         /**
@@ -74,11 +83,21 @@ public final class DejuExclusions implements PersistentStateComponent<DejuExclus
         return new ArrayList<>(state.excludedClasses);
     }
 
+    public synchronized List<String> excludedPackages() {
+        return new ArrayList<>(state.excludedPackages);
+    }
+
     public synchronized List<String> keptClasses() {
         return new ArrayList<>(state.keptClasses);
     }
 
-    /** Replaces the whole configuration; called when the dialog is applied. */
+    /**
+     * Replaces the whole configuration; called when the settings page is applied.
+     *
+     * <p>Leaves {@link ExclusionState#excludedPackages} alone: the settings page has no
+     * package tab, and silently dropping the dialog's package ticks because an unrelated
+     * field was edited would be the worst kind of surprise.
+     */
     public synchronized void update(List<String> generic, String custom,
                                     List<String> excluded, List<String> kept) {
         state.genericPatterns = new ArrayList<>(generic);
@@ -86,6 +105,14 @@ public final class DejuExclusions implements PersistentStateComponent<DejuExclus
         state.excludedClasses = dedup(excluded);
         state.keptClasses = dedup(kept);
         state.configured = true;
+    }
+
+    /** As {@link #update}, plus the package tab's ticks. Called when the dialog is applied. */
+    public synchronized void update(List<String> generic, String custom,
+                                    List<String> excluded, List<String> kept,
+                                    List<String> packages) {
+        update(generic, custom, excluded, kept);
+        state.excludedPackages = dedup(packages);
     }
 
     /**
@@ -98,9 +125,20 @@ public final class DejuExclusions implements PersistentStateComponent<DejuExclus
         state = defaults();
     }
 
-    /** Every active glob: the ticked generic ones plus whatever is in the custom box. */
+    /**
+     * Every active glob: the ticked generic ones, the ticked packages, and the custom box.
+     *
+     * <p>Packages arrive as globs here rather than as a separate concept, so every consumer,
+     * the painter, the report, the dialog's own preview, keeps working off one rule list and
+     * cannot disagree about what a package tick means.
+     */
     public synchronized List<String> activePatterns() {
         Set<String> all = new LinkedHashSet<>(state.genericPatterns);
+        for (String pkg : state.excludedPackages) {
+            if (pkg != null && !pkg.trim().isEmpty()) {
+                all.add(PackageGroups.globFor(pkg.trim()));
+            }
+        }
         all.addAll(TypeExclusionMatcher.parsePatternText(state.customPatterns));
         return new ArrayList<>(all);
     }
@@ -135,6 +173,10 @@ public final class DejuExclusions implements PersistentStateComponent<DejuExclus
         }
         if (loaded.keptClasses == null) {
             loaded.keptClasses = new ArrayList<>();
+        }
+        // Absent from every workspace.xml written before the package tab existed.
+        if (loaded.excludedPackages == null) {
+            loaded.excludedPackages = new ArrayList<>();
         }
     }
 }

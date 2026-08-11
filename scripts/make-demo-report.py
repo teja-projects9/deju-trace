@@ -21,6 +21,7 @@ Usage:  python3 scripts/make-demo-report.py
 
 import json
 import base64
+import gzip
 import pathlib
 import sys
 
@@ -438,6 +439,22 @@ def encode_calls(calls):
     }
 
 
+# Mirrors HtmlReportGenerator.GZIP_ABOVE_BYTES; keep the two in step or the demo stops
+# being a test of the reader the plugin actually produces.
+GZIP_ABOVE_BYTES = 256 * 1024
+
+
+def payload_block(raw_json):
+    """The <script> element carrying the payload, compressed once it is worth it."""
+    utf8 = raw_json.encode("utf-8")
+    if len(utf8) < GZIP_ABOVE_BYTES:
+        safe = raw_json.replace("</", "<\\/")
+        return f'<script type="application/json" id="deju-data">{safe}</script>'
+    packed = gzip.compress(utf8, 9)
+    b64 = base64.b64encode(packed).decode("ascii")
+    return f'<script type="application/octet-stream" id="deju-data-gz">{b64}</script>'
+
+
 def build_calls():
     t = Trace()
     root = t.call("com.example.order.OrderController", "placeOrder", -1, None, 47900)
@@ -488,17 +505,18 @@ def main():
         "files": build_files(),
         "calls": encode_calls(build_calls()),
         "callsTruncated": False,
-        "agentVersion": "2.0.3",
-        "pluginVersion": "2.0.3",
+        "agentVersion": "2.1.0",
+        "pluginVersion": "2.1.0",
         "excludedClasses": EXCLUDED,
         # The demo ships the full document so every feature is visible; the plugin's
         # Export dialog offers an "Essential" variant that omits this source.
         "excludedOmitted": False,
     }
 
-    # Same escaping HtmlReportGenerator applies: the JSON must not be able to close the
-    # <script> element it is embedded in.
-    payload = json.dumps(model, ensure_ascii=False).replace("</", "<\\/")
+    # Same block HtmlReportGenerator writes: plain JSON below the threshold, gzipped and
+    # base64'd above it, and never both. Escaping only matters for the plain form; base64
+    # cannot close the <script> element it sits in.
+    payload = payload_block(json.dumps(model, ensure_ascii=False))
 
     logo = data_uri(RES / "icons/dejuLogo-report.png")   # 64px; see HtmlReportGenerator
     favicon = f'<link rel="icon" type="image/png" href="{logo}">' if logo else ""
@@ -511,10 +529,10 @@ def main():
             .replace("__SCRIPT__", (RES / "report/report.js").read_text(encoding="utf-8"))
             .replace("__FAVICON_LINK__", favicon)
             .replace("__LOGO_IMG__", logo_img)
-            .replace("__PAYLOAD_JSON__", payload))
+            .replace("__PAYLOAD_BLOCK__", payload))
 
     if "__" in html.replace("__", "", 0) and any(
-            tok in html for tok in ("__STYLES__", "__SCRIPT__", "__PAYLOAD_JSON__")):
+            tok in html for tok in ("__STYLES__", "__SCRIPT__", "__PAYLOAD_BLOCK__")):
         sys.exit("a placeholder was left unsubstituted, the template changed shape")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
