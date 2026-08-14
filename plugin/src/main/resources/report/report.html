@@ -11,8 +11,19 @@ __STYLES__
 </head>
 <body>
 <header>
-  <div class="brand">__LOGO_IMG__<h1>Deju Code Trace Report</h1></div>
+  <div class="brand">__LOGO_IMG__<h1>Deju Trace Report</h1></div>
+  <!-- The run's headline numbers ride in the title row rather than in a band of their own:
+       the report opens on a laptop and every row above the toolbar is a row of trace nobody
+       can see. Script appends the stat chips here. -->
+  <div id="summary" class="summary"></div>
   <div class="headtools">
+  <button class="iconbtn" id="customizeBtn" type="button"
+          title="Customize this report (g)" aria-label="Customize this report">
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M4 5h12a1 1 0 010 2H4a1 1 0 010-2zm0 4h8a1 1 0 010 2H4a1 1 0 010-2zm0 4h12a1 1 0 010 2H4a1 1 0 010-2z"/>
+      <circle cx="14" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </svg>
+  </button>
   <button class="iconbtn" id="helpBtn" type="button"
           title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
   <button class="iconbtn" id="themeToggle" type="button"
@@ -24,38 +35,37 @@ __STYLES__
   </button>
   </div>
 </header>
-<!-- Trace point on the left, what the current view is showing on the right. Two spans
-     rather than one, because the left half is written once with textContent and the right
-     half is rewritten on every filter change. -->
-<div class="meta" id="meta"><span id="metaText"></span><span class="count" id="count"></span></div>
-<!-- The code filter rides in the stats row rather than the toolbar: it is the widest
-     control on the page and the toolbar is already two lines deep on a laptop. CSS order
-     puts it last, so the stats appended here by script still come first. -->
-<div id="summary" class="summary">
+<!-- Trace point on the left, the filter and what the current view is showing on the right.
+     The filter rides here rather than in the toolbar because this row is one line on every
+     window and survives a tab change, so one box can serve whichever tab is in front. -->
+<div class="meta" id="meta"><span id="metaText"></span>
   <input class="search" id="search" type="search" placeholder="Filter code&hellip; (press /)" autocomplete="off"
-         title="Matches source text and SQL in both views. In the Tree it also matches a frame's own class and method name.">
-</div>
+         title="Filters whatever tab is in front. Each tab remembers its own filter.">
+  <span class="count" id="count"></span></div>
 <div class="toolbar" id="toolbar">
+  <!-- Each tab's button and its panel are bracketed by <!-\-tab:id-\-> markers. The export
+       dialog cuts the pairs for tabs it was told to leave out; the markers are literal
+       comments, matched exactly, because the panels nest and tag matching can be wrong. -->
   <div class="seg" id="tabSeg" role="tablist">
-    <button class="segbtn on" id="tabTrace" type="button" role="tab" title="Line coverage and the call tree">Code Trace</button>
-    <button class="segbtn" id="tabGraph" type="button" role="tab" title="Where the time went, per file">Graph</button>
-    <button class="segbtn" id="tabFlow" type="button" role="tab" title="The call flow from start to end">Flow Graph</button>
-    <button class="segbtn" id="tabTimeline" type="button" role="tab" title="Where the wall clock actually went">Timeline</button>
-    <button class="segbtn" id="tabFindings" type="button" role="tab" title="Things in this run worth a look">Findings <span class="tabbadge" id="findingsBadge" hidden></span></button>
+    <!--tab:trace--><button class="segbtn on" id="tabTrace" type="button" role="tab" aria-selected="true" title="Line coverage and the call tree">Code Trace</button><!--/tab:trace-->
+    <!--tab:graph--><button class="segbtn" id="tabGraph" type="button" role="tab" aria-selected="false" title="Where the time went, per file">Graph</button><!--/tab:graph-->
+    <!--tab:flow--><button class="segbtn" id="tabFlow" type="button" role="tab" aria-selected="false" title="The call flow from start to end">Flow Graph</button><!--/tab:flow-->
+    <!--tab:timeline--><button class="segbtn" id="tabTimeline" type="button" role="tab" aria-selected="false" title="Where the wall clock actually went">Timeline</button><!--/tab:timeline-->
+    <!--tab:findings--><button class="segbtn" id="tabFindings" type="button" role="tab" aria-selected="false" title="Things in this run worth a look">Findings <span class="tabbadge" id="findingsBadge" hidden></span></button><!--/tab:findings-->
   </div>
 
   <!-- display:contents, so these stay direct flex children of the toolbar and the
        existing wrapping is untouched; hiding the group hides the lot in one go. -->
-  <span class="ctlgroup" id="traceControls">
+<!--tab:trace-->  <span class="ctlgroup" id="traceControls">
   <div class="seg" id="viewSeg" role="tablist">
-    <button class="segbtn on" id="viewTree" type="button" role="tab">Tree</button>
-    <button class="segbtn" id="viewFiles" type="button" role="tab">Files</button>
+    <button class="segbtn on" id="viewTree" type="button" role="tab" aria-selected="true">Tree</button>
+    <button class="segbtn" id="viewFiles" type="button" role="tab" aria-selected="false">Files</button>
   </div>
 
   <!-- Tree view only -->
   <div class="seg t-only" id="detailSeg" data-owns-visibility role="tablist" hidden>
-    <button class="segbtn on" id="detailEssential" type="button" role="tab" title="Fold away calls into excluded types">Essential</button>
-    <button class="segbtn" id="detailFull" type="button" role="tab" title="Show every recorded call">Full</button>
+    <button class="segbtn on" id="detailEssential" type="button" role="tab" aria-selected="true" title="Fold away calls into excluded types">Essential</button>
+    <button class="segbtn" id="detailFull" type="button" role="tab" aria-selected="false" title="Show every recorded call">Full</button>
   </div>
   <button class="toggle t-only" id="hotBtn" type="button" title="Highlight the slowest chain of calls from the trace point">Hot path</button>
   <select class="sort t-only" id="minTime" title="Keep only calls whose own total time matches (structure is never reordered)">
@@ -130,29 +140,37 @@ Press Enter to apply, Esc to cancel.">
   <!-- Both views -->
   <button class="toggle" id="foldBtn" type="button" title="Collapse or expand everything">Collapse all</button>
   <button class="toggle" id="problemsBtn" type="button" title="Show only lines that did not fully execute">Problems only</button>
-  </span>
+  </span><!--/tab:trace-->
 
 
-  <span class="ctlgroup" id="graphControls" hidden>
+<!--tab:graph-->  <span class="ctlgroup" id="graphControls" hidden>
     <button class="toggle on" id="graphSqlBtn" type="button"
             title="Count each query against the method that issued it. Off leaves only time spent in your own code.">Include SQL</button>
     <button class="toggle" id="graphAllBtn" type="button" hidden
             title="Show every file rather than the slowest few">Show all files</button>
-  </span>
+  </span><!--/tab:graph-->
 
-  <span class="ctlgroup" id="timelineControls" hidden>
+<!--tab:timeline-->  <span class="ctlgroup" id="timelineControls" hidden>
+    <button class="toggle" id="timelineFoldBtn" type="button"
+            title="Collapse or expand every step that has steps underneath it">Collapse all</button>
     <button class="toggle excl" id="timelineExcludedBtn" type="button" hidden
             title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
     <button class="toggle" id="timelineAllBtn" type="button"
             title="Include steps too brief to matter as well as the ones that took the time">Show every step</button>
     <button class="toggle" id="timelineCopyBtn" type="button" title="Copy this table as text">Copy</button>
-  </span>
+  </span><!--/tab:timeline-->
 
-  <span class="ctlgroup" id="findingsControls" hidden>
+<!--tab:findings-->  <span class="ctlgroup" id="findingsControls" hidden>
     <button class="toggle" id="findingsCopyBtn" type="button" title="Copy every finding as text">Copy all</button>
-  </span>
+  </span><!--/tab:findings-->
 
-  <span class="ctlgroup" id="flowControls" hidden>
+<!--tab:flow-->  <span class="ctlgroup" id="flowControls" hidden>
+    <select class="sort" id="flowScopeSel"
+            title="Which steps the filter box keeps. Matching keeps the callers above a match so the chain stays whole.">
+      <option value="sub">Match &plus; callees</option>
+      <option value="only">Match only</option>
+      <option value="pkg">Match package</option>
+    </select>
     <button class="toggle on" id="flowSqlBtn" type="button" title="Show or hide SQL steps">SQL</button>
     <button class="toggle" id="flowGroupBtn" type="button"
             title="Fold a run of identical sibling calls into one box marked with its count">Group repeats</button>
@@ -162,16 +180,28 @@ Press Enter to apply, Esc to cancel.">
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
     <button class="toggle" id="flowFlameBtn" type="button"
             title="Lay the diagram out by time instead of by nesting: box width is duration">Flame</button>
+    <select class="sort" id="flowColorSel" title="What a frame's colour means in the flame layout">
+      <option value="glowroot">Glowroot</option>
+      <option value="deju">Deju</option>
+      <option value="pkg">By package</option>
+    </select>
+    <select class="sort" id="flowMinWSel" title="Narrowest a frame may be drawn in the flame layout. Above 1px the diagram stops being a true time axis, and every frame becomes visible instead.">
+      <option value="1">Every frame 1px</option>
+      <option value="3">Every frame 3px</option>
+      <option value="12">Every frame 12px</option>
+      <option value="34">Every frame labelled</option>
+    </select>
     <span class="zoomseg">
       <button class="toggle zoombtn" id="flowOutBtn" type="button" title="Zoom out">&minus;</button>
       <button class="toggle zoombtn" id="flowInBtn" type="button" title="Zoom in">&plus;</button>
     </span>
     <button class="toggle" id="flowFitBtn" type="button" title="Scale the diagram to fit the window width">Fit width</button>
     <button class="toggle" id="flowPngBtn" type="button" title="Save the diagram as a PNG image">Save PNG</button>
-  </span>
+    <button class="toggle" id="flowSvgBtn" type="button" title="Save the diagram as an SVG image: vector, so it stays sharp at any zoom, and has no size limit">Save SVG</button>
+  </span><!--/tab:flow-->
 
 </div>
-<div id="tracePanel">
+<!--tab:trace--><div id="tracePanel" role="tabpanel">
   <div id="legend" class="legend"></div>
   <p class="notice" id="notice" hidden></p>
 
@@ -188,9 +218,9 @@ Press Enter to apply, Esc to cancel.">
     <div id="empty" class="empty" hidden>No lines match the current filters.</div>
   </section>
 </div>
-
+<!--/tab:trace-->
 <!-- Graph and Flow are built on first open and never on load; both stay empty until then. -->
-<section id="graphPanel" hidden>
+<!--tab:graph--><section id="graphPanel" role="tabpanel" hidden>
   <p class="panelnote" id="graphNote"></p>
   <div class="graphlegend">
     <span><i class="sw sw-self"></i>Own code</span>
@@ -198,35 +228,35 @@ Press Enter to apply, Esc to cancel.">
   </div>
   <div id="graphBody"></div>
   <div class="empty" id="graphEmpty" hidden>This run recorded no per-file timing.</div>
-</section>
+</section><!--/tab:graph-->
 
-<section id="flowPanel" hidden>
+<!--tab:flow--><section id="flowPanel" role="tabpanel" hidden>
   <p class="panelnote" id="flowNote"></p>
   <div class="flowcrumb" id="flowCrumb" hidden></div>
   <div class="flowwrap" id="flowWrap"></div>
   <div class="flowtip" id="flowTip" hidden></div>
   <div class="empty" id="flowEmpty" hidden>This run recorded no call tree.</div>
-</section>
+</section><!--/tab:flow-->
 
-<section id="timelinePanel" hidden>
+<!--tab:timeline--><section id="timelinePanel" role="tabpanel" hidden>
   <p class="panelnote" id="timelineNote"></p>
   <div class="tlruler" id="timelineRuler"></div>
   <div id="timelineBody"></div>
   <div class="empty" id="timelineEmpty" hidden>This run recorded no call tree.</div>
-</section>
+</section><!--/tab:timeline-->
 
-<section id="findingsPanel" hidden>
+<!--tab:findings--><section id="findingsPanel" role="tabpanel" hidden>
   <p class="panelnote" id="findingsNote"></p>
   <div id="findingsBody"></div>
   <div class="empty" id="findingsEmpty" hidden>Nothing stood out in this run.</div>
-</section>
+</section><!--/tab:findings-->
 
 <div class="help" id="help" hidden>
   <div class="card">
     <h3>Keyboard shortcuts</h3>
     <dl>
       <dt><kbd>v</kbd></dt><dd>Switch between Tree and Files</dd>
-      <dt><kbd>/</kbd></dt><dd>Focus the filter: source text, SQL, and (in Tree) class and method names</dd>
+      <dt><kbd>/</kbd></dt><dd>Focus the filter. Every tab has one and each keeps its own</dd>
       <dt><kbd>n</kbd> / <kbd>p</kbd></dt><dd>Next / previous problem line</dd>
       <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous call frame (Tree) or file (Files)</dd>
       <dt><kbd>e</kbd> / <kbd>c</kbd></dt><dd>Expand all / collapse all</dd>
@@ -237,9 +267,36 @@ Press Enter to apply, Esc to cancel.">
       <dt><kbd>y</kbd></dt><dd>Copy the current file's path</dd>
       <dt><kbd>Shift</kbd>+<kbd>C</kbd></dt><dd>Copy the current step as text</dd>
       <dt><kbd>t</kbd></dt><dd>Toggle light / dark theme</dd>
+      <dt><kbd>g</kbd></dt><dd>Customize what this report shows</dd>
       <dt><kbd>?</kbd></dt><dd>This help</dd>
-      <dt><kbd>Esc</kbd></dt><dd>Close help, or clear the filter</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Close a panel, or clear the filter</dd>
     </dl>
+    <h3>Customizing</h3>
+    <p>The slider button in the header opens <b>Customize</b>: which columns are shown, how
+    tightly the rows are packed, the theme, which tab the report opens on, and what starts
+    folded. Those choices are yours alone. They are kept in this browser and not written back
+    into the file, so the copy you forward still opens the way it was exported.</p>
+    <p>What a report opens with is set when it is exported, in the plugin's Export dialog,
+    along with which tabs are written into the file at all. A tab left out there is not in the
+    document and Customize cannot bring it back.</p>
+    <p>Filters, the time threshold and Essential/Full are deliberately not in that panel. They
+    change which calls you are looking at rather than how they look, so they stay in the
+    toolbar where they are visible.</p>
+
+    <h3>Filtering</h3>
+    <p>The box beside the trace point filters whichever tab is in front, and each tab keeps
+    its own query, so narrowing the tree down to one class does not also empty the Flow
+    Graph. What a match means differs by tab, and the box says which as you switch: source
+    text and SQL in <b>Code Trace</b>, a file or package name in <b>Graph</b>, a step label
+    in <b>Timeline</b>, a title or detail in <b>Findings</b>, and in <b>Flow Graph</b> a
+    regular expression over the step signature.</p>
+    <p>The Flow Graph's dropdown decides what a match brings with it. <b>Matches +
+    callers</b> keeps everything a matching step went on to call along with the chain of
+    callers above it, so the diagram still says how the code got there. <b>Matches only</b>
+    drops the callees, for when the shape of the calls <i>into</i> a layer is the question.
+    <b>Whole package</b> matches on package names rather than signatures, which is the
+    grouping a layered codebase is actually navigated by. A pattern that will not compile
+    is used as plain text rather than reported as an error.</p>
     <h3>Findings</h3>
     <p>A handful of rules run over this recording and name what stands out in it: the same
     statement issued in a loop, one query that is most of the request, the frame that spent
@@ -253,6 +310,11 @@ Press Enter to apply, Esc to cancel.">
     the calls it made. That split is the one the other views cannot show you, and it is
     what tells a slow method apart from a method that merely called something slow. Only
     the steps that own a meaningful share are listed; <b>Show every step</b> lifts that.</p>
+    <p>The caret on a row folds away everything that step called, however far down the run
+    those calls are; <b>Collapse all</b> does it to the lot. Hovering a row reveals three
+    actions: <b>line</b> opens the calling line in the IDE, <b>sql</b> opens the statement
+    behind a query formatted and coloured in place, and <b>step</b> jumps to that frame in
+    the Code Trace.</p>
     <p>One honest limit: the agent records how long each call took, not when it started, so
     positions are derived by laying calls end to end in the order they ran. Durations and
     ordering are exact; a gap where the request sat idle cannot be shown, because nothing in
@@ -272,6 +334,21 @@ Press Enter to apply, Esc to cancel.">
     depth. Each box is one invocation; the bar inside it is that call's total time relative
     to the whole run. Hover for the full signature and timing. It is the same data as the
     Tree view, laid out so a long chain of calls is visible at a glance.</p>
+    <p><b>Flame</b> lays the same tree out by time instead: box width is duration, the entry
+    point holds the floor and the stack grows <i>upward</i>, so the tallest column is the
+    deepest chain and the widest box is the slowest call &mdash; the orientation Glowroot and
+    every other JVM flame graph uses. Each box carries its time and its share of what is on
+    screen. Clicking one makes it the new 100%; the trail above the diagram walks back out.</p>
+    <p>Colour carries identity, since most boxes are too narrow to label. <b>Glowroot
+    colours</b> is the familiar warm ramp, <b>Deju colours</b> is this report's own palette,
+    and <b>By package</b> gives up per-class identity for per-layer identity, which is the
+    only thing that still reads once a run touches two hundred classes. Queries keep a fill
+    of their own in every scheme, because telling a query from a method is the one
+    distinction here that has to survive.</p>
+    <p><b>Save PNG</b> and <b>Save SVG</b> both write whatever the diagram is showing right
+    now, filters and zoom included. The SVG is vector, so it stays sharp however far it is
+    zoomed, and it has no size ceiling &mdash; a diagram too wide for one image comes out
+    whole, where the PNG saves only the visible part and says so.</p>
     <h3>Reading the tree</h3>
     <p>The <b>numbered badge</b> on each frame is its step number: the order the methods
     actually ran. A
@@ -334,6 +411,24 @@ Press Enter to apply, Esc to cancel.">
   </div>
 </div>
 
+<!-- Customize. The rows are built by script from what actually survived the export, so a
+     tab the exporter dropped is never offered here as something that could be switched on. -->
+<div class="help" id="custom" hidden>
+  <div class="card">
+    <h3>Customize this report</h3>
+    <p class="cushint">Yours only. Saved in this browser for this report, never in the file,
+      so what you change here is not what anyone else sees when they open their copy.</p>
+    <div id="customBody"></div>
+    <div class="curow curow-end">
+      <button class="toggle" type="button" id="customReset">Reset to the exported defaults</button>
+      <button class="toggle close" type="button" id="customClose">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- What the export dialog chose. Read once at load; absent in a report written by an older
+     plugin, in which case the script's own defaults apply and nothing changes. -->
+__PREFS_BLOCK__
 __PAYLOAD_BLOCK__
 <script>
 __SCRIPT__

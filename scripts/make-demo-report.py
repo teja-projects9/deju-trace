@@ -15,6 +15,12 @@ every feature has an obvious reason to appear:
   * identical-run folding      the five repeated menu lookups
   * excluded-type roll-up      the DTO mapping at the end
   * Files view                 method sections with line and timing counts
+  * percentages                every duration's share of the 48 ms run
+  * Customize panel            the header's slider button, over a full set of tabs
+
+The demo keeps every tab and every default, because a Marketplace sample exists to show
+what the plugin can do. To see what a trimmed export looks like instead, edit DEMO_TABS or
+DEMO_PREFS below; both go through the same cutting and substitution a real export does.
 
 Usage:  python3 scripts/make-demo-report.py
 """
@@ -340,6 +346,29 @@ EXCLUDED = ["com.example.order.OrderDto", "com.example.order.OrderLineDto"]
 
 DRINKS = ["Flat White", "Latte", "Cortado", "Mocha", "Espresso"]
 
+# Tabs written into the demo, and the position it opens in. Mirrors ReportPrefs, whose
+# defaults are the report's long-standing behaviour; the demo keeps all of them, because a
+# Marketplace sample exists to show what the plugin can do.
+#
+# Kept as data rather than inlined so that regenerating the demo with a tab cut, to check
+# what a trimmed export actually looks like, is a one-line edit rather than a rewrite.
+ALL_TABS = ["trace", "graph", "flow", "timeline", "findings"]
+DEMO_TABS = list(ALL_TABS)
+DEMO_PREFS = {
+    "openTab": "trace",
+    "view": "tree",
+    "density": "normal",
+    "theme": "auto",
+    "showTime": True,
+    "showPercent": True,
+    "showStep": True,
+    "showLine": True,
+    "sql": True,
+    "groupRepeats": False,
+    "collapseTree": False,
+    "collapseSections": False,
+}
+
 SQL_DRINK = "select id, name, base_price_pence from drink where name = ?"
 SQL_MEMBER = "select count(*) from membership where customer_id = ?"
 SQL_POINTS = "update customer set points = points + ? where id = ?"
@@ -455,6 +484,43 @@ def payload_block(raw_json):
     return f'<script type="application/octet-stream" id="deju-data-gz">{b64}</script>'
 
 
+def prefs_block(prefs, tabs):
+    """The <script> element carrying the starting position, as ReportPrefs.toModel() writes it.
+
+    The tab list is deliberately not in it: by the time the report runs, a dropped tab is
+    simply not in the document, and openTab is corrected here so the file cannot open on a
+    tab that was cut out from under it.
+    """
+    model = dict(prefs)
+    if model["openTab"] not in tabs:
+        model["openTab"] = next((t for t in ALL_TABS if t in tabs), "trace")
+    return ('<script type="application/json" id="deju-prefs">'
+            + json.dumps(model, ensure_ascii=False) + "</script>")
+
+
+def drop_tabs(template, tabs):
+    """Cuts the markup of every tab not in `tabs`, exactly as HtmlReportGenerator.dropTabs does.
+
+    Mirrored rather than skipped even though the demo keeps every tab: the point of this
+    script is that the demo goes through the same steps a real export does, so a template
+    change that breaks the cutting is caught here too.
+    """
+    out = template
+    for tab in ALL_TABS:
+        if tab in tabs:
+            continue
+        opener, closer = f"<!--tab:{tab}-->", f"<!--/tab:{tab}-->"
+        while True:
+            start = out.find(opener)
+            if start < 0:
+                break
+            end = out.find(closer, start)
+            if end < 0:
+                break       # unbalanced template; leave the rest of the document alone
+            out = out[:start] + out[end + len(closer):]
+    return out
+
+
 def build_calls():
     t = Trace()
     root = t.call("com.example.order.OrderController", "placeOrder", -1, None, 47900)
@@ -522,18 +588,25 @@ def main():
     favicon = f'<link rel="icon" type="image/png" href="{logo}">' if logo else ""
     logo_img = f'<img class="logo" alt="" src="{logo}">' if logo else ""
 
-    html = (RES / "report/report.html").read_text(encoding="utf-8")
+    # Tabs are cut from the raw template, before anything is substituted into it, so the
+    # markers can only ever match the template's own markup and never traced source.
+    html = drop_tabs((RES / "report/report.html").read_text(encoding="utf-8"), DEMO_TABS)
     # Payload last, so traced source containing a placeholder token cannot be expanded.
     html = (html
             .replace("__STYLES__", (RES / "report/report.css").read_text(encoding="utf-8"))
             .replace("__SCRIPT__", (RES / "report/report.js").read_text(encoding="utf-8"))
             .replace("__FAVICON_LINK__", favicon)
             .replace("__LOGO_IMG__", logo_img)
+            .replace("__PREFS_BLOCK__", prefs_block(DEMO_PREFS, DEMO_TABS))
             .replace("__PAYLOAD_BLOCK__", payload))
 
-    if "__" in html.replace("__", "", 0) and any(
-            tok in html for tok in ("__STYLES__", "__SCRIPT__", "__PAYLOAD_BLOCK__")):
-        sys.exit("a placeholder was left unsubstituted, the template changed shape")
+    # Every placeholder the template can carry. A new one added to report.html and forgotten
+    # here would otherwise ship as literal text in the middle of the Marketplace sample.
+    left = [tok for tok in ("__STYLES__", "__SCRIPT__", "__FAVICON_LINK__", "__LOGO_IMG__",
+                            "__PREFS_BLOCK__", "__PAYLOAD_BLOCK__") if tok in html]
+    if left:
+        sys.exit("placeholder(s) left unsubstituted, the template changed shape: "
+                 + ", ".join(left))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(html, encoding="utf-8")
@@ -541,6 +614,7 @@ def main():
     print(f"wrote {OUT.relative_to(ROOT)}  ({len(html):,} bytes)")
     print(f"  {len(model['files'])} files, {calls['n']} call nodes, "
           f"{sum(1 for q in calls['sql'] if q >= 0)} queries, {len(EXCLUDED)} excluded types")
+    print(f"  tabs: {', '.join(DEMO_TABS)}  ·  opens on {DEMO_PREFS['openTab']}")
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@
   --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
   --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
   /* macOS surface tokens: hairline separators, soft elevation, translucent chrome. */
-  --hairline:rgba(0,0,0,.10);
+  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22);
   --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
   --elev-sm:0 1px 2px rgba(0,0,0,.06);
   --glass:rgba(255,255,255,.72);
@@ -42,7 +42,7 @@
   --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
   --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
   --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
-  --hairline:rgba(255,255,255,.10);
+  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34);
   --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
   --elev-sm:0 1px 2px rgba(0,0,0,.35);
   --glass:rgba(38,40,44,.72);
@@ -57,7 +57,7 @@
   --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
   --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
   --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
-  --hairline:rgba(255,255,255,.10);
+  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34);
   --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
   --elev-sm:0 1px 2px rgba(0,0,0,.35);
   --glass:rgba(38,40,44,.72);
@@ -72,7 +72,7 @@
   --sql-ink:#ff9933; --flow-cls:#2e9e4f; --flow-mth:#2f6fd0;
   --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
   --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
-  --hairline:rgba(0,0,0,.10);
+  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22);
   --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
   --elev-sm:0 1px 2px rgba(0,0,0,.06);
   --glass:rgba(255,255,255,.72);
@@ -84,8 +84,9 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,sans-serif;
   margin:0;padding:1.25rem;background:var(--bg);color:var(--fg);
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
-.brand{display:flex;align-items:center;gap:.6rem;}
+header{display:flex;align-items:center;gap:.9rem;flex-wrap:wrap;
+  padding-bottom:.5rem;border-bottom:1px solid var(--hairline);}
+.brand{display:flex;align-items:center;gap:.6rem;flex:0 0 auto;}
 .brand .logo{width:28px;height:28px;border-radius:6px;flex:0 0 auto;}
 h1{font-size:1.05rem;margin:0;}
 /* "Code Traces" as a chip beside the product name, in the same yellow-fill/green-ink
@@ -106,8 +107,19 @@ h1{font-size:1.05rem;margin:0;}
 .iconbtn:hover{background:var(--control-hover);color:var(--fg);border-color:var(--border);}
 .iconbtn:active{transform:translateY(.5px);}
 .iconbtn svg{display:block;}
-.meta{display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;
-  color:var(--muted);font-size:.82rem;margin:.35rem 0 .75rem;}
+.meta{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  color:var(--muted);font-size:.82rem;margin:.5rem 0 .7rem;}
+/* Pushed right so the trace point keeps the left edge. The count follows it and gets no
+   free space of its own, which keeps the two together at the end of the row. */
+.meta .search{margin-left:auto;flex:0 1 20rem;min-width:10rem;font-size:.8rem;
+  padding:.3rem .85rem;background:var(--panel);}
+/* The trace point takes whatever is left and truncates rather than pushing the count onto
+   a second line: this row exists to be one line, which is the whole point of folding the
+   stats into the title above it. The full text stays on the element's title. */
+.meta #metaText{flex:1 1 14rem;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;}
+.meta .count{flex:0 0 auto;}
+.meta .search[hidden]{display:none;}
 
 .legend{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.78rem;}
 .legend .chip{padding:.15rem .6rem;border-radius:99px;border:1px solid var(--hairline);
@@ -330,20 +342,30 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .genToggle{display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--muted);cursor:pointer;white-space:nowrap;}
 .genToggle[hidden]{display:none;}
 .count{color:var(--muted);font-size:.78rem;margin-left:auto;white-space:nowrap;}
+/* The share of the run, riding inside the time it qualifies. Dimmer and smaller than the
+   duration: the number is the measurement, the percentage is the context for it, and a
+   reader scanning a column of frames should still be scanning durations. */
+.fpct{margin-left:.4rem;font-size:.72em;font-weight:400;color:var(--muted);
+  font-variant-numeric:tabular-nums;}
+.ftime .fpct,.tltime .fpct{opacity:.85;}
 
-.summary{display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;margin:.25rem 0 .9rem;padding:.55rem .8rem;background:var(--panel);border:1px solid var(--border);border-radius:8px;}
-/* Ordered last and pushed right, so the stats the script appends after it in the DOM
-   still read left to right. Sized to the stat blocks' own height rather than the
-   toolbar's, which is why it does not simply inherit .search. */
-.summary .search{order:2;margin-left:auto;height:2.3rem;font-size:.85rem;
-  padding:.3rem 1rem;flex:0 1 24rem;min-width:11rem;background:var(--bg);}
-.summary .stat{display:flex;flex-direction:column;line-height:1.25;}
-.summary .stat b{font-size:1rem;font-weight:600;}
+/* The run's headline numbers, inline in the title row. Value and caption sit on one line
+   divided by hairlines, so five stats cost the height of the heading beside them rather
+   than a banded row of their own above the toolbar. */
+.summary{display:flex;align-items:center;flex-wrap:wrap;gap:.15rem .1rem;
+  flex:1 1 auto;min-width:0;margin:0;}
+.summary .stat{display:flex;align-items:baseline;gap:.35rem;line-height:1.2;
+  padding:.1rem .8rem;border-left:1px solid var(--hairline);white-space:nowrap;}
+.summary .stat:first-child{border-left:0;}
+.summary .stat b{font-size:.92rem;font-weight:600;font-variant-numeric:tabular-nums;}
 /* The seconds/minutes reading beside a millisecond total: present, but clearly secondary
    to the figure it restates. */
-.summary .stat b .statalt{font-size:.78rem;font-weight:400;color:var(--muted);
+.summary .stat b .statalt{font-size:.75rem;font-weight:400;color:var(--muted);
   text-transform:none;letter-spacing:0;}
-.summary .stat span{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+.summary .stat span{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+/* A stat the reader must not take at face value: something was capped or dropped. */
+.summary .stat.warn b{color:var(--sql-ink);}
+.summary .stat.warn{cursor:help;}
 .empty{color:var(--muted);font-size:.85rem;padding:1rem;border:1px dashed var(--border);border-radius:8px;text-align:center;}
 .notice{color:var(--muted);font-size:.76rem;margin:0 0 .75rem;}
 
@@ -422,6 +444,10 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
   font-size:.74rem;line-height:1.45;}
 .flowtip .t-sig{font-weight:600;}
 .flowtip .t-sub{color:var(--muted);}
+/* The run-wide figures sit between the signature and the step line: brighter than the
+   muted footnote because they are usually the reason the frame was hovered, but not the
+   heading. */
+.flowtip .t-stat{color:var(--fg);opacity:.85;margin-top:.15rem;}
 .flowtip .t-sql{font-family:SFMono-Regular,Consolas,monospace;font-size:.7rem;
   white-space:pre-wrap;word-break:break-word;margin-top:.2rem;}
 
@@ -455,17 +481,42 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 
 /* ------------------------------------------------------------------ timeline --- */
 
-.tlruler{position:relative;height:1.1rem;margin:0 0 .25rem;
-  /* Same three columns as a row, so the ticks line up with the bars under them. */
-  padding-left:calc(22rem + .5rem);padding-right:7rem;}
+.tlruler{position:relative;height:1.1rem;
+  /* Inset to exactly the bar track below it, so a tick sits over the time it names. Margin
+     rather than padding: the ticks are absolutely positioned, and both their 0% and their
+     100% resolve against this element's PADDING box — which includes any padding it has, so
+     padding here moved the label text and left every tick exactly where it was. The ruler
+     read a whole column to the left of the bars it was meant to be a scale for. */
+  margin:0 13.8rem .25rem 23.1rem;}
 .tltick{position:absolute;top:0;transform:translateX(-50%);font-size:.66rem;color:var(--muted);
   white-space:nowrap;}
 .tltick:first-child{transform:none;}
 .tltick:last-child{transform:translateX(-100%);}
 
-.tlrow{display:grid;grid-template-columns:22rem 1fr 7rem;gap:.5rem;align-items:center;
-  padding:.14rem .3rem;border-radius:var(--radius-sm);cursor:pointer;}
+.tlrow{display:grid;grid-template-columns:1rem 21rem 1fr 8.5rem 4.6rem;gap:.4rem;
+  align-items:center;padding:.14rem .3rem;border-radius:var(--radius-sm);}
+/* Only rows that actually have steps underneath them get a caret; the column is kept on
+   the others so a leaf and a parent still line their names up. */
+.tlcaret{font-size:.82rem;line-height:1;color:var(--fg);opacity:.5;text-align:center;
+  user-select:none;cursor:pointer;border-radius:3px;}
+.tlcaret.leaf{visibility:hidden;cursor:default;}
+.tlcaret:hover{background:var(--control-hover);opacity:1;}
+/* Hidden until the row is hovered, the same rule .rowcopy follows in the tree: a column
+   of two hundred rows should not be a column of six hundred buttons. */
+.tlacts{display:flex;gap:.15rem;justify-content:flex-end;opacity:0;transition:opacity .12s;}
+.tlrow:hover .tlacts,.tlacts:focus-within{opacity:1;}
+.tlacts button,.tlacts a{font:inherit;font-size:.66rem;line-height:1;padding:.2rem .35rem;
+  border:1px solid var(--hairline);border-radius:var(--radius-sm);background:var(--control);
+  color:var(--muted);cursor:pointer;text-decoration:none;}
+.tlacts button:hover,.tlacts a:hover{color:var(--fg);background:var(--control-hover);}
+/* The statement a row issued, opened in place rather than in a tooltip that cannot be
+   copied out of. Spans the whole grid so a long query is not squeezed into one column. */
+.tlsql{grid-column:1/-1;margin:.15rem 0 .4rem 1.4rem;padding:.45rem .6rem;
+  background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius-sm);
+  font-family:SFMono-Regular,Consolas,monospace;font-size:.7rem;white-space:pre-wrap;
+  overflow-x:auto;}
 .tlrow:hover{background:var(--control-hover);}
+.tlname{cursor:pointer;}
 .tlname{padding-left:calc(var(--depth,0) * .55rem);font-size:.76rem;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tlrow.sql .tlname{color:var(--sql-ink);font-family:SFMono-Regular,Consolas,monospace;
@@ -494,8 +545,8 @@ tr:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
 .fold.grouped .fcount{color:var(--accent);}
 
 @media (max-width:900px){
-  .tlrow{grid-template-columns:11rem 1fr 5.5rem;}
-  .tlruler{padding-left:calc(11rem + .5rem);padding-right:5.5rem;}
+  .tlrow{grid-template-columns:1rem 10rem 1fr 5.5rem 3.6rem;}
+  .tlruler{margin-left:12.1rem;margin-right:9.8rem;}
 }
 
 /* Printing. The tree is virtualised, so report.js swaps the full row list in on
@@ -514,4 +565,48 @@ tr:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
   a{text-decoration:none;color:inherit;}
   /* A collapsed file prints as its header alone, which is what it looks like on screen. */
   .file.collapsed .scroll{display:none;}
+}
+
+/* ------------------------------------------------------------ customize --- */
+
+/* Reuses the help overlay's card, so the two panels behave identically and only the
+   contents differ. */
+.help .cushint{margin:0 0 .8rem;}
+.curow{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem .9rem;margin:0 0 .55rem;}
+.curow-end{justify-content:flex-end;gap:.5rem;margin-top:.9rem;
+  border-top:1px solid var(--hairline);padding-top:.8rem;margin-bottom:0;}
+.cuhead{font-size:.72rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  color:var(--muted);margin:.9rem 0 .45rem;}
+.cuhead:first-child{margin-top:0;}
+/* A fixed basis rather than max-content: ragged checkbox columns read as a list of
+   unrelated switches, and these are meant to be scanned as a set. */
+.culabel{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;
+  flex:0 0 auto;min-width:8.5rem;cursor:pointer;}
+.culabel input{margin:0;cursor:pointer;}
+.culabel.wide{min-width:100%;}
+.cusel{font:inherit;font-size:.76rem;padding:.15rem .3rem;border:1px solid var(--border);
+  border-radius:5px;background:var(--panel);color:var(--fg);}
+.cunote{font-size:.72rem;color:var(--muted);margin:.15rem 0 0;flex:1 1 100%;}
+
+/* Columns the reader switched off. Every rule hides a whole column's worth of cells at
+   once, so a table never ends up with rows of differing widths. */
+body.no-time td.time,body.no-time .ftime,body.no-time .tltime b{display:none;}
+body.no-pct .fpct{display:none;}
+body.no-step .fhead .step{display:none;}
+body.no-line td.ln{display:none;}
+
+/* Compact: the same information at roughly four rows in the space of three. Only padding
+   and leading change, never a font size, so nothing reflows differently. */
+body.compact td{padding:0 .5rem;}
+body.compact td.code{line-height:1.32;}
+body.compact .tlrow{padding-top:.05rem;padding-bottom:.05rem;}
+body.compact .finding{padding:.5rem .7rem;}
+
+/* The row a Timeline or Findings link just landed on. Fades from a wash of the accent to
+   nothing, so the eye is pulled to the right row without leaving a mark that competes with
+   the cursor highlight afterwards. */
+@keyframes deju-land{from{background:var(--land);}to{background:transparent;}}
+tr.landed td,.file.landed h2,.tlrow.landed{animation:deju-land 1.6s ease-out;}
+@media (prefers-reduced-motion:reduce){
+  tr.landed td,.file.landed h2,.tlrow.landed{animation:none;background:var(--land);}
 }

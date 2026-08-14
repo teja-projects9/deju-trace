@@ -6,7 +6,8 @@ import java.awt.FlowLayout;
 import java.awt.datatransfer.StringSelection;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -344,7 +345,8 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
             return;
         }
         try {
-            controller.exportHtml(entry.slot, wrapper.getFile().toPath(), options.isOmitExcluded());
+            controller.exportHtml(entry.slot, wrapper.getFile().toPath(),
+                    options.isOmitExcluded(), options.prefs());
         } catch (IOException ex) {
             Messages.showErrorDialog(project, "Failed to export report: " + ex.getMessage(), "Deju Trace");
         }
@@ -603,9 +605,45 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
         updateHistoryButtons();
     }
 
+    /**
+     * One history row: when the run was recorded, what was traced, and how much it covered.
+     *
+     * <p>The date is spelled out rather than left to the locale's short form, because the list
+     * holds five runs that are often minutes apart and often days apart, and a bare clock time
+     * cannot tell those two cases apart. Fixed {@code dd/MM/yy} keeps the column aligned and
+     * unambiguous wherever the IDE is running.
+     */
     private static String describe(ExecutionEntry entry) {
-        String time = DateFormat.getTimeInstance(DateFormat.MEDIUM).format(new Date(entry.savedAtMillis));
-        return time + ", " + entry.target
+        String when = new SimpleDateFormat("dd/MM/yy HH:mm:ss").format(new Date(entry.savedAtMillis));
+        return when + "  ·  " + shortTarget(entry.target)
                 + "   (" + entry.fileCount + " files, " + entry.lineCount + " lines)";
+    }
+
+    /**
+     * {@code com.acme.billing.InvoiceService#post} shown as {@code InvoiceService#post}.
+     *
+     * <p>The package is the least useful part of the label and by far the longest: five rows of
+     * fully-qualified names all begin with the same company prefix and push the method name,
+     * the part that identifies the run, off the visible width of the tool window.
+     *
+     * <p>Where the class name starts is decided by case, the first segment beginning with an
+     * upper-case letter, so a nested class keeps its outer class ({@code Outer.Inner#run})
+     * rather than being cut down to a name that appears in no file.
+     */
+    static String shortTarget(String target) {
+        if (target == null || target.isBlank()) {
+            return "—";
+        }
+        int hash = target.indexOf('#');
+        String type = hash < 0 ? target : target.substring(0, hash);
+        String rest = hash < 0 ? "" : target.substring(hash);
+        String[] parts = type.split("\\.");
+        for (int i = 0; i < parts.length; i++) {
+            if (!parts[i].isEmpty() && Character.isUpperCase(parts[i].charAt(0))) {
+                return String.join(".", Arrays.asList(parts).subList(i, parts.length)) + rest;
+            }
+        }
+        // All lower-case: not a name this rule understands, so change nothing.
+        return target;
     }
 }

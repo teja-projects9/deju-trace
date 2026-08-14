@@ -25,6 +25,7 @@ import org.deju.plugin.history.DejuHistoryStore;
 import org.deju.plugin.history.ExecutionEntry;
 import org.deju.plugin.history.ExportScope;
 import org.deju.plugin.history.HtmlReportGenerator;
+import org.deju.plugin.history.ReportPrefs;
 import org.deju.plugin.run.DejuAgentBundle;
 import org.deju.plugin.run.RunConfigAgentUpdater;
 import org.deju.plugin.paint.EditorPainter;
@@ -216,12 +217,12 @@ public final class DejuController implements AgentClient.Listener, Disposable {
     }
 
     /** Writes a self-contained HTML report for a stored execution to {@code target}. */
-    public void exportHtml(int slot, Path target, boolean omitExcluded) throws IOException {
+    public void exportHtml(int slot, Path target, boolean omitExcluded, ReportPrefs prefs) throws IOException {
         DejuPayload payload = DejuHistoryStore.getInstance(project).load(slot);
         if (payload == null) {
             throw new IOException("Execution " + slot + " is no longer available");
         }
-        String html = new HtmlReportGenerator(project).generate(payload, omitExcluded);
+        String html = new HtmlReportGenerator(project).generate(payload, omitExcluded, prefs);
         Files.write(target, html.getBytes(StandardCharsets.UTF_8));
     }
 

@@ -68,6 +68,13 @@ public final class EditorPainter {
     /** Live only while something is painted; see {@link #listenForLaterOpens()}. */
     private MessageBusConnection connection;
 
+    /**
+     * The painted run's wall-clock length, in microseconds, and the denominator for every
+     * percentage in the gutter. Zero when nothing is painted or the run reported no duration,
+     * which suppresses the percentages rather than showing a made-up one.
+     */
+    private long runMicros;
+
     /** A registered timing column, kept so it can be removed on clear without touching others. */
     private record GutterHandle(Editor editor, TimingGutterProvider provider) {
     }
@@ -86,6 +93,7 @@ public final class EditorPainter {
      */
     public void paint(DejuPayload payload) {
         clear();
+        runMicros = runMicrosOf(payload);
         TypeExclusionMatcher matcher = DejuExclusions.getInstance(project).matcher();
         PaintPlan plan = PaintPlan.of(payload, matcher::isExcluded, DejuSettings.getInstance().maxOpenFiles);
 
@@ -239,13 +247,19 @@ public final class EditorPainter {
             Long self = lc.getTimeMicros();
             if (methodTotal != null) {
                 // Method's first line: headline the inclusive total; self time in the tooltip.
-                text.put(line0, "▸ " + TimingGutterProvider.format(methodTotal));
+                text.put(line0, "▸ " + TimingGutterProvider.format(methodTotal)
+                        + TimingGutterProvider.suffixPercent(methodTotal, runMicros));
                 Long methodSelf = lc.getMethodSelfMicros();
                 tips.put(line0, "Method total " + TimingGutterProvider.format(methodTotal)
-                        + (methodSelf != null ? "  ·  self " + TimingGutterProvider.format(methodSelf) : ""));
+                        + TimingGutterProvider.suffixPercent(methodTotal, runMicros)
+                        + (methodSelf != null ? "  ·  self " + TimingGutterProvider.format(methodSelf)
+                                + TimingGutterProvider.suffixPercent(methodSelf, runMicros) : "")
+                        + ofRun());
             } else if (self != null) {
-                text.put(line0, TimingGutterProvider.format(self));
-                tips.put(line0, "Line self time " + TimingGutterProvider.format(self));
+                text.put(line0, TimingGutterProvider.format(self)
+                        + TimingGutterProvider.suffixPercent(self, runMicros));
+                tips.put(line0, "Line self time " + TimingGutterProvider.format(self)
+                        + TimingGutterProvider.suffixPercent(self, runMicros) + ofRun());
             }
         }
         if (text.isEmpty()) {
@@ -254,6 +268,33 @@ public final class EditorPainter {
         TimingGutterProvider provider = new TimingGutterProvider(text, tips);
         editor.getGutter().registerTextAnnotation(provider);
         gutters.add(new GutterHandle(editor, provider));
+    }
+
+    /** Names the denominator, so a percentage in a tooltip is not left to be guessed at. */
+    private String ofRun() {
+        return runMicros > 0 ? "  ·  of a " + TimingGutterProvider.format(runMicros) + " run" : "";
+    }
+
+    /**
+     * The run's total length in microseconds, for percentages.
+     *
+     * <p>Normally the recorded wall-clock duration, but a method's own total is used instead
+     * when it is larger. The duration is measured around the traced call while method totals
+     * come from the instrumented frames, and on a short run the two can disagree by enough to
+     * produce a percentage over 100, which reads as a bug in the timings rather than as the
+     * rounding it is.
+     */
+    private static long runMicrosOf(DejuPayload payload) {
+        long micros = payload.getDurationMs() * 1000L;
+        for (FileCoverage fc : payload.getFiles()) {
+            for (LineCoverage lc : fc.getLines()) {
+                Long total = lc.getMethodTotalMicros();
+                if (total != null && total > micros) {
+                    micros = total;
+                }
+            }
+        }
+        return micros;
     }
 
     /**
@@ -303,6 +344,7 @@ public final class EditorPainter {
             connection = null;
         }
         painted.clear();
+        runMicros = 0;
         for (RangeHighlighter h : active) {
             try {
                 h.dispose();

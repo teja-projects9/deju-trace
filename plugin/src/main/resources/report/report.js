@@ -24,6 +24,32 @@
    * nothing has run yet and there is nothing to undo, and the 3,000 lines underneath stay
    * exactly as they are.
    */
+  /**
+   * An element by id, or a detached stand-in when the export left it out.
+   *
+   * <p>Dropping a tab at export time takes its button, its toolbar controls and its panel
+   * with it, which would otherwise turn several dozen lookups below into null dereferences
+   * spread over the whole file. A stand-in accepts listeners, classes and textContent like
+   * any element and is never in the document, so nothing it is told to do can be seen,
+   * measured or clicked. Tabs are the only markup that can go missing, and code that needs
+   * to know asks tabPresent rather than testing a lookup for null.
+   *
+   * <p>The payload blocks are exempt. Their absence is real information rather than a tab
+   * somebody chose to leave out, and the boot path has to be able to tell the difference.
+   */
+  var elementStubs = {};
+  function byId(id) {
+    var found = document.getElementById(id);
+    if (found) return found;
+    if (id.indexOf('deju-') === 0) return null;
+    return elementStubs[id] || (elementStubs[id] = document.createElement('span'));
+  }
+
+  /** True when this id survived the export, i.e. its tab was included in the file. */
+  function tabPresent(id) {
+    return !!document.getElementById(id);
+  }
+
   var payloadText = payloadJson();
   if (payloadText === null) return;          // unpacking; boot() runs again when it lands
 
@@ -33,9 +59,9 @@
   /** The payload as text, or null when it is being unpacked (or cannot be). */
   function payloadJson() {
     if (window.__dejuJson != null) return window.__dejuJson;
-    var plain = document.getElementById('deju-data');
+    var plain = byId('deju-data');
     if (plain) return plain.textContent;
-    var packed = document.getElementById('deju-data-gz');
+    var packed = byId('deju-data-gz');
     if (!packed) {
       cannotOpen('This report has no data in it. It was probably truncated in transit.');
       return null;
@@ -68,9 +94,9 @@
 
   /** Says so on the page. A blank report with an error only in the console helps nobody. */
   function cannotOpen(message) {
-    var meta = document.getElementById('metaText');
+    var meta = byId('metaText');
     if (meta) meta.textContent = 'Deju: this report could not be opened';
-    var notice = document.getElementById('notice');
+    var notice = byId('notice');
     if (notice) {
       notice.textContent = message;
       notice.hidden = false;
@@ -125,12 +151,77 @@
   // than offering a Full view that turns up blank rows.
   var excludedOmitted = !!data.excludedOmitted;
 
+  // ------------------------------------------------------------------ prefs ---
+
+  /*
+   * How the report looks, from two sources that answer two different questions.
+   *
+   * The export dialog wrote a starting position into the file: what this run is best read
+   * as, decided by whoever exported it. The reader's own choices live in localStorage,
+   * stored sparsely, only the keys they actually touched, and layered on top. Storing the
+   * whole object instead would freeze today's defaults into every report opened afterwards,
+   * so a report exported next month to open on the Timeline would still open on the tree
+   * because someone once clicked something.
+   *
+   * The store is shared by every Deju report rather than keyed per run, matching how the
+   * theme toggle has always behaved: "I like percentages off" is a fact about the reader,
+   * not about a trace.
+   */
+  var PREFS_DEFAULT = {
+    openTab: 'trace', view: 'tree', density: 'normal', theme: 'auto',
+    showTime: true, showPercent: true, showStep: true, showLine: true,
+    sql: true, groupRepeats: false, collapseTree: false, collapseSections: false
+  };
+  var PREFS_KEY = 'deju.report.prefs';
+
+  /** The starting position the export chose, or the long-standing defaults without one. */
+  var exportedPrefs = (function () {
+    var out = {};
+    for (var k in PREFS_DEFAULT) out[k] = PREFS_DEFAULT[k];
+    var block = document.getElementById('deju-prefs');
+    if (block) {
+      try {
+        var sent = JSON.parse(block.textContent);
+        for (var j in PREFS_DEFAULT) if (sent[j] !== undefined) out[j] = sent[j];
+      } catch (e) {
+        // A malformed block is a broken export, not something to fail the report over.
+      }
+    }
+    return out;
+  }());
+
+  /** Only what the reader changed. Wrapped: a file:// page can have storage denied. */
+  function readOverrides() {
+    try {
+      var raw = window.localStorage.getItem(PREFS_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeOverrides(o) {
+    try {
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify(o));
+    } catch (e) {
+      // Storage is a convenience here; the panel still works for this sitting.
+    }
+  }
+
+  var prefOverrides = readOverrides();
+  var prefs = {};
+  (function () {
+    for (var k in exportedPrefs) prefs[k] = exportedPrefs[k];
+    for (var j in prefOverrides) if (exportedPrefs[j] !== undefined) prefs[j] = prefOverrides[j];
+  }());
+
   var counts = { FULL: 0, PARTIAL: 0, NONE: 0 };
   var statusOn = { FULL: true, PARTIAL: true, NONE: true };
   /* Declared with the other view state, not beside its button: applyTreeFilters reads it
      and is defined long before that wiring runs, so a `var` down there would be hoisted
      as undefined and hide every query on the first render. */
-  var sqlOn = true;
+  var sqlOn = prefs.sql;
   /* Same reason as sqlOn: applyTreeFilters reads it long before its button is wired. */
   var rollupOn = true;
   var rollupAvailable = 0;   // roll-up rows the current filters leave on screen
@@ -162,6 +253,38 @@
   }
 
   /**
+   * The whole traced call in microseconds: the denominator for every share on the page.
+   *
+   * <p>Seeded from the wall time the agent reported and raised to the widest root once the
+   * call tree is in, because the two are rounded differently and a frame reading 101% of
+   * the request undermines every other number beside it. Both are the same measurement;
+   * taking the larger is the only reading that can never overshoot.
+   */
+  var runMicrosTotal = (data.durationMs || 0) * 1000;
+
+  /**
+   * A duration as a share of the run.
+   *
+   * <p>The point of putting this beside every time is that "48 ms" needs the reader to
+   * remember what the request cost before it means anything, and "31%" does not. Kept to
+   * one decimal below ten percent, none above it: the extra digit on a big share is noise,
+   * and on a small one it is the difference between "rounds to nothing" and "0.4%".
+   */
+  function pct(micros) {
+    if (!(runMicrosTotal > 0) || micros == null) return '';
+    var p = (micros / runMicrosTotal) * 100;
+    if (p >= 10) return p.toFixed(0) + '%';
+    if (p >= 0.1) return p.toFixed(1) + '%';
+    return p > 0 ? '<0.1%' : '0%';
+  }
+
+  /** Time and share together, the form used wherever both fit on one line. */
+  function fmtPct(micros) {
+    var p = pct(micros);
+    return p ? fmt(micros) + '  ' + p : fmt(micros);
+  }
+
+  /**
    * The recording's start time, in the reader's own timezone.
    *
    * <p>The payload carries UTC. Rewriting only the date half of it produced
@@ -169,11 +292,46 @@
    * clock the developer was watching. The ISO string is kept on the element's title, so the
    * exact recorded instant is still one hover away.
    */
+  /**
+   * A recorded instant as {@code dd/MM/yy HH:mm:ss}, in the reader's own timezone.
+   *
+   * <p>Fixed rather than {@code toLocaleString}: a report is written on one machine and read
+   * on others, and a date that means one thing to the person who exported it and another to
+   * the person they sent it to is worse than one nobody's locale would have chosen. The
+   * ambiguous case is real, {@code 03/04/25} is two different days on two sides of an
+   * ocean, and day-first at least matches the ISO instant kept alongside it in the tooltip.
+   */
   function inDate(iso) {
     if (!iso) return '—';
     var d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
-    return d.toLocaleString();
+    function two(n) { return (n < 10 ? '0' : '') + n; }
+    return two(d.getDate()) + '/' + two(d.getMonth() + 1) + '/' + two(d.getFullYear() % 100)
+      + ' ' + two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds());
+  }
+
+  /**
+   * {@code com.acme.billing.InvoiceService#post} shown as {@code InvoiceService#post}.
+   *
+   * <p>The package is the longest part of the label and the least useful: it is the same on
+   * every run of the same application, and it pushes the class and method, the part that
+   * says what was traced, past the width the row has. Where the class begins is decided by
+   * case, the first segment starting with a capital, so a nested class keeps its outer
+   * class rather than being cut to a name that matches no file. The full name stays in the
+   * row's tooltip.
+   */
+  function shortTarget(fq) {
+    if (!fq) return '—';
+    var hash = fq.indexOf('#');
+    var type = hash < 0 ? fq : fq.slice(0, hash);
+    var rest = hash < 0 ? '' : fq.slice(hash);
+    var parts = type.split('.');
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i] && parts[i].charAt(0) >= 'A' && parts[i].charAt(0) <= 'Z') {
+        return parts.slice(i).join('.') + rest;
+      }
+    }
+    return fq;
   }
 
   function isGeneratedName(fq) {
@@ -380,6 +538,31 @@
   var SQL_CLASS = { kw: 'k-kw', str: 'k-str', num: 'k-num', cmt: 'k-cmt', ph: 'k-ann' };
 
   /**
+   * Splits a driver's provenance comment off the front of a statement.
+   *
+   * <p>Datasource wrappers and ORM comment hooks stamp the origin onto a query as a line
+   * comment: {@code -- FooServiceImpl L27 -- BarController L2062 select ...}, all on one
+   * line. A {@code --} comment runs to the end of its line, so tokenising that verbatim
+   * turned the entire statement into a single comment token and the whole query rendered
+   * grey and italic. The colouring switched itself off precisely on the queries carrying
+   * the most context, which is the wrong way round.
+   *
+   * <p>The split is made at the first place a statement keyword starts, so the note is
+   * shown as a note and the SQL behind it is tokenised as SQL. A statement with no such
+   * prefix, and a comment that genuinely occupies its own line, both come back untouched.
+   */
+  var SQL_LEAD = new RegExp(
+    '^\\s*--[^\\n]*?(?=\\s+(?:select|insert|update|delete|merge|with|call|replace'
+    + '|create|alter|drop|truncate|upsert|set|show|explain)\\b)', 'i');
+
+  function splitSqlLead(text) {
+    var s = String(text == null ? '' : text);
+    var m = SQL_LEAD.exec(s);
+    if (!m || !m[0].trim()) return { lead: null, sql: s };
+    return { lead: m[0].trim(), sql: s.slice(m[0].length).replace(/^\s+/, '') };
+  }
+
+  /**
    * Writes a formatted, coloured statement into a container.
    *
    * <p>Every fragment is a text node or a span set with textContent, exactly as
@@ -389,7 +572,12 @@
    */
   function paintSql(container, text) {
     if (!text) return;
-    var lines = formatSqlLines(tokenizeSql(text));
+    var split = splitSqlLead(text);
+    if (split.lead) {
+      container.appendChild(el('span', 'k-cmt', split.lead));
+      container.appendChild(document.createTextNode('\n'));
+    }
+    var lines = formatSqlLines(tokenizeSql(split.sql));
     lines.forEach(function (ln, i) {
       if (i > 0) container.appendChild(document.createTextNode('\n'));
       if (ln.indent > 0) {
@@ -432,6 +620,14 @@
   /** A line-number cell that opens the IDE when the source path is known. */
   function lineCell(file, line) {
     var td = el('td', 'ln');
+    // A synthetic frame — a bridge method, a lambda body the compiler moved — carries no
+    // real source line and arrives as -1. Printing it as a line number invited a click on
+    // a jetbrains:// link that can only fail, so it is shown as "no line" instead.
+    if (line == null || line < 0) {
+      td.textContent = '—';
+      td.title = 'no source line was recorded for this entry';
+      return td;
+    }
     var url = file ? ideUrl(file.path, line) : null;
     if (url) {
       var a = el('a', null, String(line));
@@ -506,10 +702,14 @@
 
   // Written to the left span, not to #meta itself: the count shares that row and a
   // textContent assignment on the parent would delete it.
-  var metaTextEl = document.getElementById('metaText');
+  var metaTextEl = byId('metaText');
   metaTextEl.textContent =
-    'Trace point: ' + (data.target || '—') + '   |   Started ' + inDate(data.startedAtIso);
-  if (data.startedAtIso) metaTextEl.title = 'Recorded at ' + data.startedAtIso;
+    'Trace point: ' + shortTarget(data.target) + '   |   Started ' + inDate(data.startedAtIso);
+  // The row truncates to stay one line and the package was dropped from the label above, so
+  // the tooltip is the only place either is still recoverable.
+  metaTextEl.title = 'Trace point: ' + (data.target || '—')
+    + '\nStarted ' + inDate(data.startedAtIso)
+    + (data.startedAtIso ? '\nRecorded at ' + data.startedAtIso : '');
 
   // ------------------------------------------------------------- file index ---
 
@@ -539,8 +739,8 @@
 
   // -------------------------------------------------------- files view build ---
 
-  var root = document.getElementById('root');
-  var fileList = document.getElementById('fileList');
+  var root = byId('root');
+  var fileList = byId('fileList');
   var entries = [];
   /** Class name -> its entry, so the Tree view can honour the same file selection. */
   var entryByClass = {};
@@ -705,7 +905,7 @@
     var kind = methodKind(section.name);
     if (kind) head.appendChild(el('span', 'mkind', kind));
     var mmeta = el('span', 'mmeta',
-      (section.total != null ? fmt(section.total) + ' · ' : '')
+      (section.total != null ? fmtPct(section.total) + ' · ' : '')
       + 'line ' + section.declLine + ' · ' + section.rows.length
       + (section.rows.length === 1 ? ' line' : ' lines'));
     head.appendChild(mmeta);
@@ -731,7 +931,12 @@
     var micros = (l.methodTotalMicros != null) ? l.methodTotalMicros : l.timeMicros;
     if (micros != null) {
       tm.textContent = (l.methodTotalMicros != null ? '▸ ' : '') + fmt(micros);
-      tm.title = (l.methodTotalMicros != null ? 'method total' : 'line self time');
+      // The share goes on the title rather than into the cell: this column is one narrow
+      // gutter beside every line of source, and doubling its width to carry a second
+      // number would take the width off the code it exists to annotate.
+      var lp = pct(micros);
+      tm.title = (l.methodTotalMicros != null ? 'method total' : 'line self time')
+        + (lp ? ' · ' + lp + ' of the run' : '');
     }
     var code = el('td', 'code');
     paintCode(code, l.code != null ? l.code : '');
@@ -816,10 +1021,10 @@
 
   // --------------------------------------------------------- tree view build ---
 
-  var treeTable = document.getElementById('treeTable');
-  var treeView = document.getElementById('treeView');
-  var filesView = document.getElementById('filesView');
-  var treeEmpty = document.getElementById('treeEmpty');
+  var treeTable = byId('treeTable');
+  var treeView = byId('treeView');
+  var filesView = byId('filesView');
+  var treeEmpty = byId('treeEmpty');
   var childrenBySeq = {};
   var nodeBySeq = {};
   var roots = [];
@@ -839,7 +1044,7 @@
   var detailFull = false;        // false = Essential, excluded types folded away
   var expandedRollups = {};
   var expandedGroups = {};       // "parentSeq#key" -> repeats put back where they ran
-  var treeGroup = false;         // fold repeats of one call under their first occurrence
+  var treeGroup = prefs.groupRepeats;   // fold repeats of one call under their first occurrence
   var revealPath = null;         // seq -> true for a jumped-to step and its ancestors
   var hiddenFrameCount = 0;
 
@@ -852,6 +1057,45 @@
       (childrenBySeq[c.parentSeq] = childrenBySeq[c.parentSeq] || []).push(c);
     }
   });
+
+  // The widest root is the same measurement as the reported wall time, rounded elsewhere.
+  // Taking the larger of the two is what keeps a frame from reading 101% of its own run.
+  roots.forEach(function (c) {
+    if ((c.totalMicros || 0) > runMicrosTotal) runMicrosTotal = c.totalMicros || 0;
+  });
+
+  /**
+   * How much of the run no recorded call accounts for, as a fraction of it.
+   *
+   * <p>Reported only on a capped recording, and that restraint is the whole point. The
+   * number itself is just the entry point's own time — on a complete trace that is an
+   * ordinary reading, a method that does its own work — but once the agent stopped
+   * recording partway, the untraced remainder of the run has nowhere else to land, so the
+   * same figure becomes the size of the hole.
+   *
+   * <p>Worth saying out loud because "capped" on its own reads like a footnote. A run that
+   * kept 16% of itself and a run that kept 99% both say "capped", and only one of them is
+   * still worth drawing conclusions from.
+   */
+  var unrecordedShare = 0;
+  if (data.callsTruncated && roots.length) {
+    var deepest = roots[0];
+    roots.forEach(function (c) {
+      if ((c.totalMicros || 0) > (deepest.totalMicros || 0)) deepest = c;
+    });
+    var rootTotal = deepest.totalMicros || 0;
+    var kidsTotal = 0;
+    (childrenBySeq[deepest.seq] || []).forEach(function (k) { kidsTotal += k.totalMicros || 0; });
+    if (rootTotal > 0) unrecordedShare = Math.max(0, (rootTotal - kidsTotal) / rootTotal);
+  }
+
+  /** The unrecorded share as a rounded percentage, or '' when there is nothing to report. */
+  function unrecordedPct() {
+    if (unrecordedShare <= 0.005) return '';
+    return (unrecordedShare >= 0.1
+      ? Math.round(unrecordedShare * 100)
+      : (unrecordedShare * 100).toFixed(1)) + '%';
+  }
 
   /**
    * Whether a call, and everything it went on to do, is excluded.
@@ -944,6 +1188,8 @@
     if (node.totalMicros != null) {
       var time = el('span', 'ftime', fmt(node.totalMicros));
       time.title = 'time spent executing this query';
+      var qp = pct(node.totalMicros);
+      if (qp) time.appendChild(el('span', 'fpct', qp));
       head.appendChild(time);
     }
     td.appendChild(head);
@@ -1018,6 +1264,10 @@
 
     var time = el('span', 'ftime', node.totalMicros != null ? fmt(node.totalMicros) : '');
     time.title = 'total (inclusive) time of this call';
+    // The share rides inside the time element rather than beside it, so the two never wrap
+    // apart and the number keeps its own meaning: "48 ms, which is a third of the request".
+    var fp = pct(node.totalMicros);
+    if (fp) time.appendChild(el('span', 'fpct', fp));
     head.appendChild(time);
     head.appendChild(copyButton(function () { return frameAsText(node); }));
 
@@ -1050,7 +1300,13 @@
     var tm = el('td', 'time');
     if (lineModel.timeMicros != null) {
       tm.textContent = fmt(lineModel.timeMicros);
-      tm.title = 'line self time';
+      // The share on the title, the way the Files view already does it: the column is one
+      // narrow gutter beside every line of source, and a second number in it would take
+      // the width off the code it exists to annotate. The Tree used to say nothing at all
+      // here, so the same line answered "what share of the run is this?" in one view and
+      // not the other.
+      var lp = pct(lineModel.timeMicros);
+      tm.title = 'line self time' + (lp ? ' · ' + lp + ' of the run' : '');
     }
     var code = el('td', 'code tcode');
     code.style.setProperty('--depth', depth);
@@ -1358,7 +1614,7 @@
   }
 
   function filtering() {
-    return searchEl.value.trim() !== ''
+    return queryFor('trace').trim() !== ''
       || !(statusOn.FULL && statusOn.PARTIAL && statusOn.NONE);
   }
 
@@ -1484,8 +1740,12 @@
    */
   function renderTreeWindow() {
     for (var pass = 0; pass < 3; pass++) {
-      if (!paintTreeWindow()) return;
+      if (!paintTreeWindow()) break;
     }
+    // Rows are recycled as the window moves, so a landing mark set before this ran is on
+    // the wrong element, or on none. Re-applied here rather than in paintTreeWindow so it
+    // survives all three measurement passes and is only put on once.
+    if (landedSeq != null) paintLanded();
   }
 
   /** One pass. Returns true when measurement moved the rows and another pass is due. */
@@ -1557,7 +1817,7 @@
   window.addEventListener('resize', function () { sqlClampGeneration++; });
 
   function applyTreeFilters() {
-    var q = searchEl.value.trim().toLowerCase();
+    var q = queryFor('trace').trim().toLowerCase();
     var active = filtering();
     var shownLines = 0, shownFrames = 0;
     var rollupTotal = 0;
@@ -1676,8 +1936,8 @@
     // Held across the rebuild only while the filter text is unchanged. Typing is a fresh
     // question and the answer belongs at the top; collapsing a frame is not, and used to
     // dump the reader back to the start of the trace.
-    var sameQuery = lastRefreshQuery === searchEl.value;
-    lastRefreshQuery = searchEl.value;
+    var sameQuery = lastRefreshQuery === queryFor('trace');
+    lastRefreshQuery = queryFor('trace');
     var anchor = sameQuery ? treeAnchor() : null;
     buildTree();
     applyTreeFilters();
@@ -1687,15 +1947,54 @@
 
   // ------------------------------------------------------------ shared state ---
 
-  var searchEl = document.getElementById('search');
-  var countEl = document.getElementById('count');
-  var emptyEl = document.getElementById('empty');
-  var foldBtn = document.getElementById('foldBtn');
-  var noticeEl = document.getElementById('notice');
-  var view = 'tree';
+  var searchEl = byId('search');
+  var countEl = byId('count');
+  var emptyEl = byId('empty');
+  var foldBtn = byId('foldBtn');
+  var noticeEl = byId('notice');
+  var view = prefs.view === 'files' ? 'files' : 'tree';
+
+  /**
+   * One filter box, one query per tab.
+   *
+   * <p>The box used to vanish on every tab but Code Trace, which left four views with no way
+   * to narrow them down — on exactly the runs where narrowing them down is the only way to
+   * read them. Keeping a separate query per tab rather than one shared string is what makes
+   * that usable: the tabs filter different things by different rules, and a class name typed
+   * into the tree would filter the Flow Graph's regex box down to nothing the moment the
+   * reader switched.
+   */
+  var tabQuery = { trace: '', graph: '', flow: '', timeline: '', findings: '' };
+  var TAB_SEARCH = {
+    trace: { hint: 'Filter code\u2026 (press /)',
+      title: 'Matches source text and SQL in both views. In the Tree it also matches a '
+        + "frame's own class and method name." },
+    graph: { hint: 'Filter files\u2026 (press /)',
+      title: 'Matches a file name or the package it sits in.' },
+    flow: { hint: 'Filter steps by pattern\u2026 (press /)',
+      title: 'A regular expression over the step signature, or plain text when it is not a '
+        + 'valid one. The dropdown beside the tab decides what a match brings with it.' },
+    timeline: { hint: 'Filter steps\u2026 (press /)',
+      title: 'Matches the step label, and for a query its statement.' },
+    findings: { hint: 'Filter findings\u2026 (press /)',
+      title: "Matches a finding's title and its detail." }
+  };
+
+  /** The query belonging to a tab, whether or not that tab is the one in front. */
+  function queryFor(which) {
+    return which === tab ? searchEl.value : tabQuery[which];
+  }
+
+  /** Empties the box and the query behind it, for Esc and for a jump to a step. */
+  function clearSearch() {
+    if (searchEl.value === '') return false;
+    searchEl.value = '';
+    if (tab) tabQuery[tab] = '';
+    return true;
+  }
 
   function applyFileFilters() {
-    var q = searchEl.value.trim().toLowerCase();
+    var q = queryFor('trace').trim().toLowerCase();
     var shownLines = 0, shownFiles = 0;
     entries.forEach(function (e) {
       if (!e.checkbox.checked) { e.box.hidden = true; return; }
@@ -1741,11 +2040,21 @@
     if (flowBuilt) drawFlow();
   }
 
-  searchEl.addEventListener('input', function () { applyFilters(); rememberUrlState(); });
+  /** Routes a keystroke to whichever tab is in front. */
+  function onSearchChanged() {
+    if (tab) tabQuery[tab] = searchEl.value;
+    if (tab === 'graph') renderGraph();
+    else if (tab === 'flow') { if (setFlowFilter(searchEl.value)) { hideFlowTip(); drawFlow(); } }
+    else if (tab === 'timeline') renderTimeline();
+    else if (tab === 'findings') renderFindings();
+    else applyFilters();
+    rememberUrlState();
+  }
+  searchEl.addEventListener('input', onSearchChanged);
 
   // ------------------------------------------------------------------ legend ---
 
-  var legend = document.getElementById('legend');
+  var legend = byId('legend');
   [['full', 'FULL', 'fully executed'],
    ['partial', 'PARTIAL', 'only some branches taken'],
    ['none', 'NONE', 'entered method, line not executed']].forEach(function (x) {
@@ -1768,8 +2077,8 @@
 
   // ------------------------------------------------------------ view switch ---
 
-  var viewTree = document.getElementById('viewTree');
-  var viewFiles = document.getElementById('viewFiles');
+  var viewTree = byId('viewTree');
+  var viewFiles = byId('viewFiles');
 
   function setView(next) {
     if (next === 'tree' && !treeAvailable) return;
@@ -1835,7 +2144,7 @@
 
   // -------------------------------------------------------------------- sort ---
 
-  var sortEl = document.getElementById('sort');
+  var sortEl = byId('sort');
   function applySort() {
     var list = entries.slice();
     var v = sortEl.value;
@@ -1874,7 +2183,19 @@
       }
       refreshTree();
     } else {
-      entries.forEach(function (e) { setCollapsed(e, collapsed); });
+      // Sections fold with their files. "Collapse all" that shut the file boxes and left
+      // every method inside them open was only half a fold: expanding one forty-method
+      // file still gave back the wall of code the button existed to put away. Folding both
+      // levels means expanding a file lands you on its list of methods, which is the index
+      // this view is actually navigated by.
+      entries.forEach(function (e) {
+        setCollapsed(e, collapsed);
+        e.sections.forEach(function (s) {
+          s.collapsed = collapsed;
+          if (s.caret) s.caret.textContent = collapsed ? '▸' : '▾';
+        });
+      });
+      applyFilters();
     }
     foldBtn.textContent = collapsed ? 'Expand all' : 'Collapse all';
   }
@@ -1891,7 +2212,7 @@
 
   // ----------------------------------------------------------- problems only ---
 
-  var problemsBtn = document.getElementById('problemsBtn');
+  var problemsBtn = byId('problemsBtn');
   var problemsOn = false;
   var savedStatus = null;
 
@@ -1924,7 +2245,7 @@
 
   // ---------------------------------------------------------- tree controls ---
 
-  var hotBtn = document.getElementById('hotBtn');
+  var hotBtn = byId('hotBtn');
   function setHot(on) {
     hotOn = on;
     hotBtn.classList.toggle('on', on);
@@ -1934,12 +2255,12 @@
 
   // ------------------------------------------------------- time filter ---
 
-  var minTime = document.getElementById('minTime');
-  var minOp = document.getElementById('minTimeOp');
-  var minCustom = document.getElementById('minTimeCustom');
-  var minCustom2 = document.getElementById('minTimeCustom2');
-  var minAnd = document.getElementById('minTimeAnd');
-  var minCustomApply = document.getElementById('minTimeCustomApply');
+  var minTime = byId('minTime');
+  var minOp = byId('minTimeOp');
+  var minCustom = byId('minTimeCustom');
+  var minCustom2 = byId('minTimeCustom2');
+  var minAnd = byId('minTimeAnd');
+  var minCustomApply = byId('minTimeCustomApply');
   /* The value the select carried before "Custom…" was picked, so cancelling restores the
      filter that was actually in force rather than silently resetting to All calls. */
   var minTimePrevious = '0';
@@ -2000,7 +2321,7 @@
 
   /** Adds or updates the one option that carries a hand-entered filter. */
   function setCustomOption(value, label) {
-    var opt = document.getElementById('minTimeCustomOpt');
+    var opt = byId('minTimeCustomOpt');
     if (!opt) {
       opt = el('option');
       opt.id = 'minTimeCustomOpt';
@@ -2073,7 +2394,7 @@
 
   /* On by default: queries are the reason SQL is recorded at all. The toggle is for
      reading pure control flow, where a chatty repository drowns the calls around it. */
-  var sqlBtn = document.getElementById('sqlBtn');
+  var sqlBtn = byId('sqlBtn');
 
   /**
    * Opens the Code Trace on one step, whatever is currently folded over it.
@@ -2092,7 +2413,7 @@
       delete collapsedSeqs[cur.seq];
       expandedRollups[cur.seq] = true;
     }
-    if (searchEl.value !== '') { searchEl.value = ''; }
+    clearSearch();
     setTab('trace');
     if (view !== 'tree') setView('tree');
     else refreshTree();
@@ -2104,9 +2425,56 @@
     // Held only for the build that just ran; leaving it set would quietly disable folding
     // for the rest of the session.
     revealPath = null;
+    landOn(seq);
   }
 
-  var treeGroupBtn = document.getElementById('treeGroupBtn');
+  /*
+   * Marks the row a cross-tab link just arrived at.
+   *
+   * <p>Arriving from the Timeline changes the tab, the view and the folding all at once, and
+   * the cursor outline alone is easy to lose in a screen of rows that all just moved. A wash
+   * that fades out says "here" without leaving a second permanent highlight competing with
+   * the cursor.
+   *
+   * <p>Held as a seq rather than pinned to the element, because the tree is virtualised: the
+   * row scrolled to may not be built yet, and the one that exists now can be recycled for a
+   * different frame before the animation ends. renderTreeWindow re-applies it to whichever
+   * element currently carries that seq, so the mark follows the frame and not the DOM node.
+   */
+  var landedSeq = null;
+  var landedTimer = 0;
+
+  function landOn(seq) {
+    landedSeq = seq;
+    paintLanded();
+    if (landedTimer) clearTimeout(landedTimer);
+    // Slightly longer than the CSS animation, so it can never be cleared mid-fade.
+    landedTimer = setTimeout(function () {
+      landedSeq = null;
+      landedTimer = 0;
+      paintLanded();
+    }, 1800);
+  }
+
+  /** Puts the mark on the row holding landedSeq right now, and takes it off every other. */
+  function paintLanded() {
+    var rows = treeWrapEl ? treeWrapEl.querySelectorAll('tr.landed') : [];
+    for (var i = 0; i < rows.length; i++) rows[i].classList.remove('landed');
+    if (landedSeq == null) return;
+    for (var k = 0; k < treeRows.length; k++) {
+      var r = treeRows[k];
+      if (r.node && r.node.seq === landedSeq && r.tr && r.tr.parentNode) {
+        // Restarting the animation matters when the same row is landed on twice: without
+        // the reflow between removals the browser treats it as the same running animation.
+        r.tr.classList.remove('landed');
+        void r.tr.offsetWidth;
+        r.tr.classList.add('landed');
+        return;
+      }
+    }
+  }
+
+  var treeGroupBtn = byId('treeGroupBtn');
   treeGroupBtn.addEventListener('click', function () {
     treeGroup = !treeGroup;
     treeGroupBtn.classList.toggle('on', treeGroup);
@@ -2126,9 +2494,9 @@
 
   // --------------------------------------------------------- detail level ---
 
-  var detailSeg = document.getElementById('detailSeg');
-  var detailEssentialBtn = document.getElementById('detailEssential');
-  var detailFullBtn = document.getElementById('detailFull');
+  var detailSeg = byId('detailSeg');
+  var detailEssentialBtn = byId('detailEssential');
+  var detailFullBtn = byId('detailFull');
   function setDetail(full) {
     detailFull = full;
     detailEssentialBtn.classList.toggle('on', !full);
@@ -2148,7 +2516,7 @@
   /* The "… N excluded calls" rows are a deliberate trace of what Essential folded away, so
      they stay on by default. Hiding them is for reading a clean call flow once you have
      already accepted that the excluded types are not interesting. */
-  var rollupBtn = document.getElementById('rollupBtn');
+  var rollupBtn = byId('rollupBtn');
 
   /**
    * Puts the button in the state the tree is actually in.
@@ -2179,8 +2547,8 @@
   // --------------------------------------------------------------- generated ---
 
   if (generatedCount > 0) {
-    var genToggle = document.getElementById('genToggle');
-    document.getElementById('genCount').textContent = '(' + generatedCount + ')';
+    var genToggle = byId('genToggle');
+    byId('genCount').textContent = '(' + generatedCount + ')';
     // Opens and closes them rather than filtering them away. Generated files are never
     // hidden from the Tree or from the counts, they are just folded shut so the Files view
     // is not eight screens of MapperImpl before the first line anybody wants to read.
@@ -2213,26 +2581,238 @@
     var next = dark ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     storedTheme(next);
+    // Keep the Customize panel's dropdown telling the truth: the toggle and the dropdown
+    // are two controls over one setting, and either can be used at any time.
+    prefs.theme = next;
+    if (typeof syncCustomize === 'function') syncCustomize();
   }
-  var savedTheme = storedTheme();
-  if (savedTheme === 'dark' || savedTheme === 'light') {
-    document.documentElement.setAttribute('data-theme', savedTheme);
+  /**
+   * Settles the theme from the reader's last choice, then the export's, then the OS.
+   *
+   * <p>The reader wins because the toggle has always been sticky and taking that away would
+   * be a regression. The exported preference is only consulted for a reader who has never
+   * expressed one, which is exactly the case it was meant for: sending a report to somebody
+   * and having it open the way it was written.
+   */
+  function applyTheme() {
+    var saved = storedTheme();
+    var pick = (saved === 'dark' || saved === 'light') ? saved : prefs.theme;
+    if (pick === 'dark' || pick === 'light') {
+      document.documentElement.setAttribute('data-theme', pick);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
   }
-  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+  applyTheme();
+  byId('themeToggle').addEventListener('click', toggleTheme);
 
   // -------------------------------------------------------------------- help ---
 
-  var help = document.getElementById('help');
-  document.getElementById('helpBtn').addEventListener('click', function () { help.hidden = false; });
-  document.getElementById('helpClose').addEventListener('click', function () { help.hidden = true; });
+  var help = byId('help');
+  byId('helpBtn').addEventListener('click', function () { help.hidden = false; });
+  byId('helpClose').addEventListener('click', function () { help.hidden = true; });
   help.addEventListener('click', function (e) { if (e.target === help) help.hidden = true; });
+
+  // --------------------------------------------------------------- customize ---
+
+  /*
+   * Everything the reader is allowed to change about this report, in one panel.
+   *
+   * <p>Each control is declared once, here, with the pref key it writes and how to apply it.
+   * The panel's markup, the wiring, the persistence and the reset are all derived from this
+   * list, so adding a setting is one entry rather than four edits in four places that can
+   * disagree with each other.
+   *
+   * <p>Deliberately excluded: anything that changes what the numbers mean. Filters, the
+   * time threshold and Essential/Full stay in the toolbar where they are visible, because a
+   * reader who forgot they set one in a panel would misread the report rather than just
+   * dislike the look of it.
+   */
+  var CUSTOM_GROUPS = [
+    {
+      head: 'Show', items: [
+        { key: 'showTime', label: 'Time' },
+        { key: 'showPercent', label: 'Percent' },
+        { key: 'showStep', label: 'Step number' },
+        { key: 'showLine', label: 'Line number' },
+        { key: 'sql', label: 'SQL statements' }
+      ]
+    },
+    {
+      head: 'Layout', selects: [
+        {
+          key: 'openTab', label: 'Opens on', options: [
+            ['trace', 'Code Trace'], ['graph', 'Graph'], ['flow', 'Flow Graph'],
+            ['timeline', 'Timeline'], ['findings', 'Findings']
+          ], tabs: true
+        },
+        { key: 'view', label: 'Code Trace view', options: [['tree', 'Tree'], ['files', 'Files']] },
+        { key: 'density', label: 'Density', options: [['normal', 'Normal'], ['compact', 'Compact']] },
+        { key: 'theme', label: 'Theme', options: [['auto', 'Follow my system'], ['light', 'Light'], ['dark', 'Dark']] }
+      ],
+      note: 'Opens on and Code Trace view take effect the next time this report is opened.'
+    },
+    {
+      head: 'Starts folded', items: [
+        { key: 'groupRepeats', label: 'Group repeated calls' },
+        { key: 'collapseTree', label: 'Call tree' },
+        { key: 'collapseSections', label: 'Files and sections' }
+      ]
+    }
+  ];
+
+  var customPanel = byId('custom');
+  var customBody = byId('customBody');
+  var customInputs = {};      // pref key -> the control showing it
+
+  /**
+   * Applies every pref that can be applied without rebuilding anything.
+   *
+   * <p>Column visibility and density are CSS-only on purpose: a class on the body reaches
+   * every row that exists and every row built later, where hiding cells in the row builder
+   * would mean re-rendering the tree, the timeline and the findings list to change one
+   * checkbox. The virtualised tree measures its own row heights and corrects them on the
+   * next pass, so a density change needs no help beyond a repaint.
+   */
+  function applyPrefs() {
+    var body = document.body;
+    body.classList.toggle('no-time', !prefs.showTime);
+    body.classList.toggle('no-pct', !prefs.showPercent);
+    body.classList.toggle('no-step', !prefs.showStep);
+    body.classList.toggle('no-line', !prefs.showLine);
+    body.classList.toggle('compact', prefs.density === 'compact');
+    applyTheme();
+  }
+
+  /** Records one reader choice, applies it, and remembers it for the next report. */
+  function setPref(key, value) {
+    if (prefs[key] === value) return;
+    prefs[key] = value;
+    prefOverrides[key] = value;
+    writeOverrides(prefOverrides);
+
+    if (key === 'theme') {
+      // Shares a key with the header's toggle, which is the same setting by another route.
+      if (value === 'auto') {
+        try { window.localStorage.removeItem(THEME_KEY); } catch (e) { /* no storage */ }
+      } else {
+        storedTheme(value);
+      }
+      applyTheme();
+      return;
+    }
+    if (key === 'sql') {
+      setSql(value);
+      return;
+    }
+    if (key === 'groupRepeats') {
+      if (treeGroup !== value) treeGroupBtn.click();
+      return;
+    }
+    if (key === 'collapseTree' || key === 'collapseSections') {
+      applyFoldPrefs();
+      return;
+    }
+    applyPrefs();
+    // The tree's cached row heights were measured at the old density, and the timeline
+    // draws its bars from measured widths; both have to be taken again.
+    if (view === 'tree') { renderDirty = true; renderTreeWindow(); }
+    if (tab === 'timeline' && timelineBuilt) renderTimeline();
+  }
+
+  /**
+   * Folds what the prefs say should start folded.
+   *
+   * <p>Only ever folds. Unticking the box does not unfold, because by then the reader has
+   * been opening and closing rows by hand and throwing that away to honour a checkbox they
+   * just cleared would be the opposite of what they asked for.
+   */
+  function applyFoldPrefs() {
+    if (view === 'tree' ? prefs.collapseTree : prefs.collapseSections) foldAll(true);
+  }
+
+  /** Builds the panel from CUSTOM_GROUPS. Called once, after everything it drives exists. */
+  function buildCustomize() {
+    CUSTOM_GROUPS.forEach(function (group) {
+      customBody.appendChild(el('div', 'cuhead', group.head));
+      var row = el('div', 'curow');
+      (group.items || []).forEach(function (item) {
+        var label = el('label', 'culabel');
+        var box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = !!prefs[item.key];
+        box.addEventListener('change', function () { setPref(item.key, box.checked); });
+        customInputs[item.key] = box;
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(item.label));
+        row.appendChild(label);
+      });
+      (group.selects || []).forEach(function (sel) {
+        var label = el('label', 'culabel');
+        label.appendChild(document.createTextNode(sel.label));
+        var input = document.createElement('select');
+        input.className = 'cusel';
+        sel.options.forEach(function (opt) {
+          // A tab this export left out is not offered as somewhere the report could open.
+          if (sel.tabs && !tabPresent(TAB_BUTTON_ID[opt[0]])) return;
+          var o = document.createElement('option');
+          o.value = opt[0];
+          o.textContent = opt[1];
+          input.appendChild(o);
+        });
+        input.value = prefs[sel.key];
+        input.addEventListener('change', function () { setPref(sel.key, input.value); });
+        customInputs[sel.key] = input;
+        label.appendChild(input);
+        row.appendChild(label);
+      });
+      if (group.note) row.appendChild(el('p', 'cunote', group.note));
+      customBody.appendChild(row);
+    });
+    syncCustomize();
+  }
+
+  /** Puts the controls back in step with prefs, after a reset or the header's theme toggle. */
+  function syncCustomize() {
+    for (var key in customInputs) {
+      var input = customInputs[key];
+      if (input.type === 'checkbox') input.checked = !!prefs[key];
+      else input.value = prefs[key];
+    }
+  }
+
+  byId('customizeBtn').addEventListener('click', function () { customPanel.hidden = false; });
+  byId('customClose').addEventListener('click', function () { customPanel.hidden = true; });
+  customPanel.addEventListener('click', function (e) {
+    if (e.target === customPanel) customPanel.hidden = true;
+  });
+
+  byId('customReset').addEventListener('click', function () {
+    // Back to what the export chose, not to the report's built-in defaults: "the exported
+    // defaults" is what the button says, and it is the state the sender intended.
+    var keys = [];
+    for (var k in prefOverrides) keys.push(k);
+    prefOverrides = {};
+    writeOverrides(prefOverrides);
+    try { window.localStorage.removeItem(THEME_KEY); } catch (e) { /* no storage */ }
+    keys.forEach(function (key) {
+      if (exportedPrefs[key] === undefined || prefs[key] === exportedPrefs[key]) return;
+      // Routed through setPref so each one is applied the same way it would be by hand,
+      // then the override it writes back is cleared below.
+      setPref(key, exportedPrefs[key]);
+    });
+    prefOverrides = {};
+    writeOverrides(prefOverrides);
+    applyPrefs();
+    syncCustomize();
+  });
 
   // ------------------------------------------------------- files dropdown ---
 
-  var fileBtn = document.getElementById('fileBtn');
-  var fileMenu = document.getElementById('fileMenu');
-  var fileSearch = document.getElementById('fileSearch');
-  var fileNoMatch = document.getElementById('fileNoMatch');
+  var fileBtn = byId('fileBtn');
+  var fileMenu = byId('fileMenu');
+  var fileSearch = byId('fileSearch');
+  var fileNoMatch = byId('fileNoMatch');
 
   // Works in both views: in Files it picks what renders, in Tree it hides those frames.
   function openMenu() {
@@ -2266,11 +2846,11 @@
     if (e.key === 'Escape') { e.stopPropagation(); fileMenu.hidden = true; fileBtn.focus(); }
   });
 
-  document.getElementById('fileAll').addEventListener('click', function () {
+  byId('fileAll').addEventListener('click', function () {
     menuMatches().forEach(function (e) { e.checkbox.checked = true; e.userToggled = true; });
     applyFilters();
   });
-  document.getElementById('fileNone').addEventListener('click', function () {
+  byId('fileNone').addEventListener('click', function () {
     menuMatches().forEach(function (e) { e.checkbox.checked = false; e.userToggled = true; });
     applyFilters();
   });
@@ -2386,8 +2966,9 @@
 
     if (e.key === 'Escape') {
       if (!help.hidden) { help.hidden = true; return; }
+      if (!customPanel.hidden) { customPanel.hidden = true; return; }
       if (!fileMenu.hidden) { fileMenu.hidden = true; return; }
-      if (searchEl.value !== '') { searchEl.value = ''; applyFilters(); }
+      if (clearSearch()) onSearchChanged();
       if (isTyping(e.target)) e.target.blur();
       clearCursor();
       return;
@@ -2411,6 +2992,7 @@
       case 'f': e.preventDefault(); openMenu(); break;
       case 'x': e.preventDefault(); setProblems(!problemsOn); break;
       case 't': e.preventDefault(); toggleTheme(); break;
+      case 'g': e.preventDefault(); customPanel.hidden = false; break;
       case '?': e.preventDefault(); help.hidden = false; break;
       case 'o': {
         e.preventDefault();
@@ -2443,7 +3025,7 @@
 
   // ----------------------------------------------------------------- summary ---
 
-  var summary = document.getElementById('summary');
+  var summary = byId('summary');
   function stat(value, label, title, alt) {
     var d = el('div', 'stat');
     var b = el('b', null, value);
@@ -2478,10 +3060,28 @@
   summary.appendChild(stat(String(entries.length), entries.length === 1 ? 'File' : 'Files'));
   summary.appendChild(stat(String(totalLines), totalLines === 1 ? 'Line' : 'Lines'));
   summary.appendChild(stat(String(totalRed), 'Unexecuted'));
+  // A capped recording makes every number beside it a floor rather than a total, and the
+  // stats row is where they are read. Saying so here, next to the counts it qualifies, is
+  // the only place it cannot be scrolled past.
+  if (data.callsTruncated) {
+    // The percentage rather than the word, when it can be worked out. "Capped" says a
+    // limit was reached; the number says whether what is left is most of the run or a
+    // sixth of it, which is the difference between a caveat and a warning.
+    var missingPct = unrecordedPct();
+    var capped = stat(missingPct || 'capped', missingPct ? 'Unrecorded' : 'Recording',
+      'The agent hit its recording cap, so later invocations were never recorded.'
+      + ' Every count and total above is a lower bound, not the whole run.'
+      + (missingPct
+        ? ' ' + missingPct + ' of the run\'s time is not accounted for by any call in this'
+          + ' report: the recording stopped before that work was reached.'
+        : ''));
+    capped.classList.add('warn');
+    summary.appendChild(capped);
+  }
 
   // ------------------------------------------------- sticky offset + startup ---
 
-  var toolbar = document.getElementById('toolbar');
+  var toolbar = byId('toolbar');
   function measureToolbar() {
     document.documentElement.style.setProperty('--toolbarH', toolbar.offsetHeight + 'px');
   }
@@ -2504,7 +3104,9 @@
     var mismatch = agentMismatch();
     if (mismatch) msgs.push(mismatch);
     if (data.callsTruncated) {
-      msgs.push('The call tree hit the agent\'s recording cap, later invocations are missing.');
+      var missing = unrecordedPct();
+      msgs.push('The call tree hit the agent\'s recording cap, later invocations are missing.'
+        + (missing ? ' About ' + missing + ' of the run is not accounted for by any recorded call.' : ''));
     }
     if (treeTruncated) {
       msgs.push('Tree display truncated at ' + MAX_TREE_ROWS
@@ -2517,7 +3119,7 @@
     noticeEl.textContent = msgs.join('  ');
   }
 
-  document.getElementById('fidelity').textContent = treeAvailable
+  byId('fidelity').textContent = treeAvailable
     ? 'Steps are in exact execution order. Lines within a method are in source order and '
       + 'merged across invocations, so a loop body appears once rather than once per iteration.'
     : '';
@@ -2547,29 +3149,55 @@
   // a tab re-uses what was already built; only the flow canvas repaints, because a theme
   // change or a resize can invalidate the pixels.
 
-  var tabTrace = document.getElementById('tabTrace');
-  var tabGraph = document.getElementById('tabGraph');
-  var tabFlow = document.getElementById('tabFlow');
-  var tabTimeline = document.getElementById('tabTimeline');
-  var tabFindings = document.getElementById('tabFindings');
-  var tracePanel = document.getElementById('tracePanel');
-  var graphPanel = document.getElementById('graphPanel');
-  var flowPanel = document.getElementById('flowPanel');
-  var timelinePanel = document.getElementById('timelinePanel');
-  var findingsPanel = document.getElementById('findingsPanel');
-  var traceControls = document.getElementById('traceControls');
-  var graphControls = document.getElementById('graphControls');
-  var flowControls = document.getElementById('flowControls');
-  var timelineControls = document.getElementById('timelineControls');
-  var findingsControls = document.getElementById('findingsControls');
+  var tabTrace = byId('tabTrace');
+  var tabGraph = byId('tabGraph');
+  var tabFlow = byId('tabFlow');
+  var tabTimeline = byId('tabTimeline');
+  var tabFindings = byId('tabFindings');
+  var tracePanel = byId('tracePanel');
+  var graphPanel = byId('graphPanel');
+  var flowPanel = byId('flowPanel');
+  var timelinePanel = byId('timelinePanel');
+  var findingsPanel = byId('findingsPanel');
+  var traceControls = byId('traceControls');
+  var graphControls = byId('graphControls');
+  var flowControls = byId('flowControls');
+  var timelineControls = byId('timelineControls');
+  var findingsControls = byId('findingsControls');
   var tab = 'trace';
   var graphBuilt = false;
   var flowBuilt = false;
   var timelineBuilt = false;
   var findingsBuilt = false;
 
-  function setTab(next) {
+  /** Tab ids in toolbar order, paired with the button whose presence proves the tab exists. */
+  var TAB_BUTTON_ID = {
+    trace: 'tabTrace', graph: 'tabGraph', flow: 'tabFlow',
+    timeline: 'tabTimeline', findings: 'tabFindings'
+  };
+  var TAB_ORDER = ['trace', 'graph', 'flow', 'timeline', 'findings'];
+
+  /**
+   * The nearest tab to {@code want} that is actually in this file.
+   *
+   * <p>An export can leave tabs out, and the requests that arrive here do not know that: a
+   * shared URL, a stored preference and a link from a findings row were all written when
+   * five tabs existed. Falling back to the first surviving tab keeps every one of those
+   * working, where honouring the request would show a header over an empty page.
+   */
+  function nearestTab(want) {
+    if (tabPresent(TAB_BUTTON_ID[want])) return want;
+    for (var i = 0; i < TAB_ORDER.length; i++) {
+      if (tabPresent(TAB_BUTTON_ID[TAB_ORDER[i]])) return TAB_ORDER[i];
+    }
+    return 'trace';
+  }
+
+  function setTab(want) {
+    var next = nearestTab(want);
     if (next === tab) return;
+    // Park the outgoing tab's query before the box is handed to the incoming one.
+    tabQuery[tab] = searchEl.value;
     tab = next;
     tabTrace.classList.toggle('on', next === 'trace');
     tabGraph.classList.toggle('on', next === 'graph');
@@ -2586,15 +3214,26 @@
     flowControls.hidden = next !== 'flow';
     timelineControls.hidden = next !== 'timeline';
     findingsControls.hidden = next !== 'findings';
-    // The filter lives in the stats row, which is outside the panels and so survives a
-    // tab change. It only filters code, so it goes away where there is no code to filter.
-    searchEl.hidden = next !== 'trace';
+    // The filter lives in the trace-point row, outside the panels, so one box can serve
+    // every tab. It stays on all of them and carries that tab's own query and its own
+    // description of what a match means there.
+    var hint = TAB_SEARCH[next] || TAB_SEARCH.trace;
+    searchEl.value = tabQuery[next] || '';
+    searchEl.placeholder = hint.hint;
+    searchEl.title = hint.title;
+    searchEl.hidden = false;
+    // Tabs are a radio group to a screen reader, and .on is a class it cannot see.
+    [[tabTrace, 'trace'], [tabGraph, 'graph'], [tabFlow, 'flow'],
+     [tabTimeline, 'timeline'], [tabFindings, 'findings']].forEach(function (p) {
+      p[0].setAttribute('aria-selected', next === p[1] ? 'true' : 'false');
+    });
     hideFlowTip();
     if (next === 'graph') {
       if (!graphBuilt) { graphBuilt = true; buildGraph(); }
       renderGraph();
     } else if (next === 'flow') {
       if (!flowBuilt) { flowBuilt = true; buildFlow(); }
+      setFlowFilter(searchEl.value);
       drawFlow();
     } else if (next === 'timeline') {
       if (!timelineBuilt) { timelineBuilt = true; buildTimeline(); }
@@ -2633,14 +3272,16 @@
   var TIMELINE_MAX_ROWS = 600;     // beyond this the page stops being a waterfall
   var TIMELINE_MIN_ROWS = 12;      // below this the threshold has told the reader nothing
   var TIMELINE_FALLBACK_ROWS = 60; // the biggest steps, when no threshold separates them
-  var timelineBody = document.getElementById('timelineBody');
-  var timelineRuler = document.getElementById('timelineRuler');
-  var timelineEmpty = document.getElementById('timelineEmpty');
-  var timelineNote = document.getElementById('timelineNote');
-  var timelineAllBtn = document.getElementById('timelineAllBtn');
+  var timelineBody = byId('timelineBody');
+  var timelineRuler = byId('timelineRuler');
+  var timelineEmpty = byId('timelineEmpty');
+  var timelineNote = byId('timelineNote');
+  var timelineAllBtn = byId('timelineAllBtn');
+  var timelineFoldBtn = byId('timelineFoldBtn');
   var timelineRows = [];
   var timelineSpan = 0;
   var timelineAll = false;
+  var collapsedTl = {};        // seq -> true, this step's callees folded away
 
   function buildTimeline() {
     if (!treeAvailable) {
@@ -2704,8 +3345,10 @@
     // The file picker and the excluded types apply here too. They used to not, which made
     // this the one view that answered a question nobody had asked: the whole recording,
     // whatever you had told the report to leave out.
+    var tq = queryFor('timeline').trim().toLowerCase();
     var eligible = timelineRows.filter(function (r) {
       if (r.cname && !classSelected(r.cname)) return false;
+      if (tq && (r.label + ' ' + (r.sub || '')).toLowerCase().indexOf(tq) === -1) return false;
       return showExcluded || !r.excluded;
     });
     // Only the steps that own a slice of the clock, unless asked otherwise. A waterfall of
@@ -2727,6 +3370,20 @@
     var trimmed = shown.length > TIMELINE_MAX_ROWS;
     if (trimmed) shown = shown.slice(0, TIMELINE_MAX_ROWS);
 
+    // Which listed steps have listed steps underneath them. Nesting is walked on the real
+    // call tree, not on this list: the list is already thinned to the steps that own time,
+    // so two rows sitting next to each other on screen are usually many frames apart in the
+    // run, and the row above is very often not the caller.
+    var listed = {};
+    shown.forEach(function (r) { listed[r.seq] = true; });
+    var hasKids = {};
+    shown.forEach(function (r) {
+      for (var p = ancestorSeq(r.seq); p >= 0; p = ancestorSeq(p)) {
+        if (listed[p]) { hasKids[p] = true; break; }
+      }
+    });
+    var visible = shown.filter(function (r) { return !foldedAbove(r.seq); });
+
     timelineNote.textContent = 'Steps laid out in the order they ran, over '
       + fmt(timelineSpan) + '. The solid part of each bar is time in that step\'s own '
       + 'code; the faint part is time inside the calls it made. '
@@ -2739,20 +3396,38 @@
     timelineNote.hidden = false;
 
     var frag = document.createDocumentFragment();
-    shown.forEach(function (r) {
+    visible.forEach(function (r) {
       var row = el('div', 'tlrow' + (r.isSql ? ' sql' : ''));
+
+      // The caret has a column of its own so a leaf and a parent still line their names up;
+      // on a leaf it is present but invisible rather than absent.
+      var kids = !!hasKids[r.seq];
+      var caret = el('span', 'tlcaret' + (kids ? '' : ' leaf'),
+        kids ? (collapsedTl[r.seq] ? '\u25b8' : '\u25be') : '\u25be');
+      if (kids) {
+        caret.title = collapsedTl[r.seq]
+          ? 'Show the steps this one called' : 'Fold away the steps this one called';
+        caret.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          if (collapsedTl[r.seq]) delete collapsedTl[r.seq];
+          else collapsedTl[r.seq] = true;
+          renderTimeline();
+        });
+      }
+      row.appendChild(caret);
 
       var name = el('div', 'tlname');
       name.style.setProperty('--depth', Math.min(r.depth, 12));
       name.appendChild(document.createTextNode(r.label));
       name.title = r.sub + '\nstep ' + (r.seq + 1) + ' · starts at ' + fmt(r.t0)
-        + ' · total ' + fmt(r.total) + ' · own ' + fmt(r.own);
+        + ' · total ' + fmtPct(r.total) + ' · own ' + fmtPct(r.own);
+      name.addEventListener('click', function () { goToStep(r.seq); });
       row.appendChild(name);
 
       var track = el('div', 'tltrack');
       var bar = el('i', 'tlbar');
-      bar.style.left = pct(r.t0, timelineSpan);
-      bar.style.width = pct(Math.max(r.total, timelineSpan / 2000), timelineSpan);
+      bar.style.left = pctWidth(r.t0, timelineSpan);
+      bar.style.width = pctWidth(Math.max(r.total, timelineSpan / 2000), timelineSpan);
       var ownBar = el('i', 'tlown');
       ownBar.style.width = r.total > 0
         ? (Math.min(100, (r.own / r.total) * 100)).toFixed(3) + '%' : '100%';
@@ -2763,9 +3438,44 @@
       var time = el('div', 'tltime');
       time.appendChild(el('b', null, fmt(r.own)));
       time.appendChild(document.createTextNode(' of ' + fmt(r.total)));
+      var op = pct(r.own);
+      if (op) time.appendChild(el('span', 'fpct', op));
       row.appendChild(time);
 
-      row.addEventListener('click', function () { goToStep(r.seq); });
+      // Three things a reader wants from a row here, none of which used to be reachable
+      // from it: the line that made the call, the statement behind a query, and the step
+      // itself in the tree. The whole row was one click that did the last of those, which
+      // left no room for the other two.
+      var acts = el('div', 'tlacts');
+      var url = callSiteUrl(r.seq);
+      if (url) {
+        var open = el('a', null, 'line');
+        open.href = url;
+        open.title = 'Open the calling line in the IDE';
+        open.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        acts.appendChild(open);
+      }
+      if (r.isSql) {
+        var sqlBtn = el('button', null, 'sql');
+        sqlBtn.type = 'button';
+        sqlBtn.title = 'Show the statement, formatted and coloured';
+        sqlBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          var already = row.querySelector('.tlsql');
+          if (already) { row.removeChild(already); return; }
+          var pre = el('pre', 'tlsql');
+          paintSql(pre, nodeBySeq[r.seq] && nodeBySeq[r.seq].sql);
+          row.appendChild(pre);
+        });
+        acts.appendChild(sqlBtn);
+      }
+      var step = el('button', null, 'step');
+      step.type = 'button';
+      step.title = 'Show this step in the Code Trace';
+      step.addEventListener('click', function (ev) { ev.stopPropagation(); goToStep(r.seq); });
+      acts.appendChild(step);
+      row.appendChild(acts);
+
       frag.appendChild(row);
     });
 
@@ -2779,11 +3489,13 @@
 
     timelineBody.textContent = '';
     timelineBody.appendChild(frag);
-    countEl.textContent = shown.length + ' of ' + timelineRows.length
+    countEl.textContent = visible.length + ' of ' + timelineRows.length
       + (timelineRows.length === 1 ? ' step' : ' steps');
   }
 
-  function pct(value, span) {
+  /** A CSS width/offset as a percentage of the timeline's span. Not the report's pct(),
+      which is a human-readable share of the run. */
+  function pctWidth(value, span) {
     return span > 0 ? ((value / span) * 100).toFixed(4) + '%' : '0%';
   }
 
@@ -2795,11 +3507,57 @@
       }).join('\n');
   }
 
+  /** The caller of a step, by seq, or -1 at a root. */
+  function ancestorSeq(seq) {
+    var n = nodeBySeq[seq];
+    return n && n.parentSeq != null ? n.parentSeq : -1;
+  }
+
+  /** Whether any caller of this step is folded, however far up the run it is. */
+  function foldedAbove(seq) {
+    for (var p = ancestorSeq(seq); p >= 0; p = ancestorSeq(p)) {
+      if (collapsedTl[p]) return true;
+    }
+    return false;
+  }
+
+  /**
+   * A jetbrains:// link to the line that made this call.
+   *
+   * <p>The caller's file, not the callee's, exactly as the tree's "called at :44" does: the
+   * line worth opening is the one you would put a breakpoint on. A query has no call site
+   * of its own, so it borrows the frame that issued it.
+   */
+  function callSiteUrl(seq) {
+    var n = nodeBySeq[seq];
+    if (!n) return null;
+    if (n.sql != null) n = nodeBySeq[n.parentSeq] || n;
+    if (n.callSiteLine == null) return null;
+    var parent = nodeBySeq[n.parentSeq];
+    var file = parent ? fileByClass[parent.className] : null;
+    return file ? ideUrl(file.path, n.callSiteLine) : null;
+  }
+
+  timelineFoldBtn.addEventListener('click', function () {
+    var collapse = timelineFoldBtn.textContent === 'Collapse all';
+    collapsedTl = {};
+    if (collapse) {
+      // Every step that called something, except the roots: a fully folded waterfall with
+      // no entry point left on it is a blank tab.
+      timelineRows.forEach(function (r) {
+        if (ancestorSeq(r.seq) >= 0) collapsedTl[r.seq] = true;
+      });
+    }
+    timelineFoldBtn.textContent = collapse ? 'Expand all' : 'Collapse all';
+    timelineFoldBtn.classList.toggle('on', collapse);
+    renderTimeline();
+  });
+
   timelineAllBtn.addEventListener('click', function () {
     timelineAll = !timelineAll;
     renderTimeline();
   });
-  document.getElementById('timelineCopyBtn').addEventListener('click', function () {
+  byId('timelineCopyBtn').addEventListener('click', function () {
     var btn = this;
     copyText(timelineAsText(), function (ok) { flash(btn, ok ? 'Copied' : 'Failed'); });
   });
@@ -2812,10 +3570,10 @@
   // your code, only an observation about what the recording contains, which is why every
   // card carries the numbers it was derived from.
 
-  var findingsBody = document.getElementById('findingsBody');
-  var findingsEmpty = document.getElementById('findingsEmpty');
-  var findingsNote = document.getElementById('findingsNote');
-  var findingsBadge = document.getElementById('findingsBadge');
+  var findingsBody = byId('findingsBody');
+  var findingsEmpty = byId('findingsEmpty');
+  var findingsNote = byId('findingsNote');
+  var findingsBadge = byId('findingsBadge');
   var findings = [];
 
   /** Repeats of one call worth mentioning, and queries worth mentioning, start here. */
@@ -2965,8 +3723,14 @@
   /** Anything that makes the numbers above a lower bound rather than the truth. */
   function findRecordingLimits() {
     if (data.callsTruncated) {
-      addFinding('high', 'The recording hit the agent\'s cap',
-        'Later invocations were dropped, so every total on this page is a lower bound. '
+      var gone = unrecordedPct();
+      addFinding('high', gone
+        ? 'The recording hit the agent\'s cap — ' + gone + ' of the run is missing'
+        : 'The recording hit the agent\'s cap',
+        (gone
+          ? gone + ' of the run\'s time is not accounted for by any call below: the cap was '
+            + 'reached before that work ran. Every total on this page is a lower bound. '
+          : 'Later invocations were dropped, so every total on this page is a lower bound. ')
         + 'Narrow Includes, or put the trace point deeper in, and record again.', null);
     }
     if (data.excludedOmitted) {
@@ -2984,15 +3748,25 @@
   }
 
   function renderFindings() {
+    // The badge always counts every finding: it is a claim about the run, not about the
+    // filter, and a badge that shrank as you typed would be reporting on the search box.
     findingsBadge.textContent = String(findings.length);
     findingsBadge.hidden = findings.length === 0;
-    findingsEmpty.hidden = findings.length > 0;
-    findingsNote.textContent = findings.length === 0 ? ''
-      : 'Derived from this recording alone. Each one links to the step it came from.';
-    findingsNote.hidden = findings.length === 0;
+    var fq = queryFor('findings').trim().toLowerCase();
+    var shown = fq === '' ? findings : findings.filter(function (f) {
+      return (f.title + ' ' + f.detail).toLowerCase().indexOf(fq) !== -1;
+    });
+    findingsEmpty.hidden = shown.length > 0;
+    findingsEmpty.textContent = findings.length === 0
+      ? 'Nothing stood out in this run.'
+      : 'No finding matches that filter.';
+    findingsNote.textContent = shown.length === 0 ? ''
+      : (fq === '' ? '' : shown.length + ' of ' + findings.length + ' findings · ')
+        + 'Derived from this recording alone. Each one links to the step it came from.';
+    findingsNote.hidden = shown.length === 0;
 
     var frag = document.createDocumentFragment();
-    findings.forEach(function (f) {
+    shown.forEach(function (f) {
       var card = el('div', 'finding ' + f.sev);
       card.appendChild(el('span', 'fsev', f.sev === 'high' ? 'Look here'
         : (f.sev === 'med' ? 'Worth a look' : 'For information')));
@@ -3041,7 +3815,7 @@
     }).join('\n');
   }
 
-  document.getElementById('findingsCopyBtn').addEventListener('click', function () {
+  byId('findingsCopyBtn').addEventListener('click', function () {
     var btn = this;
     copyText(findingsAsText(), function (ok) { flash(btn, ok ? 'Copied' : 'Failed'); });
   });
@@ -3052,11 +3826,11 @@
   var graphRows = [];
   var graphSql = true;
   var graphAll = false;
-  var graphBody = document.getElementById('graphBody');
-  var graphEmpty = document.getElementById('graphEmpty');
-  var graphNote = document.getElementById('graphNote');
-  var graphSqlBtn = document.getElementById('graphSqlBtn');
-  var graphAllBtn = document.getElementById('graphAllBtn');
+  var graphBody = byId('graphBody');
+  var graphEmpty = byId('graphEmpty');
+  var graphNote = byId('graphNote');
+  var graphSqlBtn = byId('graphSqlBtn');
+  var graphAllBtn = byId('graphAllBtn');
 
   /**
    * Time per file, split into the file's own code and the SQL it caused.
@@ -3151,8 +3925,12 @@
 
   function renderGraph() {
     var useSql = graphSql;
+    var gq = queryFor('graph').trim().toLowerCase();
     var rows = graphRows.filter(function (r) {
-      return (r.self + (useSql ? r.sql : 0)) > 0;
+      if (!((r.self + (useSql ? r.sql : 0)) > 0)) return false;
+      // Name or package: on a run touching two hundred files the bar chart is a scroll,
+      // and "which of my repositories cost what" is the question it is opened with.
+      return gq === '' || (r.label + ' ' + (r.sub || '')).toLowerCase().indexOf(gq) !== -1;
     });
     rows.sort(function (a, b) {
       return (b.self + (useSql ? b.sql : 0)) - (a.self + (useSql ? a.sql : 0));
@@ -3256,26 +4034,39 @@
   var FLOW_LINE = 15;          // line height inside a multi-line SQL box
   var FLOW_SQL_MAX = 8;        // clause lines shown before a statement is cut off
   var FLOW_SQL_FONT = '11px ui-monospace,SFMono-Regular,Menlo,monospace';
+  /**
+   * The face every frame label is drawn in.
+   *
+   * <p>Named rather than repeated, because a canvas font is a property of the context and
+   * not of the call: a helper that sets its own and returns has changed the font for
+   * everything drawn after it. The ruler and the query box both do exactly that, and both
+   * run before the frames, so the labels used to come out in whichever face happened to be
+   * left behind — 10px in the flame, 11px monospace in the tree.
+   */
+  var FLOW_FONT = '12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
   var FLOW_RULER = 22;         // headroom above the flame stack for the time axis
   var FLOW_FLAME_W = 1100;     // width of the time axis in flame mode, before zoom
   var ZOOM_MIN = 0.4;
   var ZOOM_MAX = 3;
   var ZOOM_STEP = 1.25;
 
-  var flowWrap = document.getElementById('flowWrap');
+  var flowWrap = byId('flowWrap');
   var flowCanvas = null;      // created on first open of the tab, not on load
-  var flowEmpty = document.getElementById('flowEmpty');
-  var flowNote = document.getElementById('flowNote');
-  var flowTip = document.getElementById('flowTip');
-  var flowSqlBtn = document.getElementById('flowSqlBtn');
-  var flowGroupBtn = document.getElementById('flowGroupBtn');
-  var flowHotBtn = document.getElementById('flowHotBtn');
-  var flowFlameBtn = document.getElementById('flowFlameBtn');
-  var flowCrumb = document.getElementById('flowCrumb');
-  var flowFitBtn = document.getElementById('flowFitBtn');
-  var flowOutBtn = document.getElementById('flowOutBtn');
-  var flowInBtn = document.getElementById('flowInBtn');
-  var flowPngBtn = document.getElementById('flowPngBtn');
+  var flowEmpty = byId('flowEmpty');
+  var flowNote = byId('flowNote');
+  var flowTip = byId('flowTip');
+  var flowSqlBtn = byId('flowSqlBtn');
+  var flowGroupBtn = byId('flowGroupBtn');
+  var flowHotBtn = byId('flowHotBtn');
+  var flowFlameBtn = byId('flowFlameBtn');
+  var flowCrumb = byId('flowCrumb');
+  var flowFitBtn = byId('flowFitBtn');
+  var flowOutBtn = byId('flowOutBtn');
+  var flowInBtn = byId('flowInBtn');
+  var flowPngBtn = byId('flowPngBtn');
+  var flowSvgBtn = byId('flowSvgBtn');
+  var flowScopeSel = byId('flowScopeSel');
+  var flowColorSel = byId('flowColorSel');
 
   var flowSpacer = null;       // sized to the whole diagram; the canvas is not
   var flowContentW = 0;        // diagram size in its own coordinates, pre-scale
@@ -3285,7 +4076,14 @@
   var flowBySeq = {};          // seq -> node, for walking back up the zoom trail
   var flowVisible = [];        // what survives the SQL, fold and group filters
   var flowDrawn = [];          // what is actually painted: flowVisible, or one subtree
-  var flowByDepth = {};        // depth -> drawn nodes, for flame hit-testing
+  var flowByDepth = {};        // drawn ROW -> nodes on it, for flame hit-testing and paint
+  var flowIdxBySeq = {};       // seq -> index into flowNodes, for the filter's tree walks
+  var flowParentIdx = null;    // index -> parent's index, or -1; built with the spans
+  var flowKeep = null;         // index -> 1 when the pattern filter keeps this step
+  var flowFilterText = '';
+  var flowFilterLiteral = false;   // the pattern would not compile, so it is a substring
+  var flowScope = 'sub';       // how a match pulls its neighbours in: sub | only | pkg
+  var flowColorMode = 'glowroot';
   var flameRoot = null;        // seq the flame view is zoomed into, null for the whole run
   var collapsedFlow = {};      // seq -> true, subtree folded away by a click
   var flowSql = true;
@@ -3295,8 +4093,8 @@
      data classes are on screen. Off by default: excluding a type is a statement that it is
      noise, and a diagram is where noise costs the most. */
   var showExcluded = false;
-  var flowExcludedBtn = document.getElementById('flowExcludedBtn');
-  var timelineExcludedBtn = document.getElementById('timelineExcludedBtn');
+  var flowExcludedBtn = byId('flowExcludedBtn');
+  var timelineExcludedBtn = byId('timelineExcludedBtn');
 
   /**
    * Keeps both copies of the control saying the same thing.
@@ -3328,6 +4126,16 @@
     if (b) b.addEventListener('click', function () { setShowExcluded(!showExcluded); });
   });
   var flowFlame = false;
+  /**
+   * Narrowest a flame frame may be drawn, in pixels.
+   *
+   * <p>One is the floor rather than zero because the alternative is a frame that cannot be
+   * seen, hovered or clicked, which is indistinguishable from one the report decided not to
+   * show. Larger settings trade the width-is-time reading for the guarantee that every
+   * frame carries something readable; 34 is where a label fits.
+   */
+  var flameMinW = 1;
+  var flameWidened = false;   // true once the floor has had to stretch the diagram
   var flowFit = false;
   var flowHover = null;        // seq under the cursor, for the highlight
   var flameSpan = 0;           // pixel width of the time axis, for the ruler
@@ -3382,7 +4190,8 @@
         // Queries are laid out on their clause lines in the box itself rather than
         // abbreviated to a hover: the statement IS the step, and a select trimmed at
         // forty characters tells you nothing about the where clause that made it slow.
-        sqlLines: c.sql ? formatSqlLines(tokenizeSql(String(c.sql))).slice(0, FLOW_SQL_MAX)
+        sqlLines: c.sql
+          ? formatSqlLines(tokenizeSql(splitSqlLead(c.sql).sql)).slice(0, FLOW_SQL_MAX)
           : null,
         span: 1
       });
@@ -3403,11 +4212,22 @@
       }
       n.span = s;
       flowBySeq[n.seq] = n;
+      flowIdxBySeq[n.seq] = j;
+    }
+    // Parent by index rather than by seq, so the filter's two passes are array reads. In
+    // pre-order a parent always sits at a lower index than its children, which is what lets
+    // "any descendant matched" and "any ancestor matched" each be a single linear sweep.
+    flowParentIdx = new Int32Array(flowNodes.length);
+    for (var pi = 0; pi < flowNodes.length; pi++) {
+      var pp = flowIdxBySeq[flowNodes[pi].parentSeq];
+      flowParentIdx[pi] = pp === undefined ? -1 : pp;
     }
 
     flowRootTotal = roots.reduce(function (m, x) {
       return Math.max(m, x.totalMicros || 0);
     }, 0);
+
+    computeFlowStats();
 
     // The canvas is made here rather than shipped in the markup. A report that is never
     // opened on this tab should not carry the element, and one opened on it pays for the
@@ -3446,15 +4266,40 @@
     if (!showExcluded && hasExclusions) {
       bits.push('excluded types are folded away');
     }
-    if (data.callsTruncated) {
-      bits.push('the recording truncated the call list, so the tail is missing');
+    if (flowFilterText.trim()) {
+      bits.push('filtered by ' + (flowFilterLiteral ? 'text' : 'pattern')
+        + ' "' + flowFilterText.trim() + '"'
+        + (flowScope === 'only' ? ', matches and their callers'
+          : flowScope === 'pkg' ? ', matched on package names'
+          : ', with their callers and callees'));
     }
-    flowNote.textContent = bits.join(' · ') + '. Click a step to fold its calls away.';
+    if (data.callsTruncated) {
+      var lost = unrecordedPct();
+      bits.push(lost
+        ? 'the recording was capped, and ' + lost + ' of the run is not on this diagram'
+        : 'the recording truncated the call list, so the tail is missing');
+    }
+    // Said plainly, because it changes how the picture must be read: once a frame has been
+    // widened to reach the floor, a wide box is no longer necessarily a slow one. The
+    // percentage on each box still is, which is why it stays.
+    if (flowFlame && flameWidened) {
+      bits.push('every frame widened to at least ' + flameMinW + 'px, so width is no longer'
+        + ' time — read the percentages, not the boxes');
+    }
+    flowNote.textContent = bits.join(' · ') + '. '
+      + (flowFlame ? 'Click a step to zoom into it; callers are at the bottom.'
+        : 'Click a step to fold its calls away.');
   }
 
-  /** First few words of a statement: enough to tell queries apart in a small box. */
+  /**
+   * First few words of a statement: enough to tell queries apart in a small box.
+   *
+   * <p>The driver's provenance comment is dropped first. Forty-four characters of
+   * "-- FooServiceImpl L27 -- BarController L20" is a label that identifies nothing, and
+   * it is the same label on every query the class issued.
+   */
   function sqlLabel(sql) {
-    var s = String(sql).replace(/\s+/g, ' ').trim();
+    var s = splitSqlLead(sql).sql.replace(/\s+/g, ' ').trim();
     return s.length > 44 ? s.slice(0, 44) + '…' : s;
   }
 
@@ -3468,11 +4313,129 @@
    * five times over, is exactly the shape of an N+1, and five near-identical boxes say it
    * far less clearly than one box marked ×5.
    */
+  /**
+   * The pattern filter: which steps survive a regex typed into the filter box.
+   *
+   * <p>The Flow Graph is the one tab that cannot be read by scrolling. A run of two hundred
+   * thousand steps is a wall, and the reader almost always arrives knowing roughly what
+   * they are looking for — a repository, a package, a method name. This turns that into
+   * the question the diagram answers.
+   *
+   * <p>Three scopes, because a match on its own is not usually what you want to see. The
+   * default keeps a match, everything it went on to call, and the chain of callers above
+   * it: a subtree hanging off nothing would be a diagram that no longer says how the code
+   * got there. "Matches only" drops the callees for when the shape of the calls into a
+   * layer is the question. "Whole package" matches on the package rather than the
+   * signature, which is the grouping a layered codebase is actually navigated by.
+   *
+   * <p>An invalid pattern filters by substring instead of failing. Typing {@code get(} into
+   * a box is not a request for a syntax error.
+   */
+  function computeFlowFilter() {
+    flowKeep = null;
+    flowFilterLiteral = false;
+    var q = flowFilterText.trim();
+    if (!q || !flowNodes.length) return;
+
+    var re;
+    try {
+      re = new RegExp(q, 'i');
+    } catch (err) {
+      flowFilterLiteral = true;
+      re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    }
+
+    var n = flowNodes.length;
+    var self = new Uint8Array(n);
+    var up = new Uint8Array(n);      // this step, or something under it, matched
+    for (var i = 0; i < n; i++) {
+      var node = flowNodes[i];
+      var hay = flowScope === 'pkg' ? packageOf(node.owner) : (node.sig || '');
+      if (re.test(hay)) { self[i] = 1; up[i] = 1; }
+    }
+    // Backwards: a parent is always at a lower index, so one sweep carries every match up
+    // to the root.
+    for (var j = n - 1; j > 0; j--) {
+      if (up[j] && flowParentIdx[j] >= 0) up[flowParentIdx[j]] = 1;
+    }
+    if (flowScope === 'only') { flowKeep = up; return; }
+    // Forwards for the other direction: everything under a match comes with it.
+    var down = new Uint8Array(n);
+    for (var k = 0; k < n; k++) {
+      down[k] = self[k] || (flowParentIdx[k] >= 0 ? down[flowParentIdx[k]] : 0);
+      if (down[k]) up[k] = 1;
+    }
+    flowKeep = up;
+  }
+
+  /**
+   * What each method and each statement cost across the whole run.
+   *
+   * <p>A frame on the diagram is one invocation, and one invocation is rarely the question
+   * being asked of it. "8.1 ms" beside a repository lookup says nothing useful until you
+   * know it is the first of five and that the five come to 12.7 ms — a quarter of the
+   * request. The five boxes are scattered across the diagram and four of them are too
+   * narrow to label, so adding them up is not something the reader can do by looking.
+   *
+   * <p>Counted over every call in the trace rather than over what is currently drawn.
+   * Filtering the diagram is a question about where to look, not a claim that the rest of
+   * the run stopped happening, and a total that moved when the filter changed would be the
+   * second kind of number while looking like the first.
+   */
+  var flowStats = {};
+
+  function computeFlowStats() {
+    flowStats = {};
+    var childTotals = {};
+    var i;
+    var n;
+    for (i = 0; i < flowNodes.length; i++) {
+      n = flowNodes[i];
+      if (n.parentSeq >= 0) {
+        childTotals[n.parentSeq] = (childTotals[n.parentSeq] || 0) + n.total;
+      }
+    }
+    for (i = 0; i < flowNodes.length; i++) {
+      n = flowNodes[i];
+      var s = flowStats[n.key];
+      if (!s) s = flowStats[n.key] = { n: 0, total: 0, self: 0, max: 0, times: [] };
+      s.n++;
+      s.total += n.total;
+      // Clamped: a parent whose children were measured across a clock edge can come out a
+      // microsecond short of them, and a negative "own time" is not a thing to report.
+      s.self += Math.max(0, n.total - (childTotals[n.seq] || 0));
+      if (n.total > s.max) s.max = n.total;
+      s.times.push(n.total);
+    }
+  }
+
+  /**
+   * The middle call of a set, worked out on demand.
+   *
+   * <p>Deliberately not the mean. The interesting shape here is a first call that pays for
+   * a cache or a connection and four that do not, and a mean quietly splits that difference
+   * into a number describing neither. Sorted on first ask and kept, because the hover card
+   * asks for the same method repeatedly and almost never for most of them.
+   */
+  function flowMedian(s) {
+    if (s.median == null) {
+      s.times.sort(function (a, b) { return a - b; });
+      var m = s.times.length >> 1;
+      s.median = s.times.length % 2
+        ? s.times[m]
+        : Math.round((s.times[m - 1] + s.times[m]) / 2);
+    }
+    return s.median;
+  }
+
   function computeFlowVisible() {
     var out = [];
     var i = 0;
     while (i < flowNodes.length) {
       var n = flowNodes[i];
+      // Nothing under a dropped step can have matched — "kept" already propagated upward
+      // from every match — so its whole subtree goes with it.
+      if (flowKeep && !flowKeep[flowIdxBySeq[n.seq]]) { i += n.span; continue; }
       // Unticking a file hides its calls and everything they went on to do, which is what
       // the same picker already means in the Tree. Dropping the frame but keeping its
       // children would leave callees floating under a caller that is no longer drawn.
@@ -3531,6 +4494,75 @@
     }
   }
 
+  /**
+   * Flame widths in pixels, with a floor no frame may fall below.
+   *
+   * <p>Time alone cannot lay this out. A frame's share of the run spans six orders of
+   * magnitude — a 1 µs getter inside a 103 s request is a millionth of a pixel — and the
+   * agent records nothing at all under a microsecond, so a proportional layout hands some
+   * frames a width of exactly zero. Flooring only the width, which is what this used to do,
+   * leaves the positions proportional: 199 frames on one row of a real trace were all
+   * assigned their own pixel and then drawn on top of each other at 27 distinct positions.
+   * A frame nobody can see or hover is a frame the diagram has hidden.
+   *
+   * <p>So the floor is applied to the layout instead of to the drawing. A parent is at
+   * least as wide as its children laid side by side, which is what keeps a widened frame
+   * from spilling out from under the call that made it, and the extra width propagates up
+   * the tree rather than overlapping anything.
+   *
+   * <p>The cost is honest and worth stating: above the floor a box is still time, but a
+   * frame that had to be widened to reach it is not. That is why the ruler is dropped and
+   * the note says so whenever the floor is doing any work.
+   *
+   * @return the width of the whole diagram, in pixels
+   */
+  function layoutFlamePx(drawn, baseDepth, baseT0, total, span, floor) {
+    var len = drawn.length;
+    if (!len) return 0;
+    var pw = new Float64Array(len);
+    var kids = new Float64Array(len);
+    var parent = new Int32Array(len);
+    var stack = [];
+    var i;
+    var d;
+
+    // Pre-order means a parent is always seen before its children, so the nearest entry one
+    // level up is the parent and a single sweep finds every one of them.
+    for (i = 0; i < len; i++) {
+      d = drawn[i].depth - baseDepth;
+      stack[d] = i;
+      parent[i] = d > 0 && stack[d - 1] != null ? stack[d - 1] : -1;
+    }
+
+    // Backwards, so a node's children have all reported in before it is sized.
+    for (i = len - 1; i >= 0; i--) {
+      var prop = total > 0 ? (drawn[i].shown / total) * span : span;
+      var w = Math.max(floor, prop, kids[i]);
+      pw[i] = w;
+      if (parent[i] >= 0) kids[parent[i]] += w;
+    }
+
+    // Forwards again, each node starting where its parent's previous child finished.
+    var pen = new Float64Array(len);
+    var widest = 0;
+    for (i = 0; i < len; i++) {
+      var p = parent[i];
+      var x;
+      if (p < 0) {
+        // A root keeps the place time gave it, so several roots stay in call order.
+        x = total > 0 ? ((drawn[i].t0 - baseT0) / total) * span : 0;
+      } else {
+        x = pen[p];
+        pen[p] += pw[i];
+      }
+      pen[i] = x;
+      drawn[i].x = FLOW_PAD + x;
+      drawn[i].w = pw[i];
+      if (x + pw[i] > widest) widest = x + pw[i];
+    }
+    return widest;
+  }
+
   function flowColors() {
     // Read from the stylesheet rather than hardcoded, so one theme toggle repaints the
     // canvas in the new palette with no second source of truth for the colours.
@@ -3569,39 +4601,95 @@
   }
 
   /**
-   * Categorical fills for flame frames, one slot per owning class.
+   * Categorical fills for flame frames, one slot per owner.
    *
-   * A fixed, validated order rather than a hue spun out of a hash: hashed hues land
-   * wherever they land, and two classes that happen to collide, or a colour that happens
-   * to sit on top of the SQL orange, are indistinguishable with no way to fix it. These
-   * six clear the colour-blindness and normal-vision separation floors in both themes as
-   * an ordered list, and are assigned in first-appearance order so a class keeps its
-   * colour no matter what the filters hide.
+   * <p>Three schemes rather than one, because the diagram gets read two ways. Glowroot's
+   * warm ramp is what a JVM developer recognises on sight, so it is the default; the Deju
+   * scheme is the report's own palette, for a screenshot that has to sit beside the
+   * product; "by package" gives up per-class identity for per-layer identity, which is the
+   * only honest answer once a run touches two hundred classes and no palette can name them
+   * all.
    *
-   * Yellow is deliberately absent from the six. It measures ΔE 1.2 against the SQL orange
-   * under protanopia, which would make a query and a method indistinguishable — the one
-   * distinction this diagram cannot afford to lose.
+   * <p>SQL keeps a fill of its own in every scheme, and in the warm ones it is deliberately
+   * the only cool colour on the canvas. Telling a query apart from a method is the one
+   * distinction this diagram cannot afford to lose, and a warm ramp has no shade left over
+   * that could carry it.
    *
-   * Solid, not a wash: composited down to a tint over the box fill, the same six collapse
-   * below every separation floor.
+   * <p>Slots are handed out in first-appearance order, so a class keeps its colour whatever
+   * the filters hide. Past the eight base fills the scheme cycles through three lightness
+   * steps of itself rather than stopping: thirty-two distinguishable fills, and only then
+   * grey. The previous six-slot cap was principled about never recycling a hue, but on a
+   * real trace it painted the seventh class onward — nearly all of them — the same grey,
+   * which loses far more than a repeated colour at two different lightnesses ever did.
    */
-  var FLAME_LIGHT = ['#2a78d6', '#1baf7a', '#e34948', '#008300', '#e87ba4', '#4a3aa7'];
-  var FLAME_DARK = ['#3987e5', '#199e70', '#e66767', '#008300', '#d55181', '#9085e9'];
-  var FLAME_OTHER_LIGHT = '#8b8f94';   // the 7th class onward, deliberately colourless
+  var FLAME_SCHEMES = {
+    glowroot: {
+      light: ['#e8703a', '#d9534f', '#ec9a3c', '#c0392b', '#e2854a', '#b7472a',
+              '#f0a95c', '#9c3520'],
+      dark:  ['#f0844f', '#e06a64', '#f2ab55', '#d1503f', '#ea9462', '#c85a3c',
+              '#f5bb74', '#b8543c'],
+      sqlLight: '#3d6ea8', sqlDark: '#6f9fdd'
+    },
+    deju: {
+      light: ['#2f6fd0', '#2e9e4f', '#c9457a', '#6c5ce7', '#0f9b9b', '#d94a3d',
+              '#8a6d3b', '#4a3aa7'],
+      dark:  ['#5b93e0', '#4bb56a', '#df6a99', '#8f81f0', '#2bb3b3', '#e8695c',
+              '#b8955c', '#9085e9'],
+      // Deju's own SQL ink is already the brand orange and is nowhere in the eight above,
+      // so the tree's colour carries straight over.
+      sqlLight: null, sqlDark: null
+    }
+  };
+  var FLAME_OTHER_LIGHT = '#8b8f94';   // past every cycle, deliberately colourless
   var FLAME_OTHER_DARK = '#6b7075';
+  var FLAME_CYCLES = [0, 0.30, -0.26, 0.55];   // lightness steps applied per wrap
+
   var ownerSlot = {};
   var ownerSlotCount = 0;
 
+  /** Resets slot assignment: a scheme change has to re-deal from the top of the new list. */
+  function resetFlameSlots() {
+    ownerSlot = {};
+    ownerSlotCount = 0;
+  }
+
+  /** Lifts a fill toward white (positive) or down toward black (negative). */
+  function shade(hex, amt) {
+    if (!amt) return hex;
+    var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+    if (!m) return hex;
+    var out = '#';
+    for (var i = 1; i <= 3; i++) {
+      var v = parseInt(m[i], 16);
+      v = amt >= 0 ? v + (255 - v) * amt : v * (1 + amt);
+      out += ('0' + Math.max(0, Math.min(255, Math.round(v))).toString(16)).slice(-2);
+    }
+    return out;
+  }
+
+  /** The package a class belongs to, which is what "by package" colours by. */
+  function packageOf(fq) {
+    var i = String(fq || '').lastIndexOf('.');
+    return i > 0 ? fq.slice(0, i) : (fq || '(default)');
+  }
+
+  function flameScheme() {
+    return FLAME_SCHEMES[flowColorMode === 'deju' ? 'deju' : 'glowroot'];
+  }
+
   function classFill(name, dark) {
     var slot = ownerSlot[name];
-    if (slot === undefined) {
-      // Past the palette the honest answer is "no colour", not a recycled one: two classes
-      // sharing a hue would read as one.
-      slot = ownerSlot[name] = ownerSlotCount < FLAME_LIGHT.length ? ownerSlotCount : -1;
-      ownerSlotCount++;
-    }
-    if (slot < 0) return dark ? FLAME_OTHER_DARK : FLAME_OTHER_LIGHT;
-    return (dark ? FLAME_DARK : FLAME_LIGHT)[slot];
+    if (slot === undefined) slot = ownerSlot[name] = ownerSlotCount++;
+    var sc = flameScheme();
+    var pal = dark ? sc.dark : sc.light;
+    var cycle = Math.floor(slot / pal.length);
+    if (cycle >= FLAME_CYCLES.length) return dark ? FLAME_OTHER_DARK : FLAME_OTHER_LIGHT;
+    return shade(pal[slot % pal.length], FLAME_CYCLES[cycle]);
+  }
+
+  /** What a frame is coloured by: its class normally, its package in "by package" mode. */
+  function fillKey(n) {
+    return flowColorMode === 'pkg' ? packageOf(n.owner) : (n.owner || '');
   }
 
   /**
@@ -3661,8 +4749,12 @@
     // it, since its subtree is the whole run. A blank canvas looks like a broken report, so
     // say what happened and how to undo it.
     if (flowVisible.length === 0) {
-      flowEmpty.textContent = 'Every step is filtered out.'
-        + ' Re-tick files in the Files picker, or turn SQL back on.';
+      flowEmpty.textContent = flowFilterText.trim()
+        ? 'No step matches ' + (flowFilterLiteral ? 'the text' : 'the pattern')
+          + ' "' + flowFilterText.trim() + '". Clear the filter box, or widen it with the '
+          + 'dropdown beside the tabs.'
+        : 'Every step is filtered out.'
+          + ' Re-tick files in the Files picker, or turn SQL back on.';
       flowEmpty.hidden = false;
       flowWrap.hidden = true;
       return;
@@ -3671,6 +4763,9 @@
     flowWrap.hidden = false;
     syncExcludedButtons();
     flowByDepth = {};
+    // Cleared per draw: the tree layout never sets it, and a stale true would leave the
+    // note claiming a floor that only the flame applies.
+    flameWidened = false;
     var maxDepth = 0;
     flowVisible.forEach(function (n) { if (n.depth > maxDepth) maxDepth = n.depth; });
 
@@ -3714,23 +4809,35 @@
         : Math.max(FLOW_FLAME_W, avail - FLOW_PAD * 2) * flowZoom;
       var maxD = 0;
       drawn.forEach(function (n) {
+        var dd = n.depth - baseDepth;
+        if (dd > maxD) maxD = dd;
+      });
+      // x and w together, because a floor on one without the other is what let frames pile
+      // up on a single pixel. Returns how wide the diagram came out: at the smallest floor
+      // that is the span it was given, and at larger ones it is however much room every
+      // frame needed to be visible.
+      var laidW = layoutFlamePx(drawn, baseDepth, baseT0, total, span, flameMinW);
+      flameWidened = laidW > span + 0.5;
+      drawn.forEach(function (n) {
         var d = n.depth - baseDepth;
-        if (d > maxD) maxD = d;
-        n.x = FLOW_PAD + (total > 0 ? ((n.t0 - baseT0) / total) * span : 0);
-        // Never below a pixel: a 30 µs call inside a 48 ms request is far thinner than
-        // that, and a box with no width is a box the reader cannot hover.
-        n.w = Math.max(1, total > 0 ? (n.shown / total) * span : span);
-        // Rows touch. The stack of columns is the thing being read, and a gap between
-        // levels breaks the one line the eye follows from a caller down into its callee.
-        n.y = FLOW_PAD + FLOW_RULER + d * FLOW_BOX;
+        // Flame, not icicle: the caller sits at the BOTTOM and the stack grows upward, the
+        // way Glowroot, async-profiler and every other flame graph a JVM developer has read
+        // draws it. Depth is inverted into a row rather than used as one, so the deepest
+        // frame lands on row 0 at the top and the entry point holds the floor. Rows touch;
+        // a gap between levels would break the column the eye follows from a callee back
+        // down to whatever called it.
+        var row = maxD - d;
+        n.y = FLOW_PAD + FLOW_RULER + row * FLOW_BOX;
         n.h = FLOW_BOX;
-        (flowByDepth[d] || (flowByDepth[d] = [])).push(n);
+        // Keyed by drawn row, not by depth: hit-testing and painting both work in screen
+        // rows, and after the flip those are no longer the same number.
+        (flowByDepth[row] || (flowByDepth[row] = [])).push(n);
       });
       flowDrawn = drawn;
       indexDrawn();
       flameSpan = span;
       flameTotal = total;
-      contentW = FLOW_PAD * 2 + span;
+      contentW = FLOW_PAD * 2 + Math.max(span, laidW);
       contentH = FLOW_PAD * 2 + FLOW_RULER + (maxD + 1) * FLOW_BOX;
     } else {
       var slack = avail - FLOW_PAD * 2 - maxDepth * FLOW_INDENT;
@@ -3754,6 +4861,9 @@
     // Flame already spent the zoom on its time axis, so the canvas itself stays 1:1 there.
     flowScale = flowFlame ? 1
       : (flowFit && contentW > avail ? avail / contentW : flowZoom);
+    // Again, now that the layout has run: whether the width floor had to stretch anything
+    // is not known until the frames have been sized, and it is the note's job to say so.
+    updateFlowNote();
     renderCrumb();
 
     flowContentW = contentW;
@@ -3788,6 +4898,22 @@
    * browser accepts the size and hands back a canvas that silently draws nothing. Sizing to
    * the viewport instead keeps the canvas a few hundred pixels tall however long the run is.
    */
+  /**
+   * Device pixels to put behind each CSS pixel of canvas.
+   *
+   * <p>{@code devicePixelRatio} is not a floor. Zoom a browser below 100% and it drops with
+   * the zoom — 0.8 at 80%, 0.67 at 67% — so the backing store comes out smaller than the box
+   * it is stretched across and every label on the diagram is upscaled from fewer pixels than
+   * it was drawn with. Text is what shows it first, which is why the flame went soft in
+   * Chrome on Windows at 80% and nowhere else.
+   *
+   * <p>Capped as well as floored: a 3x phone painting a wide flame at full ratio buys
+   * sharpness nobody can see with memory that is very much felt.
+   */
+  function flowDpr() {
+    return Math.min(Math.max(window.devicePixelRatio || 1, 1), 3);
+  }
+
   function paintFlow() {
     if (!flowCanvas || flowContentH === 0) return;
 
@@ -3800,7 +4926,7 @@
     flowCanvas.style.left = sx + 'px';
     flowCanvas.style.top = sy + 'px';
 
-    var dpr = window.devicePixelRatio || 1;
+    var dpr = flowDpr();
     var needW = Math.ceil(viewW * dpr);
     var needH = Math.ceil(viewH * dpr);
     // Assigning width/height clears the canvas, so it is only done when it really changed.
@@ -3833,12 +4959,34 @@
     ctx.fillStyle = c.bg;
     ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
 
-    ctx.font = '12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ctx.font = FLOW_FONT;
     ctx.textBaseline = 'middle';
 
-    if (flowFlame) drawRuler(ctx, c, flameSpan, flameTotal, flowContentH);
-    else drawConnectors(ctx, c, y0, y1);
+    if (flowFlame) {
+      // Only while the axis still means something. Once the floor has widened a frame past
+      // its share, position no longer maps to time, and a ruler would be a scale printed
+      // against distances it does not describe.
+      if (!flameWidened) drawRuler(ctx, c, flameSpan, flameTotal, flowContentH);
+      // Flame rows are a fixed pitch and every node on one is already indexed by that row,
+      // so the band on screen is arithmetic and only the nodes actually in it are touched.
+      // This used to walk the whole drawn array on every scroll and every hover, which on a
+      // 200,000-step run meant 200,000 rejections per repaint to move one highlight.
+      var r0 = Math.max(0, Math.floor((y0 - FLOW_PAD - FLOW_RULER) / FLOW_BOX));
+      var r1 = Math.floor((y1 - FLOW_PAD - FLOW_RULER) / FLOW_BOX);
+      for (var r = r0; r <= r1; r++) {
+        var list = flowByDepth[r];
+        if (!list) continue;
+        for (var k = 0; k < list.length; k++) {
+          var fn = list[k];
+          // Horizontal culling too: zoomed in, most of a row is off to one side.
+          if (fn.x > x1 || fn.x + fn.w < x0) continue;
+          drawNode(ctx, c, fn);
+        }
+      }
+      return;
+    }
 
+    drawConnectors(ctx, c, y0, y1);
     var slice = visibleSlice(y0, y1);
     for (var j = slice.from; j < slice.to; j++) {
       var n = flowDrawn[j];
@@ -3850,13 +4998,11 @@
   /**
    * The index range of {@link flowDrawn} that can appear between two content rows.
    *
-   * <p>Tree mode stacks rows in order, so the range is found by bisection. Flame mode packs
-   * every node of a depth onto one row and the array is not sorted by y at all, so there the
-   * honest answer is the whole array and the per-node test below does the rejecting; that
-   * costs one comparison per node, against re-laying-out all of them.
+   * <p>Tree mode only: rows are stacked in order there, so the range is a bisection. Flame
+   * mode packs a whole depth onto one row and is not sorted by y at all, so it is painted
+   * from {@link flowByDepth} instead, which indexes exactly that.
    */
   function visibleSlice(y0, y1) {
-    if (flowFlame) return { from: 0, to: flowDrawn.length };
     var lo = 0;
     var hi = flowDrawn.length;
     while (lo < hi) {
@@ -3928,7 +5074,9 @@
     // be decoration competing with the coverage colours the report uses on code rows.
     var ink = null;
     if (flowFlame) {
-      var fill = n.isSql ? c.sql : classFill(n.owner, c.dark);
+      var sc = flameScheme();
+      var sqlFill = c.dark ? (sc.sqlDark || c.sql) : (sc.sqlLight || c.sql);
+      var fill = n.isSql ? sqlFill : classFill(fillKey(n), c.dark);
       ctx.fillStyle = fill;
       ctx.fill();
       ink = inkOn(fill);
@@ -3959,10 +5107,30 @@
       return;
     }
 
+    // Claimed here rather than once before the loop. Set once, it survives only until the
+    // first helper that wants a font of its own, and both of them run inside this loop:
+    // every label after a query box came out monospace, and in the flame the ruler's 10px
+    // reached every frame on the diagram. Assigning the same string is a no-op the browser
+    // already caches, so the cost of being certain is nothing.
+    ctx.font = FLOW_FONT;
+
     var mid = n.y + h / 2;
     var right = n.x + n.w - 7;
 
+    // Width already says how long a flame box took, but only relative to whatever is beside
+    // it; the number is what makes it comparable to anything else in the report, and the
+    // share is what makes it comparable without remembering the run total. Both go in when
+    // the box can hold them, the time alone when it cannot.
     var time = fmt(n.shown);
+    if (flowFlame) {
+      var sharePct = flameTotal > 0
+        ? (n.shown / flameTotal) * 100 : 0;
+      var shareTxt = sharePct >= 10 ? sharePct.toFixed(0) + '%'
+        : sharePct >= 0.1 ? sharePct.toFixed(1) + '%' : '';
+      if (shareTxt && ctx.measureText(time + '  ' + shareTxt).width < n.w - 60) {
+        time = time + '  ' + shareTxt;
+      }
+    }
     var timeW = ctx.measureText(time).width;
     ctx.fillStyle = ink || c.muted;
     if (ink) ctx.globalAlpha = 0.75;
@@ -4016,7 +5184,7 @@
    */
   function drawSqlBox(ctx, c, n, h) {
     var time = fmt(n.shown);
-    ctx.font = '12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ctx.font = FLOW_FONT;
     var timeW = ctx.measureText(time).width;
     ctx.fillStyle = c.muted;
     ctx.fillText(time, n.x + n.w - 7 - timeW, n.y + 9);
@@ -4190,7 +5358,28 @@
     } else {
       flowTip.appendChild(el('div', 't-sig', n.sig));
     }
-    var sub = 'step ' + (n.seq + 1) + ' · ' + fmt(n.shown);
+    // What this call cost the run as a whole, which is the thing the box cannot say. A
+    // frame is one invocation of something that usually ran many times, and its own width
+    // is measured against whatever is on screen rather than against the request.
+    var st = flowStats[n.key];
+    if (st) {
+      var facts = [];
+      if (st.n > 1) {
+        facts.push('called ' + st.n + '× in this run');
+        facts.push(fmtPct(st.total) + ' altogether');
+        facts.push('slowest ' + fmt(st.max));
+        facts.push('median ' + fmt(flowMedian(st)));
+      }
+      // Only once the two differ enough to matter. On a frame that calls nothing they are
+      // the same number, and printing it twice would suggest a distinction that is not
+      // there; on one that calls plenty, the gap is the whole point — the widest box in a
+      // trace is usually the one doing the least of the work itself.
+      if (st.self < st.total * 0.98) {
+        facts.push('own code ' + fmtPct(st.self));
+      }
+      if (facts.length) flowTip.appendChild(el('div', 't-stat', facts.join(' · ')));
+    }
+    var sub = 'step ' + (n.seq + 1) + ' · ' + fmtPct(n.shown);
     if (n.reps > 1) sub += ' · ' + n.reps + ' identical calls combined';
     if (n.site != null) sub += ' · called at line ' + n.site;
     if (flowFlame) sub += (flameRoot === n.seq) ? ' · click to zoom out' : ' · click to zoom in';
@@ -4231,6 +5420,46 @@
     function (v) { flowFlame = v; if (!v) flameRoot = null; });
   flowToggle(flowFitBtn, function () { return flowFit; }, function (v) { flowFit = v; });
 
+  /** Applies a new pattern. Returns whether anything actually changed. */
+  function setFlowFilter(text) {
+    if (text === flowFilterText) return false;
+    flowFilterText = text;
+    if (flowBuilt) computeFlowFilter();
+    return true;
+  }
+
+  if (flowScopeSel) {
+    flowScopeSel.addEventListener('change', function () {
+      flowScope = flowScopeSel.value;
+      if (flowBuilt) { computeFlowFilter(); hideFlowTip(); drawFlow(); }
+    });
+  }
+  if (flowColorSel) {
+    flowColorSel.addEventListener('change', function () {
+      flowColorMode = flowColorSel.value;
+      // A new scheme, or a switch between class and package identity, has to re-deal the
+      // slots from the top: keeping the old assignment would colour the first package with
+      // whatever the first class happened to be given.
+      resetFlameSlots();
+      if (flowBuilt) { hideFlowTip(); drawFlow(); }
+    });
+  }
+
+  var flowMinWSel = byId('flowMinWSel');
+  if (flowMinWSel) {
+    flowMinWSel.addEventListener('change', function () {
+      flameMinW = Math.max(1, parseFloat(flowMinWSel.value) || 1);
+      // Fit-width and a width floor are contradictory instructions — one says the diagram
+      // must be as wide as the window, the other says it must be as wide as its frames
+      // need — so asking for room drops the request to fit.
+      if (flameMinW > 1 && flowFit) {
+        flowFit = false;
+        flowFitBtn.classList.remove('on');
+      }
+      if (flowBuilt) { hideFlowTip(); drawFlow(); }
+    });
+  }
+
   function zoomBy(factor) {
     // Zoom and fit are two answers to the same question, so asking for one drops the
     // other rather than compounding into a scale nobody chose.
@@ -4249,12 +5478,310 @@
    * <p>Chrome tops out at 65535px and hands back a silently blank canvas past it; Safari
    * gives up sooner. 32767 is the value every engine in use manages, and a diagram past it
    * is exported as the visible region rather than as a blank PNG.
+   *
+   * <p>The SVG export has no equivalent limit, which is most of why it exists.
    */
   var CANVAS_MAX = 32767;
 
+  // --------------------------------------------------------- svg export ---
+  //
+  // A 2D-context stand-in that writes SVG elements instead of pixels.
+  //
+  // The point of the shim is that renderFlow stays the only renderer in the file. An
+  // exporter that walked flowDrawn itself would be a second description of the same
+  // diagram, free to drift from the one on screen every time a box gains a badge; this one
+  // cannot drift, because it is handed to the same function the canvas is.
+  //
+  // Only the members renderFlow actually reaches for are implemented. That is deliberate:
+  // if the diagram later grows a feature drawn with some other call, the export throws
+  // instead of quietly saving a picture with the feature missing.
+
+  // Character-for-character what the canvas font strings carry after the size, so the
+  // common case compares equal and the stack is written once in a rule instead of on
+  // every one of a thousand labels.
+  var SVG_FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+
+  /** Two decimals is under a tenth of a pixel and roughly halves the file. */
+  function svgNum(v) {
+    return String(Math.round(v * 100) / 100);
+  }
+
+  function xmlText(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function xmlAttr(s) {
+    return xmlText(s).replace(/"/g, '&quot;');
+  }
+
+  /**
+   * Spaces that survive being rendered.
+   *
+   * <p>Every renderer collapses a run of spaces to one and drops them at the edges, and
+   * {@code xml:space} is honoured in a standalone file but not once the same markup is
+   * pasted into an HTML page. A label was positioned against the width {@code measureText}
+   * gave it, so "8.1 ms  17%" losing one of its two spaces moves the text off the place it
+   * was measured for. A non-breaking space is never collapsed by anything.
+   */
+  function svgSpaces(s) {
+    // Written as an escape rather than the character itself: a literal non-breaking
+    // space in the source is indistinguishable from an ordinary one to anyone reading it.
+    var NB = '\u00a0';
+    return s.replace(/ {2,}/g, function (run) { return run.replace(/ /g, NB); })
+      .replace(/^ /, NB).replace(/ $/, NB);
+  }
+
+  /**
+   * True when a CSS colour paints at full strength.
+   *
+   * <p>Only used to decide whether one fill may replace another on the same box, which is
+   * safe for an opaque colour and wrong for a translucent one.
+   */
+  function svgOpaque(colour) {
+    return !/rgba|hsla/i.test(colour) && !/^#(?:[0-9a-f]{4}|[0-9a-f]{8})$/i.test(colour.trim());
+  }
+
+  /** Splits "12px family, stack" into the two SVG attributes that describe it. */
+  function svgFont(font) {
+    var m = /^\s*(?:\w+\s+)*?(\d+(?:\.\d+)?)px\s+(.+)$/.exec(font);
+    return m ? { size: m[1], family: m[2] } : { size: '12', family: SVG_FONT };
+  }
+
+  /**
+   * The arc canvas draws for {@code arcTo}, as an SVG path segment.
+   *
+   * <p>Canvas takes two control points and a radius and works the tangents out; SVG wants
+   * the endpoint. Rounded corners are the only arcs this diagram draws, so the degenerate
+   * cases collapse to a straight line rather than trying to be clever.
+   */
+  function svgArc(x0, y0, x1, y1, x2, y2, r) {
+    var v1x = x0 - x1;
+    var v1y = y0 - y1;
+    var v2x = x2 - x1;
+    var v2y = y2 - y1;
+    var l1 = Math.sqrt(v1x * v1x + v1y * v1y);
+    var l2 = Math.sqrt(v2x * v2x + v2y * v2y);
+    if (!l1 || !l2 || r <= 0) return { d: 'L' + svgNum(x1) + ' ' + svgNum(y1), x: x1, y: y1 };
+    v1x /= l1; v1y /= l1; v2x /= l2; v2y /= l2;
+    var cos = v1x * v2x + v1y * v2y;
+    if (cos > 0.9999 || cos < -0.9999) {
+      return { d: 'L' + svgNum(x1) + ' ' + svgNum(y1), x: x1, y: y1 };
+    }
+    var d = r / Math.tan(Math.acos(cos) / 2);
+    var t1x = x1 + v1x * d;
+    var t1y = y1 + v1y * d;
+    var t2x = x1 + v2x * d;
+    var t2y = y1 + v2y * d;
+    // Which way the corner turns decides the sweep flag; y grows downward in both
+    // coordinate systems, so a negative cross product is the clockwise one.
+    var sweep = (v1x * v2y - v1y * v2x) > 0 ? 0 : 1;
+    return {
+      d: 'L' + svgNum(t1x) + ' ' + svgNum(t1y)
+        + 'A' + svgNum(r) + ' ' + svgNum(r) + ' 0 0 ' + sweep + ' '
+        + svgNum(t2x) + ' ' + svgNum(t2y),
+      x: t2x,
+      y: t2y
+    };
+  }
+
+  function svgContext(measurer) {
+    var out = [];        // finished elements, in paint order
+    var ops = [];        // the path being built
+    var last = null;     // element a following fill/stroke may still merge into
+
+    /**
+     * The path as a rectangle, when it is one.
+     *
+     * <p>Every box on the diagram arrives here as roundRect's four arcs. Recognising that
+     * shape turns roughly two hundred bytes of path data into a forty-byte {@code <rect>},
+     * which on a diagram of a thousand frames is the difference between a file that opens
+     * instantly and one that does not.
+     */
+    function asRect() {
+      if (ops.length !== 6 || ops[0][0] !== 'M' || ops[5][0] !== 'Z') return null;
+      var xs = [];
+      var ys = [];
+      for (var i = 1; i < 5; i++) {
+        if (ops[i][0] !== 'A') return null;
+        xs.push(ops[i][1]);
+        ys.push(ops[i][2]);
+      }
+      var x = Math.min.apply(null, xs);
+      var y = Math.min.apply(null, ys);
+      var w = Math.max.apply(null, xs) - x;
+      var h = Math.max.apply(null, ys) - y;
+      // roundRect starts on the top edge. Anything else is a path that merely has four
+      // arcs in it, and guessing a rectangle out of it would draw the wrong shape.
+      if (Math.abs(ops[0][2] - y) > 0.01) return null;
+      return { tag: 'rect', x: x, y: y, w: w, h: h, r: ops[1][5] };
+    }
+
+    function asPath() {
+      var d = '';
+      var cx = 0;
+      var cy = 0;
+      for (var i = 0; i < ops.length; i++) {
+        var op = ops[i];
+        if (op[0] === 'M') {
+          d += 'M' + svgNum(op[1]) + ' ' + svgNum(op[2]);
+          cx = op[1]; cy = op[2];
+        } else if (op[0] === 'L') {
+          d += 'L' + svgNum(op[1]) + ' ' + svgNum(op[2]);
+          cx = op[1]; cy = op[2];
+        } else if (op[0] === 'A') {
+          var seg = svgArc(cx, cy, op[1], op[2], op[3], op[4], op[5]);
+          d += seg.d;
+          cx = seg.x; cy = seg.y;
+        } else {
+          d += 'Z';
+        }
+      }
+      return { tag: 'path', d: d };
+    }
+
+    /** A shape's identity, so a fill and the stroke that follows it become one element. */
+    function shape() {
+      var s = asRect() || asPath();
+      s.key = s.tag === 'rect'
+        ? 'r' + svgNum(s.x) + ',' + svgNum(s.y) + ',' + svgNum(s.w) + ',' + svgNum(s.h) + ',' + svgNum(s.r)
+        : 'p' + s.d;
+      return s;
+    }
+
+    function paint(kind) {
+      if (!ops.length) return;
+      var s = shape();
+      if (last && last.key === s.key) {
+        if (kind === 'stroke' && last.stroke == null) {
+          last.stroke = api.strokeStyle;
+          last.strokeWidth = api.lineWidth;
+          last.strokeAlpha = api.globalAlpha;
+          return;
+        }
+        // Flame boxes are filled twice, once in the neutral box colour and again in the
+        // frame's own. The second covers the first exactly, so only the second is written.
+        if (kind === 'fill' && last.stroke == null && last.fill != null
+            && api.globalAlpha === 1 && last.fillAlpha === 1
+            && svgOpaque(api.fillStyle) && svgOpaque(last.fill)) {
+          last.fill = api.fillStyle;
+          return;
+        }
+      }
+      if (kind === 'fill') {
+        s.fill = api.fillStyle;
+        s.fillAlpha = api.globalAlpha;
+      } else {
+        s.stroke = api.strokeStyle;
+        s.strokeWidth = api.lineWidth;
+        s.strokeAlpha = api.globalAlpha;
+      }
+      out.push(s);
+      last = s;
+    }
+
+    var api = {
+      fillStyle: '#000',
+      strokeStyle: '#000',
+      lineWidth: 1,
+      globalAlpha: 1,
+      font: '12px sans-serif',
+      textBaseline: 'alphabetic',
+
+      beginPath: function () { ops = []; last = null; },
+      moveTo: function (x, y) { ops.push(['M', x, y]); },
+      lineTo: function (x, y) { ops.push(['L', x, y]); },
+      arcTo: function (x1, y1, x2, y2, r) { ops.push(['A', x1, y1, x2, y2, r]); },
+      closePath: function () { ops.push(['Z']); },
+      fill: function () { paint('fill'); },
+      stroke: function () { paint('stroke'); },
+
+      fillRect: function (x, y, w, h) {
+        out.push({
+          tag: 'rect', key: null, x: x, y: y, w: w, h: h, r: 0,
+          fill: api.fillStyle, fillAlpha: api.globalAlpha
+        });
+        last = null;
+      },
+
+      fillText: function (text, x, y) {
+        if (text === '' || text == null) return;
+        out.push({
+          tag: 'text', key: null, x: x, y: y, text: String(text),
+          fill: api.fillStyle, fillAlpha: api.globalAlpha,
+          font: api.font, baseline: api.textBaseline
+        });
+        last = null;
+      },
+
+      // Delegated to a real context so a label is cut at exactly the character it is cut
+      // at on screen. Measuring any other way would give the export its own idea of what
+      // fits, and the two pictures would disagree about where the ellipsis goes.
+      measureText: function (text) {
+        measurer.font = api.font;
+        return measurer.measureText(text);
+      },
+
+      // The canvas puts scroll and device pixels in the transform. An SVG carries the same
+      // information in width/height against viewBox, so there is nothing to apply here.
+      setTransform: function () {},
+
+      serialize: function (width, height, viewW, viewH) {
+        var body = [];
+        for (var i = 0; i < out.length; i++) {
+          var e = out[i];
+          var at = '';
+          if (e.tag === 'text') {
+            var f = svgFont(e.font);
+            at = ' x="' + svgNum(e.x) + '" y="' + svgNum(e.y) + '"'
+              + ' fill="' + xmlAttr(e.fill) + '"'
+              + (e.fillAlpha < 1 ? ' fill-opacity="' + svgNum(e.fillAlpha) + '"' : '')
+              + ' font-size="' + f.size + '"'
+              + (f.family === SVG_FONT ? '' : ' font-family="' + xmlAttr(f.family) + '"')
+              + (e.baseline === 'middle' ? '' : ' dominant-baseline="auto"');
+            body.push('<text' + at + '>' + xmlText(svgSpaces(e.text)) + '</text>');
+            continue;
+          }
+          if (e.tag === 'rect') {
+            at = ' x="' + svgNum(e.x) + '" y="' + svgNum(e.y) + '"'
+              + ' width="' + svgNum(Math.max(0, e.w)) + '" height="' + svgNum(Math.max(0, e.h)) + '"'
+              + (e.r > 0 ? ' rx="' + svgNum(e.r) + '"' : '');
+          } else {
+            at = ' d="' + e.d + '"';
+          }
+          at += e.fill != null ? ' fill="' + xmlAttr(e.fill) + '"' : ' fill="none"';
+          if (e.fill != null && e.fillAlpha < 1) at += ' fill-opacity="' + svgNum(e.fillAlpha) + '"';
+          if (e.stroke != null) {
+            at += ' stroke="' + xmlAttr(e.stroke) + '"';
+            if (e.strokeWidth !== 1) at += ' stroke-width="' + svgNum(e.strokeWidth) + '"';
+            if (e.strokeAlpha < 1) at += ' stroke-opacity="' + svgNum(e.strokeAlpha) + '"';
+          }
+          body.push('<' + e.tag + at + '/>');
+        }
+        // Carried on the root and inherited, rather than set by a stylesheet rule. A rule
+        // would win over the font-family attribute on the handful of labels that need a
+        // different one — presentation attributes lose to CSS — and every query in the
+        // diagram would silently come out in the proportional face it is not measured in.
+        return '<?xml version="1.0" encoding="UTF-8"?>\n'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '"'
+          + ' viewBox="0 0 ' + svgNum(viewW) + ' ' + svgNum(viewH) + '"'
+          + ' font-family="' + xmlAttr(SVG_FONT) + '" dominant-baseline="central"'
+          // Honoured by a standalone .svg and ignored once the markup is pasted into an
+          // HTML page, which is why the spaces that matter are also written as
+          // non-breaking ones rather than trusting this alone.
+          + ' xml:space="preserve">\n'
+          + body.join('\n') + '\n</svg>\n';
+      },
+
+      count: function () { return out.length; }
+    };
+    return api;
+  }
+
   flowPngBtn.addEventListener('click', function () {
     if (!flowCanvas || flowContentH === 0) return;   // nothing drawn yet
-    var dpr = window.devicePixelRatio || 1;
+    // Floored too: a PNG saved from a zoomed-out window used to be a picture of a smaller
+    // diagram, sized as if it were the full one.
+    var dpr = flowDpr();
     var w = Math.ceil(flowContentW * flowScale * dpr);
     var h = Math.ceil(flowContentH * flowScale * dpr);
     var src = flowCanvas;
@@ -4273,6 +5800,31 @@
     a.download = 'deju-flow.png';
     a.href = src.toDataURL('image/png');
     a.click();
+    // Past the canvas limit the export silently became a picture of the viewport, which
+    // looks exactly like a successful save of the whole diagram and is not one. Say so.
+    if (src !== flowCanvas) flash(flowPngBtn, 'Saved');
+    else flash(flowPngBtn, 'Saved the visible part only — too large for one image');
+  });
+
+  flowSvgBtn.addEventListener('click', function () {
+    if (!flowCanvas || flowContentH === 0) return;   // nothing drawn yet
+    var g = svgContext(flowCanvas.getContext('2d'));
+    // The whole diagram, in its own coordinates: no CANVAS_MAX to duck under, so unlike
+    // the PNG this never quietly becomes a picture of the viewport.
+    renderFlow(g, 0, 0, flowContentW, flowContentH);
+    var svg = g.serialize(
+      Math.ceil(flowContentW * flowScale), Math.ceil(flowContentH * flowScale),
+      flowContentW, flowContentH);
+    var blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.download = 'deju-flow.svg';
+    a.href = url;
+    a.click();
+    // Revoked on the next turn: the click has taken the URL by then, and holding it would
+    // pin the whole serialised diagram in memory for as long as the report stays open.
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+    flash(flowSvgBtn, 'Saved');
   });
 
   // A canvas holds pixels, not a description of them: both a repaint-worthy change and a
@@ -4280,7 +5832,7 @@
   window.addEventListener('resize', function () {
     if (tab === 'flow' && flowBuilt) drawFlow();
   });
-  document.getElementById('themeToggle').addEventListener('click', function () {
+  byId('themeToggle').addEventListener('click', function () {
     if (tab === 'flow' && flowBuilt) drawFlow();
   });
 
@@ -4332,7 +5884,7 @@
       if (q.view === 'files' && treeAvailable) setView('files');
       else if (q.q) applyFilters();
       var wanted = q.tab || 'trace';
-      if (wanted !== 'trace' && document.getElementById('tab' + capitalise(wanted))) {
+      if (wanted !== 'trace' && tabPresent('tab' + capitalise(wanted))) {
         setTab(wanted);
       } else if (q.step) {
         var step = parseInt(q.step, 10) - 1;
@@ -4382,7 +5934,9 @@
       || 'This recording has no call tree, re-record with a current agent.';
     setView('files');
   } else {
-    setView('tree');
+    // Honours the exported preference, but only where there is a choice: the branch above
+    // is a run with no call tree at all, where Tree is not a view that can be shown.
+    setView(prefs.view === 'files' ? 'files' : 'tree');
   }
   applySort();
   updateNotice();
@@ -4398,6 +5952,19 @@
       return f.sev === 'high';
     }));
   }
+
+  // The export's starting position, applied before the URL is read so that a shared link
+  // still wins: the link describes a specific thing somebody wanted to show, the export
+  // default only describes how the report should look when opened cold.
+  applyPrefs();
+  // sqlOn and treeGroup were seeded from the prefs so the first build was already right,
+  // but their buttons carry their "on" state in markup and would otherwise claim the
+  // opposite of what the tree is doing.
+  setSql(prefs.sql);
+  treeGroupBtn.classList.toggle('on', treeGroup);
+  applyFoldPrefs();
+  setTab(prefs.openTab);
+  buildCustomize();
 
   urlStateReady = true;
   applyUrlState();
