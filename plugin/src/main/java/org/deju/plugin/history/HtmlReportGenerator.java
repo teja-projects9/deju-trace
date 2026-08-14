@@ -79,22 +79,67 @@ public final class HtmlReportGenerator {
      *                     so the roll-up rows still account for the time.
      */
     public String generate(DejuPayload payload, boolean omitExcluded) throws IOException {
+        return generate(payload, omitExcluded, new ReportPrefs());
+    }
+
+    /**
+     * @param prefs which tabs to write into the file, and the position the report opens in.
+     *              Defaults reproduce the report exactly as it behaved before the export
+     *              options existed.
+     */
+    public String generate(DejuPayload payload, boolean omitExcluded, ReportPrefs prefs) throws IOException {
         Map<String, Object> model = buildModel(payload, omitExcluded);
         String payloadBlock = payloadBlock(MAPPER.writeValueAsString(model));
+        String prefsBlock = "<script type=\"application/json\" id=\"deju-prefs\">"
+                + MAPPER.writeValueAsString(prefs.toModel()) + "</script>";
 
         String logo = logoDataUri();
         String favicon = logo.isEmpty() ? "" : "<link rel=\"icon\" type=\"image/png\" href=\"" + logo + "\">";
         String logoImg = logo.isEmpty() ? "" : "<img class=\"logo\" alt=\"\" src=\"" + logo + "\">";
 
-        // Substitution order matters: the payload goes in LAST, so that traced source
-        // which happens to contain a placeholder token (e.g. the literal __SCRIPT__)
-        // cannot be expanded by a later pass.
-        return resource(TEMPLATE_RESOURCE)
+        // Tabs are cut from the raw template, before anything is substituted into it, so the
+        // markers can only ever match the template's own markup and never traced source.
+        // Substitution order then matters for the same reason in reverse: the payload goes in
+        // LAST, so that traced source which happens to contain a placeholder token (e.g. the
+        // literal __SCRIPT__) cannot be expanded by a later pass.
+        return dropTabs(resource(TEMPLATE_RESOURCE), prefs)
                 .replace("__STYLES__", resource(CSS_RESOURCE))
                 .replace("__SCRIPT__", resource(JS_RESOURCE))
                 .replace("__FAVICON_LINK__", favicon)
                 .replace("__LOGO_IMG__", logoImg)
+                .replace("__PREFS_BLOCK__", prefsBlock)
                 .replace("__PAYLOAD_BLOCK__", payloadBlock);
+    }
+
+    /**
+     * Removes the markup of every tab the export left out.
+     *
+     * <p>The template brackets each removable region with {@code <!--tab:id-->} and
+     * {@code <!--/tab:id-->}; a tab has two of them, one round its button and one round its
+     * panel. Comment markers rather than tag matching, because the panels nest and a parser
+     * good enough to find the right closing tag is a parser that can be wrong.
+     *
+     * <p>Markers for kept tabs are left in place. They are HTML comments either way, and
+     * stripping them would save about a hundred bytes in exchange for a second pass over the
+     * document.
+     */
+    static String dropTabs(String template, ReportPrefs prefs) {
+        String out = template;
+        for (String id : ReportPrefs.ALL_TABS) {
+            if (prefs.hasTab(id)) {
+                continue;
+            }
+            String open = "<!--tab:" + id + "-->";
+            String close = "<!--/tab:" + id + "-->";
+            for (int start = out.indexOf(open); start >= 0; start = out.indexOf(open)) {
+                int end = out.indexOf(close, start);
+                if (end < 0) {
+                    break;      // unbalanced template; leave the rest of the document alone
+                }
+                out = out.substring(0, start) + out.substring(end + close.length());
+            }
+        }
+        return out;
     }
 
     /**

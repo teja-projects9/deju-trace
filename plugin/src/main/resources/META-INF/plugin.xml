@@ -21,6 +21,45 @@
         Works against a JVM you launch from the IDE, one in a Docker container, or one on
         another machine.
         <br/><br/>
+        <b>Getting started</b>
+        <ol>
+            <li>Open <b>Settings &rarr; Tools &rarr; Deju Trace</b> and set <b>Includes</b> to
+            your application's packages, for example <code>com.example</code>. Without this the
+            agent instruments nothing.</li>
+            <li>Press <b>Copy agent VM option</b> and paste it into your application's VM
+            options. If the IDE launches your app, tick <b>Auto-attach</b> instead and skip
+            this step.</li>
+            <li>Start your application. Open the <b>Deju</b> tool window and press
+            <b>Connect</b>.</li>
+            <li>Click the gutter icon next to a controller method to place a <b>deju
+            point</b>, then press <b>Track</b>.</li>
+            <li>Hit the endpoint. <b>Show</b> paints the executed lines in the editor;
+            <b>Export</b> writes the HTML report.</li>
+        </ol>
+        <b>If it isn't working</b>
+        <ul>
+            <li><b>"nothing is listening on that port"</b> &mdash; the app was not started with
+            the agent attached, or the port does not match. Re-copy the VM option and restart
+            the app.</li>
+            <li><b>"the token does not match"</b> &mdash; your <code>-javaagent</code> flag
+            needs <code>token=dejutoken</code>.</li>
+            <li><b>"the port is unreachable"</b> &mdash; running in Docker? Tick <b>Traced JVM
+            runs in a container or on another machine</b>, re-copy the VM option (it adds
+            <code>bind=0.0.0.0</code>) and publish the port.</li>
+            <li><b>Tracking started, but no run appears.</b> Either the trace point does not
+            exactly match a real method, or <b>Includes</b> does not cover its package, or you
+            changed Includes without restarting the app &mdash; the <code>-javaagent</code>
+            line is read once, at JVM start.</li>
+            <li><b>The report shows line numbers but no code.</b> The source in the IDE does
+            not match the running build. Point <b>Source roots</b> at the matching source.</li>
+            <li><b>"Recorded by agent X, but the plugin is Y"</b> &mdash; restart your traced
+            app after updating the plugin. A JVM keeps the agent it started with.</li>
+            <li><b>The report is huge or slow.</b> Exclude entities and DTOs under
+            <b>Excluded types</b>, or narrow <b>Includes</b>.</li>
+            <li><b>Clicking a line number does nothing.</b> Those are
+            <code>jetbrains://</code> links and need JetBrains Toolbox installed. Use
+            <b>Copy path</b> instead.</li>
+        </ul>
         The companion agent is attached by you via <code>-javaagent</code>. It listens on
         loopback only by default; reaching it from a container or another host takes an
         explicit <code>bind=</code>. The connection token is a fixed value,
@@ -38,6 +77,33 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.1.1</b>: make the report yours, and see every call</p>
+        <ul>
+          <li><b>New: build the report the way you want it.</b> When you export, pick which
+          tabs go in, which columns show, which tab it opens on, and light or dark.</li>
+          <li><b>New: change your mind later.</b> Whoever opens the report can rearrange it
+          from the <b>Customize</b> button, without exporting again. Press <kbd>g</kbd>.</li>
+          <li><b>Percentages, not just times.</b> <b>Show</b> puts the share of the run
+          beside each line's time in the editor, and in the report's Code Trace hovering a
+          time tells you the same thing &mdash; so you can see what a line cost without
+          doing the sums.</li>
+          <li><b>Past runs now show the date, not just the time</b>, and the name is short
+          &mdash; <code>OrderController#place</code> instead of the whole package.</li>
+          <li><b>Clicking a step in the Timeline highlights where it lands</b> in the Code
+          Trace, so you can see which row it took you to.</li>
+          <li><b>Fixed: the flame graph was hiding calls.</b> Narrow ones were drawn on top of
+          each other, so you could not see or hover them. Every call now gets its own space.</li>
+          <li><b>New: pick a minimum box width.</b> Set it big enough and every single call in
+          the run gets a readable name, however small it was.</li>
+          <li><b>Fixed: blurry, wrong-sized text.</b> Labels were too small, and went fuzzy if
+          your browser was zoomed out.</li>
+          <li><b>New: the report says how much of the run it missed.</b> If the recording hit
+          its limit, it now tells you the percentage instead of just saying "capped".</li>
+          <li><b>Hovering a call shows what it cost overall</b> &mdash; how many times it ran,
+          the total, the slowest one, and how much was its own code.</li>
+          <li><b>New: Save SVG.</b> A sharp image at any zoom, and it never gets cut off the
+          way a large PNG did.</li>
+        </ul>
         <p><b>2.1.0</b>: the report tells you where to look</p>
         <ul>
           <li><b>Action needed: the token is now always <code>dejutoken</code>.</b> If you

@@ -88,6 +88,30 @@ final class TimingGutterProvider implements TextAnnotationGutterProvider {
         return (totalMin / 60) + "h " + (totalMin % 60) + "m";
     }
 
+    /**
+     * That duration's share of the whole run, as {@code "  12%"}, ready to append to a
+     * formatted time. Empty when there is no run length to divide by, because a column that
+     * silently falls back to a percentage of something else is worse than no percentage.
+     *
+     * <p>Precision follows size, for the same reason the report's does: {@code 0.4%} and
+     * {@code <0.1%} both say "not this line", while three decimals on every trivial line
+     * would widen the gutter for noise. Anything at or above 10% loses its decimal, since by
+     * then the figure is a headline, not a measurement.
+     */
+    static String suffixPercent(long micros, long runMicros) {
+        if (runMicros <= 0) {
+            return "";
+        }
+        double p = (micros * 100.0) / runMicros;
+        if (p >= 10) {
+            return "  " + Math.round(p) + "%";
+        }
+        if (p >= 0.1) {
+            return "  " + String.format("%.1f", p) + "%";
+        }
+        return p > 0 ? "  <0.1%" : "  0%";
+    }
+
     /** One decimal, but drop a trailing ".0", and no decimals once we're in the hundreds. */
     private static String trim(double value) {
         if (value >= 100) {
