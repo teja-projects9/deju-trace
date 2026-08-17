@@ -28,6 +28,10 @@ gradle-app.setting
 .DS_Store
 Thumbs.db
 
+# --- Local agent tooling ---------------------------------------------------
+# Personal Claude Code skills, not part of the plugin build or the shared repo.
+.claude/
+
 # --- Machine-local config --------------------------------------------------
 .env
 .env.*
