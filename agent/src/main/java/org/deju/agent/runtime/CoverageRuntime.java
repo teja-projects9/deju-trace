@@ -140,7 +140,7 @@ public final class CoverageRuntime {
     private static final ThreadLocal<int[]> SQL_DEPTH = ThreadLocal.withInitial(() -> new int[1]);
 
     /** Longest SQL text kept; anything past this is truncated with an ellipsis. */
-    private static final int MAX_SQL_CHARS = 2000;
+    private static final int MAX_SQL_CHARS = 20_000;
 
     /**
      * Called on entry to a JDBC {@code execute*}; returns the start time, or 0 to skip.

@@ -45,6 +45,8 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
      */
     public static final int DEFAULT_MAX_OPEN_FILES = 1;
     public static final boolean DEFAULT_CONTAINER_OR_REMOTE_JVM = false;
+    /** See {@link #historyCapacity} and {@code DejuHistoryStore.MAX_CAPACITY}. */
+    public static final int DEFAULT_HISTORY_CAPACITY = 10;
 
     /**
      * Host the agent socket is reachable on. Loopback for a local app; for a container or a
@@ -121,6 +123,15 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
      */
     public boolean containerOrRemoteJvm = DEFAULT_CONTAINER_OR_REMOTE_JVM;
 
+    /**
+     * How many recorded runs the history ring buffer keeps, per project.
+     *
+     * <p>Clamped to {@code DejuHistoryStore.MIN_CAPACITY}..{@code MAX_CAPACITY} wherever it
+     * is read rather than here, so a value written by a future version with a wider range
+     * still round-trips through an older one instead of being silently rewritten.
+     */
+    public int historyCapacity = DEFAULT_HISTORY_CAPACITY;
+
     public static DejuSettings getInstance() {
         return ApplicationManager.getApplication().getService(DejuSettings.class);
     }
@@ -135,6 +146,7 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
         sourceRoots = DEFAULT_SOURCE_ROOTS;
         maxOpenFiles = DEFAULT_MAX_OPEN_FILES;
         containerOrRemoteJvm = DEFAULT_CONTAINER_OR_REMOTE_JVM;
+        historyCapacity = DEFAULT_HISTORY_CAPACITY;
     }
 
     @Override

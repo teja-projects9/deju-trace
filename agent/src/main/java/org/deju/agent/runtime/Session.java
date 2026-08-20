@@ -1,5 +1,7 @@
 package org.deju.agent.runtime;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Arrays;
@@ -17,11 +19,31 @@ import java.util.UUID;
  */
 final class Session {
 
+    private static final ThreadMXBean THREAD_MX = ManagementFactory.getThreadMXBean();
+    /** False on a JVM/OS combination that cannot report per-thread CPU time (rare). */
+    private static final boolean CPU_TIME_SUPPORTED = enableCpuTime();
+
+    private static boolean enableCpuTime() {
+        if (!THREAD_MX.isThreadCpuTimeSupported()) {
+            return false;
+        }
+        if (!THREAD_MX.isThreadCpuTimeEnabled()) {
+            try {
+                THREAD_MX.setThreadCpuTimeEnabled(true);
+            } catch (RuntimeException e) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     final String sessionId = UUID.randomUUID().toString();
     final String target;
     final int targetGid;
     final String startedAtIso;
     final long startNanos;
+    /** CPU nanos this thread had burned when the session opened, or -1 if unavailable. */
+    final long cpuStartNanos;
 
     /** methodGid of every method entered during this session (drives RED marking). */
     final Set<Integer> methodsEntered = new HashSet<>();
@@ -81,10 +103,26 @@ final class Session {
         this.targetGid = targetGid;
         this.startedAtIso = Instant.now().toString();
         this.startNanos = System.nanoTime();
+        this.cpuStartNanos = CPU_TIME_SUPPORTED ? THREAD_MX.getCurrentThreadCpuTime() : -1;
     }
 
     long durationMs() {
         return (System.nanoTime() - startNanos) / 1_000_000L;
+    }
+
+    /**
+     * CPU time this thread has burned since the session opened, in microseconds, or -1 when
+     * the JVM cannot report it. Read at session close, on the same thread that opened it —
+     * {@link ThreadMXBean#getCurrentThreadCpuTime()} only ever answers for the calling
+     * thread, which is exactly right for a session that never leaves the thread it started
+     * on.
+     */
+    long cpuMicros() {
+        if (cpuStartNanos < 0) {
+            return -1;
+        }
+        long now = THREAD_MX.getCurrentThreadCpuTime();
+        return now < 0 ? -1 : (now - cpuStartNanos) / 1_000L;
     }
 
     /** A source line began executing: close the previous line's delta and open this one. */

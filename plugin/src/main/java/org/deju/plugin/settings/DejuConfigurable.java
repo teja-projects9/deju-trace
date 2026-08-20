@@ -40,6 +40,7 @@ import org.deju.plugin.DejuSettings;
 import org.deju.plugin.exclude.DejuExclusions;
 import org.deju.plugin.exclude.ExcludedTypesDialog;
 import org.deju.plugin.exclude.TypeExclusionMatcher;
+import org.deju.plugin.history.DejuHistoryStore;
 import org.deju.plugin.privacy.ClearDataDialog;
 import org.deju.plugin.privacy.DataDisclosureDialog;
 import org.deju.plugin.privacy.DejuDataInventory;
@@ -73,6 +74,7 @@ public final class DejuConfigurable implements Configurable {
     private JBTextField includesField;
     private JBTextField sourceRootsField;
     private JBTextField maxOpenFilesField;
+    private JBTextField historyCapacityField;
     private Map<String, JBCheckBox> genericBoxes;
     private JBTextArea customPatternsArea;
 
@@ -102,6 +104,8 @@ public final class DejuConfigurable implements Configurable {
         sourceRootsField = new JBTextField();
         maxOpenFilesField = new JBTextField();
         maxOpenFilesField.setColumns(5);
+        historyCapacityField = new JBTextField();
+        historyCapacityField.setColumns(5);
 
         JComponent hostHint = hint("Loopback for a local app; a mapped host/port for a"
                 + " container or remote box (no socat bridge needed).");
@@ -140,6 +144,12 @@ public final class DejuConfigurable implements Configurable {
                         + " the button below to jump to any other class in the run."
                         + " 0 = open every file.</html>");
 
+        JComponent historyCapacityHint = hint(
+                "<html>How many recorded runs the tool window keeps per project (1–"
+                        + DejuHistoryStore.MAX_CAPACITY + "). A pinned run is never dropped for"
+                        + " ordinary rotation; lowering this below the number of pinned runs deletes"
+                        + " the oldest ones anyway, pinned or not, the moment you apply.</html>");
+
         JButton resetButton = UiStyle.compact(new JButton("Reset to defaults", AllIcons.General.Reset));
         resetButton.setToolTipText("Restore every field on this page, including the exclusion patterns");
         resetButton.addActionListener(e -> applyDefaultsToFields());
@@ -175,7 +185,9 @@ public final class DejuConfigurable implements Configurable {
                 .addComponentToRightColumn(sourceRootsHint)
                 .addSeparator()
                 .addLabeledComponent(new JBLabel("Max files to open:"), maxOpenFilesField)
-                .addComponentToRightColumn(maxOpenFilesHint);
+                .addComponentToRightColumn(maxOpenFilesHint)
+                .addLabeledComponent(new JBLabel("History capacity:"), historyCapacityField)
+                .addComponentToRightColumn(historyCapacityHint);
 
         addExclusionSection(builder);
 
@@ -322,6 +334,7 @@ public final class DejuConfigurable implements Configurable {
                 || !includesField.getText().trim().equals(nullToEmpty(s.includes))
                 || !sourceRootsField.getText().trim().equals(nullToEmpty(s.sourceRoots))
                 || !maxOpenFilesField.getText().trim().equals(String.valueOf(s.maxOpenFiles))
+                || !historyCapacityField.getText().trim().equals(String.valueOf(s.historyCapacity))
                 || exclusionsModified();
     }
 
@@ -369,6 +382,16 @@ public final class DejuConfigurable implements Configurable {
         if (parsedMax < 0) {
             throw new ConfigurationException("Max files to open cannot be negative (0 means no limit).");
         }
+        int parsedHistory;
+        try {
+            parsedHistory = Integer.parseInt(historyCapacityField.getText().trim());
+        } catch (NumberFormatException e) {
+            throw new ConfigurationException("History capacity must be a number.");
+        }
+        if (parsedHistory < DejuHistoryStore.MIN_CAPACITY || parsedHistory > DejuHistoryStore.MAX_CAPACITY) {
+            throw new ConfigurationException("History capacity must be between "
+                    + DejuHistoryStore.MIN_CAPACITY + " and " + DejuHistoryStore.MAX_CAPACITY + ".");
+        }
         s.host = host;
         s.port = parsedPort;
         s.token = DejuSettings.DEFAULT_TOKEN;
@@ -377,6 +400,11 @@ public final class DejuConfigurable implements Configurable {
         s.includes = includesField.getText().trim();
         s.sourceRoots = sourceRootsField.getText().trim();
         s.maxOpenFiles = parsedMax;
+        s.historyCapacity = parsedHistory;
+        // Immediately, not on the next recording: a decrease is a deliberate, explicit action
+        // here, and the tool window's list should reflect it the moment this page closes
+        // rather than waiting for something to be recorded.
+        DejuHistoryStore.getInstance(project).trimToCurrentCapacity();
 
         // The per-class lists belong to the dialog; carry them through untouched so applying
         // this page never discards decisions made there.
@@ -396,6 +424,7 @@ public final class DejuConfigurable implements Configurable {
         includesField.setText(nullToEmpty(s.includes));
         sourceRootsField.setText(nullToEmpty(s.sourceRoots));
         maxOpenFilesField.setText(String.valueOf(s.maxOpenFiles));
+        historyCapacityField.setText(String.valueOf(s.historyCapacity));
 
         DejuExclusions x = DejuExclusions.getInstance(project);
         setTicks(x.genericPatterns());
@@ -449,6 +478,7 @@ public final class DejuConfigurable implements Configurable {
         includesField.setText(DejuSettings.DEFAULT_INCLUDES);
         sourceRootsField.setText(DejuSettings.DEFAULT_SOURCE_ROOTS);
         maxOpenFilesField.setText(String.valueOf(DejuSettings.DEFAULT_MAX_OPEN_FILES));
+        historyCapacityField.setText(String.valueOf(DejuSettings.DEFAULT_HISTORY_CAPACITY));
         setTicks(TypeExclusionMatcher.DEFAULT_GENERIC_PATTERNS);
         customPatternsArea.setText("");
     }
@@ -478,6 +508,7 @@ public final class DejuConfigurable implements Configurable {
         includesField = null;
         sourceRootsField = null;
         maxOpenFilesField = null;
+        historyCapacityField = null;
         genericBoxes = null;
         customPatternsArea = null;
     }

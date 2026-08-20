@@ -56,7 +56,7 @@ public final class ExportOptionsDialog extends DialogWrapper {
     private final JBCheckBox showLine = new JBCheckBox("Line number", true);
 
     private final ComboBox<String> openTab = new ComboBox<>(new String[]{
-            "Code Trace", "Graph", "Flow Graph", "Timeline", "Findings"});
+            "Call Tree", "Breakdown", "Flame Graph", "Timeline", "Findings"});
     private final ComboBox<String> view = new ComboBox<>(new String[]{"Tree", "Files"});
     private final ComboBox<String> density = new ComboBox<>(new String[]{"Normal", "Compact"});
     private final ComboBox<String> theme = new ComboBox<>(new String[]{"Follow the reader's system", "Light", "Dark"});
@@ -71,9 +71,9 @@ public final class ExportOptionsDialog extends DialogWrapper {
 
     /** Tab ids in {@link ReportPrefs#ALL_TABS} order, paired with what the dialog calls them. */
     private static final String[][] TABS = {
-            {"trace", "Code Trace"},
-            {"graph", "Graph"},
-            {"flow", "Flow Graph"},
+            {"trace", "Call Tree"},
+            {"graph", "Breakdown"},
+            {"flow", "Flame Graph"},
             {"timeline", "Timeline"},
             {"findings", "Findings"},
     };
@@ -143,7 +143,7 @@ public final class ExportOptionsDialog extends DialogWrapper {
         layout.setAlignmentX(Component.LEFT_ALIGNMENT);
         layout.add(new JBLabel("Tab"));
         layout.add(openTab);
-        layout.add(new JBLabel("Code Trace view"));
+        layout.add(new JBLabel("Call Tree view"));
         layout.add(view);
         layout.add(new JBLabel("Density"));
         layout.add(density);

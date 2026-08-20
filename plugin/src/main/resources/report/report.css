@@ -19,7 +19,7 @@
   --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
   --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
   /* macOS surface tokens: hairline separators, soft elevation, translucent chrome. */
-  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22);
+  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22); --land-border:#e2a300;
   --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
   --elev-sm:0 1px 2px rgba(0,0,0,.06);
   --glass:rgba(255,255,255,.72);
@@ -31,8 +31,9 @@
      one orange cannot both hold its own against white and avoid glaring off near-black in
      a column of thirty badges. Same hue throughout, so it still reads as the same mark. */
   --badge-bg:#e67f18; --badge-ink:#fff;
-  /* Measured at runtime so sticky file headers park directly under the toolbar. */
-  --toolbarH:0px;
+  /* Measured at runtime so sticky file headers park directly under the toolbar, and the
+     toolbar itself parks directly under the meta row now that both stick in turn. */
+  --toolbarH:0px; --metaH:0px;
 }
 @media (prefers-color-scheme: dark){ :root{
   --bg:#1e1f22; --fg:#dfe1e5; --muted:#9aa0a6; --panel:#2b2d30; --border:#3a3d42; --ln:#6f737a;
@@ -42,7 +43,7 @@
   --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
   --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
   --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
-  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34);
+  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34); --land-border:#ffd23f;
   --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
   --elev-sm:0 1px 2px rgba(0,0,0,.35);
   --glass:rgba(38,40,44,.72);
@@ -57,7 +58,7 @@
   --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
   --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
   --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
-  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34);
+  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34); --land-border:#ffd23f;
   --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
   --elev-sm:0 1px 2px rgba(0,0,0,.35);
   --glass:rgba(38,40,44,.72);
@@ -72,7 +73,7 @@
   --sql-ink:#ff9933; --flow-cls:#2e9e4f; --flow-mth:#2f6fd0;
   --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
   --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
-  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22);
+  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22); --land-border:#e2a300;
   --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
   --elev-sm:0 1px 2px rgba(0,0,0,.06);
   --glass:rgba(255,255,255,.72);
@@ -107,8 +108,10 @@ h1{font-size:1.05rem;margin:0;}
 .iconbtn:hover{background:var(--control-hover);color:var(--fg);border-color:var(--border);}
 .iconbtn:active{transform:translateY(.5px);}
 .iconbtn svg{display:block;}
-.meta{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
-  color:var(--muted);font-size:.82rem;margin:.5rem 0 .7rem;}
+.meta{position:sticky;top:0;z-index:7;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  color:var(--muted);font-size:.82rem;padding:.55rem .75rem;margin:0 -.75rem;
+  background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--hairline);}
 /* Pushed right so the trace point keeps the left edge. The count follows it and gets no
    free space of its own, which keeps the two together at the end of the row. */
 .meta .search{margin-left:auto;flex:0 1 20rem;min-width:10rem;font-size:.8rem;
@@ -145,7 +148,7 @@ h1{font-size:1.05rem;margin:0;}
 .file{margin:0 0 1rem;border:1px solid var(--hairline);border-radius:var(--radius);
   box-shadow:var(--elev-sm);background:var(--bg);}
 .file h2{
-  position:sticky;top:var(--toolbarH);z-index:3;
+  position:sticky;top:calc(var(--metaH) + var(--toolbarH));z-index:3;
   display:flex;align-items:center;gap:.5rem;
   font-size:.85rem;font-weight:600;margin:0;padding:.55rem .8rem;
   background:var(--panel);border-bottom:1px solid var(--hairline);
@@ -296,7 +299,7 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 [hidden]{display:none !important;}
 
 /* ---------------------------------------------------------------- chrome --- */
-.toolbar{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+.toolbar{position:sticky;top:var(--metaH);z-index:6;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
   padding:.55rem .75rem;margin:0 -.75rem .75rem;background:var(--glass);
   -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
   border-bottom:1px solid var(--hairline);}
@@ -348,6 +351,16 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .fpct{margin-left:.4rem;font-size:.72em;font-weight:400;color:var(--muted);
   font-variant-numeric:tabular-nums;}
 .ftime .fpct,.tltime .fpct{opacity:.85;}
+/* A share-of-run bar behind the badge, the way Glowroot's own aggregate view reads at a
+   glance instead of asking the reader to parse a number. Only meaningful against a track
+   of fixed width, which is why it is a min-width badge rather than however wide the digits
+   happen to be — two rows' bars are only comparable when their tracks are the same size. */
+.fpct.bar{display:inline-block;min-width:2.5rem;text-align:right;
+  padding:0 .3rem;border-radius:3px;
+  background-image:linear-gradient(to right,
+    color-mix(in srgb, var(--accent) 50%, transparent),
+    color-mix(in srgb, var(--accent) 50%, transparent));
+  background-repeat:no-repeat;background-size:var(--fpct-fill,0%) 100%;}
 
 /* The run's headline numbers, inline in the title row. Value and caption sit on one line
    divided by hairlines, so five stats cost the height of the heading beside them rather
@@ -420,6 +433,9 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .graphtime{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;
   font-size:.76rem;}
 .graphtime b{color:var(--fg);font-weight:600;}
+/* Inclusive time, in method mode only: how much of this method's own time it spent on
+   code it called rather than its own — the gap between this and the bar above it. */
+.graphtime .gtotal{display:block;font-size:.68rem;opacity:.8;}
 
 /* Zoom trail for the flame view. Only shown once you are inside a frame, so the diagram
    never carries chrome it does not need. */
@@ -486,14 +502,16 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
      rather than padding: the ticks are absolutely positioned, and both their 0% and their
      100% resolve against this element's PADDING box — which includes any padding it has, so
      padding here moved the label text and left every tick exactly where it was. The ruler
-     read a whole column to the left of the bars it was meant to be a scale for. */
-  margin:0 13.8rem .25rem 23.1rem;}
+     read a whole column to the left of the bars it was meant to be a scale for. Left margin
+     now covers the actions column too, since it moved from the row's right edge to sit
+     beside the name. */
+  margin:0 9.2rem .25rem 32rem;}
 .tltick{position:absolute;top:0;transform:translateX(-50%);font-size:.66rem;color:var(--muted);
   white-space:nowrap;}
 .tltick:first-child{transform:none;}
 .tltick:last-child{transform:translateX(-100%);}
 
-.tlrow{display:grid;grid-template-columns:1rem 21rem 1fr 8.5rem 4.6rem;gap:.4rem;
+.tlrow{display:grid;grid-template-columns:1rem 21rem 8.5rem 1fr 8.5rem;gap:.4rem;
   align-items:center;padding:.14rem .3rem;border-radius:var(--radius-sm);}
 /* Only rows that actually have steps underneath them get a caret; the column is kept on
    the others so a leaf and a parent still line their names up. */
@@ -503,21 +521,22 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .tlcaret:hover{background:var(--control-hover);opacity:1;}
 /* Hidden until the row is hovered, the same rule .rowcopy follows in the tree: a column
    of two hundred rows should not be a column of six hundred buttons. */
-.tlacts{display:flex;gap:.15rem;justify-content:flex-end;opacity:0;transition:opacity .12s;}
+.tlacts{display:flex;gap:.15rem;justify-content:flex-start;opacity:0;transition:opacity .12s;}
 .tlrow:hover .tlacts,.tlacts:focus-within{opacity:1;}
 .tlacts button,.tlacts a{font:inherit;font-size:.66rem;line-height:1;padding:.2rem .35rem;
   border:1px solid var(--hairline);border-radius:var(--radius-sm);background:var(--control);
   color:var(--muted);cursor:pointer;text-decoration:none;}
 .tlacts button:hover,.tlacts a:hover{color:var(--fg);background:var(--control-hover);}
-/* The statement a row issued, opened in place rather than in a tooltip that cannot be
-   copied out of. Spans the whole grid so a long query is not squeezed into one column. */
-.tlsql{grid-column:1/-1;margin:.15rem 0 .4rem 1.4rem;padding:.45rem .6rem;
+/* The full text behind a row: the formatted statement for a query, or the fully-qualified
+   signature the name column truncates for everything else. Opened in place rather than in a
+   tooltip that cannot be copied out of. Spans the whole grid so a long line is not squeezed
+   into one column. */
+.tlfull{grid-column:1/-1;margin:.15rem 0 .4rem 1.4rem;padding:.45rem .6rem;
   background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius-sm);
   font-family:SFMono-Regular,Consolas,monospace;font-size:.7rem;white-space:pre-wrap;
   overflow-x:auto;}
 .tlrow:hover{background:var(--control-hover);}
-.tlname{cursor:pointer;}
-.tlname{padding-left:calc(var(--depth,0) * .55rem);font-size:.76rem;
+.tlname{cursor:pointer;padding-left:calc(var(--depth,0) * .55rem);font-size:.76rem;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tlrow.sql .tlname{color:var(--sql-ink);font-family:SFMono-Regular,Consolas,monospace;
   font-size:.7rem;}
@@ -545,18 +564,20 @@ tr:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
 .fold.grouped .fcount{color:var(--accent);}
 
 @media (max-width:900px){
-  .tlrow{grid-template-columns:1rem 10rem 1fr 5.5rem 3.6rem;}
-  .tlruler{margin-left:12.1rem;margin-right:9.8rem;}
+  .tlrow{grid-template-columns:1rem 10rem 8.5rem 1fr 5.5rem;}
+  .tlruler{margin-left:21rem;margin-right:5.8rem;}
 }
 
 /* Printing. The tree is virtualised, so report.js swaps the full row list in on
    beforeprint (up to a bounded size) and puts the window back afterwards; everything
    here is about getting the chrome out of the way and not slicing rows in half. */
 @media print{
-  :root{--toolbarH:0px;}
+  :root{--toolbarH:0px;--metaH:0px;}
   body{padding:0;background:#fff;color:#000;}
-  header .headtools,.toolbar,.legend,.search,#fileMenu,.help,.act,
+  header .headtools,.toolbar,#tabSeg,.legend,.search,#fileMenu,.help,.act,
   .zoomseg,#flowPngBtn{display:none !important;}
+  .meta{position:static;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+    border-bottom:none;}
   .meta,.summary{break-inside:avoid;}
   .scroll,.treewrap,.flowwrap{overflow:visible !important;max-height:none !important;
     border:none !important;}
@@ -602,11 +623,15 @@ body.compact td.code{line-height:1.32;}
 body.compact .tlrow{padding-top:.05rem;padding-bottom:.05rem;}
 body.compact .finding{padding:.5rem .7rem;}
 
-/* The row a Timeline or Findings link just landed on. Fades from a wash of the accent to
-   nothing, so the eye is pulled to the right row without leaving a mark that competes with
-   the cursor highlight afterwards. */
+/* The row a Timeline or Findings link just landed on. The background wash fades in 1.6s, so
+   the eye is pulled to the right row without a mark that competes with the cursor highlight
+   afterwards; the yellow outline is not part of that animation and holds for a full minute
+   (cleared in JS), because the fade alone was gone before a reader who glanced away could
+   find the row again. */
 @keyframes deju-land{from{background:var(--land);}to{background:transparent;}}
-tr.landed td,.file.landed h2,.tlrow.landed{animation:deju-land 1.6s ease-out;}
+tr.landed td,.file.landed h2,.tlrow.landed{
+  animation:deju-land 1.6s ease-out;
+  outline:2px solid var(--land-border);outline-offset:-2px;}
 @media (prefers-reduced-motion:reduce){
   tr.landed td,.file.landed h2,.tlrow.landed{animation:none;background:var(--land);}
 }

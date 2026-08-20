@@ -27,7 +27,7 @@
   --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
   --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
   /* macOS surface tokens: hairline separators, soft elevation, translucent chrome. */
-  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22);
+  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22); --land-border:#e2a300;
   --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
   --elev-sm:0 1px 2px rgba(0,0,0,.06);
   --glass:rgba(255,255,255,.72);
@@ -39,8 +39,9 @@
      one orange cannot both hold its own against white and avoid glaring off near-black in
      a column of thirty badges. Same hue throughout, so it still reads as the same mark. */
   --badge-bg:#e67f18; --badge-ink:#fff;
-  /* Measured at runtime so sticky file headers park directly under the toolbar. */
-  --toolbarH:0px;
+  /* Measured at runtime so sticky file headers park directly under the toolbar, and the
+     toolbar itself parks directly under the meta row now that both stick in turn. */
+  --toolbarH:0px; --metaH:0px;
 }
 @media (prefers-color-scheme: dark){ :root{
   --bg:#1e1f22; --fg:#dfe1e5; --muted:#9aa0a6; --panel:#2b2d30; --border:#3a3d42; --ln:#6f737a;
@@ -50,7 +51,7 @@
   --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
   --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
   --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
-  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34);
+  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34); --land-border:#ffd23f;
   --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
   --elev-sm:0 1px 2px rgba(0,0,0,.35);
   --glass:rgba(38,40,44,.72);
@@ -65,7 +66,7 @@
   --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
   --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
   --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
-  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34);
+  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34); --land-border:#ffd23f;
   --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
   --elev-sm:0 1px 2px rgba(0,0,0,.35);
   --glass:rgba(38,40,44,.72);
@@ -80,7 +81,7 @@
   --sql-ink:#ff9933; --flow-cls:#2e9e4f; --flow-mth:#2f6fd0;
   --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
   --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
-  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22);
+  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22); --land-border:#e2a300;
   --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
   --elev-sm:0 1px 2px rgba(0,0,0,.06);
   --glass:rgba(255,255,255,.72);
@@ -115,8 +116,10 @@ h1{font-size:1.05rem;margin:0;}
 .iconbtn:hover{background:var(--control-hover);color:var(--fg);border-color:var(--border);}
 .iconbtn:active{transform:translateY(.5px);}
 .iconbtn svg{display:block;}
-.meta{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
-  color:var(--muted);font-size:.82rem;margin:.5rem 0 .7rem;}
+.meta{position:sticky;top:0;z-index:7;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  color:var(--muted);font-size:.82rem;padding:.55rem .75rem;margin:0 -.75rem;
+  background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--hairline);}
 /* Pushed right so the trace point keeps the left edge. The count follows it and gets no
    free space of its own, which keeps the two together at the end of the row. */
 .meta .search{margin-left:auto;flex:0 1 20rem;min-width:10rem;font-size:.8rem;
@@ -153,7 +156,7 @@ h1{font-size:1.05rem;margin:0;}
 .file{margin:0 0 1rem;border:1px solid var(--hairline);border-radius:var(--radius);
   box-shadow:var(--elev-sm);background:var(--bg);}
 .file h2{
-  position:sticky;top:var(--toolbarH);z-index:3;
+  position:sticky;top:calc(var(--metaH) + var(--toolbarH));z-index:3;
   display:flex;align-items:center;gap:.5rem;
   font-size:.85rem;font-weight:600;margin:0;padding:.55rem .8rem;
   background:var(--panel);border-bottom:1px solid var(--hairline);
@@ -304,7 +307,7 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 [hidden]{display:none !important;}
 
 /* ---------------------------------------------------------------- chrome --- */
-.toolbar{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+.toolbar{position:sticky;top:var(--metaH);z-index:6;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
   padding:.55rem .75rem;margin:0 -.75rem .75rem;background:var(--glass);
   -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
   border-bottom:1px solid var(--hairline);}
@@ -356,6 +359,16 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .fpct{margin-left:.4rem;font-size:.72em;font-weight:400;color:var(--muted);
   font-variant-numeric:tabular-nums;}
 .ftime .fpct,.tltime .fpct{opacity:.85;}
+/* A share-of-run bar behind the badge, the way Glowroot's own aggregate view reads at a
+   glance instead of asking the reader to parse a number. Only meaningful against a track
+   of fixed width, which is why it is a min-width badge rather than however wide the digits
+   happen to be — two rows' bars are only comparable when their tracks are the same size. */
+.fpct.bar{display:inline-block;min-width:2.5rem;text-align:right;
+  padding:0 .3rem;border-radius:3px;
+  background-image:linear-gradient(to right,
+    color-mix(in srgb, var(--accent) 50%, transparent),
+    color-mix(in srgb, var(--accent) 50%, transparent));
+  background-repeat:no-repeat;background-size:var(--fpct-fill,0%) 100%;}
 
 /* The run's headline numbers, inline in the title row. Value and caption sit on one line
    divided by hairlines, so five stats cost the height of the heading beside them rather
@@ -428,6 +441,9 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .graphtime{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;
   font-size:.76rem;}
 .graphtime b{color:var(--fg);font-weight:600;}
+/* Inclusive time, in method mode only: how much of this method's own time it spent on
+   code it called rather than its own — the gap between this and the bar above it. */
+.graphtime .gtotal{display:block;font-size:.68rem;opacity:.8;}
 
 /* Zoom trail for the flame view. Only shown once you are inside a frame, so the diagram
    never carries chrome it does not need. */
@@ -494,14 +510,16 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
      rather than padding: the ticks are absolutely positioned, and both their 0% and their
      100% resolve against this element's PADDING box — which includes any padding it has, so
      padding here moved the label text and left every tick exactly where it was. The ruler
-     read a whole column to the left of the bars it was meant to be a scale for. */
-  margin:0 13.8rem .25rem 23.1rem;}
+     read a whole column to the left of the bars it was meant to be a scale for. Left margin
+     now covers the actions column too, since it moved from the row's right edge to sit
+     beside the name. */
+  margin:0 9.2rem .25rem 32rem;}
 .tltick{position:absolute;top:0;transform:translateX(-50%);font-size:.66rem;color:var(--muted);
   white-space:nowrap;}
 .tltick:first-child{transform:none;}
 .tltick:last-child{transform:translateX(-100%);}
 
-.tlrow{display:grid;grid-template-columns:1rem 21rem 1fr 8.5rem 4.6rem;gap:.4rem;
+.tlrow{display:grid;grid-template-columns:1rem 21rem 8.5rem 1fr 8.5rem;gap:.4rem;
   align-items:center;padding:.14rem .3rem;border-radius:var(--radius-sm);}
 /* Only rows that actually have steps underneath them get a caret; the column is kept on
    the others so a leaf and a parent still line their names up. */
@@ -511,21 +529,22 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .tlcaret:hover{background:var(--control-hover);opacity:1;}
 /* Hidden until the row is hovered, the same rule .rowcopy follows in the tree: a column
    of two hundred rows should not be a column of six hundred buttons. */
-.tlacts{display:flex;gap:.15rem;justify-content:flex-end;opacity:0;transition:opacity .12s;}
+.tlacts{display:flex;gap:.15rem;justify-content:flex-start;opacity:0;transition:opacity .12s;}
 .tlrow:hover .tlacts,.tlacts:focus-within{opacity:1;}
 .tlacts button,.tlacts a{font:inherit;font-size:.66rem;line-height:1;padding:.2rem .35rem;
   border:1px solid var(--hairline);border-radius:var(--radius-sm);background:var(--control);
   color:var(--muted);cursor:pointer;text-decoration:none;}
 .tlacts button:hover,.tlacts a:hover{color:var(--fg);background:var(--control-hover);}
-/* The statement a row issued, opened in place rather than in a tooltip that cannot be
-   copied out of. Spans the whole grid so a long query is not squeezed into one column. */
-.tlsql{grid-column:1/-1;margin:.15rem 0 .4rem 1.4rem;padding:.45rem .6rem;
+/* The full text behind a row: the formatted statement for a query, or the fully-qualified
+   signature the name column truncates for everything else. Opened in place rather than in a
+   tooltip that cannot be copied out of. Spans the whole grid so a long line is not squeezed
+   into one column. */
+.tlfull{grid-column:1/-1;margin:.15rem 0 .4rem 1.4rem;padding:.45rem .6rem;
   background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius-sm);
   font-family:SFMono-Regular,Consolas,monospace;font-size:.7rem;white-space:pre-wrap;
   overflow-x:auto;}
 .tlrow:hover{background:var(--control-hover);}
-.tlname{cursor:pointer;}
-.tlname{padding-left:calc(var(--depth,0) * .55rem);font-size:.76rem;
+.tlname{cursor:pointer;padding-left:calc(var(--depth,0) * .55rem);font-size:.76rem;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tlrow.sql .tlname{color:var(--sql-ink);font-family:SFMono-Regular,Consolas,monospace;
   font-size:.7rem;}
@@ -553,18 +572,20 @@ tr:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
 .fold.grouped .fcount{color:var(--accent);}
 
 @media (max-width:900px){
-  .tlrow{grid-template-columns:1rem 10rem 1fr 5.5rem 3.6rem;}
-  .tlruler{margin-left:12.1rem;margin-right:9.8rem;}
+  .tlrow{grid-template-columns:1rem 10rem 8.5rem 1fr 5.5rem;}
+  .tlruler{margin-left:21rem;margin-right:5.8rem;}
 }
 
 /* Printing. The tree is virtualised, so report.js swaps the full row list in on
    beforeprint (up to a bounded size) and puts the window back afterwards; everything
    here is about getting the chrome out of the way and not slicing rows in half. */
 @media print{
-  :root{--toolbarH:0px;}
+  :root{--toolbarH:0px;--metaH:0px;}
   body{padding:0;background:#fff;color:#000;}
-  header .headtools,.toolbar,.legend,.search,#fileMenu,.help,.act,
+  header .headtools,.toolbar,#tabSeg,.legend,.search,#fileMenu,.help,.act,
   .zoomseg,#flowPngBtn{display:none !important;}
+  .meta{position:static;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+    border-bottom:none;}
   .meta,.summary{break-inside:avoid;}
   .scroll,.treewrap,.flowwrap{overflow:visible !important;max-height:none !important;
     border:none !important;}
@@ -610,11 +631,15 @@ body.compact td.code{line-height:1.32;}
 body.compact .tlrow{padding-top:.05rem;padding-bottom:.05rem;}
 body.compact .finding{padding:.5rem .7rem;}
 
-/* The row a Timeline or Findings link just landed on. Fades from a wash of the accent to
-   nothing, so the eye is pulled to the right row without leaving a mark that competes with
-   the cursor highlight afterwards. */
+/* The row a Timeline or Findings link just landed on. The background wash fades in 1.6s, so
+   the eye is pulled to the right row without a mark that competes with the cursor highlight
+   afterwards; the yellow outline is not part of that animation and holds for a full minute
+   (cleared in JS), because the fade alone was gone before a reader who glanced away could
+   find the row again. */
 @keyframes deju-land{from{background:var(--land);}to{background:transparent;}}
-tr.landed td,.file.landed h2,.tlrow.landed{animation:deju-land 1.6s ease-out;}
+tr.landed td,.file.landed h2,.tlrow.landed{
+  animation:deju-land 1.6s ease-out;
+  outline:2px solid var(--land-border);outline-offset:-2px;}
 @media (prefers-reduced-motion:reduce){
   tr.landed td,.file.landed h2,.tlrow.landed{animation:none;background:var(--land);}
 }
@@ -647,25 +672,28 @@ tr.landed td,.file.landed h2,.tlrow.landed{animation:deju-land 1.6s ease-out;}
   </button>
   </div>
 </header>
-<!-- Trace point on the left, the filter and what the current view is showing on the right.
-     The filter rides here rather than in the toolbar because this row is one line on every
-     window and survives a tab change, so one box can serve whichever tab is in front. -->
-<div class="meta" id="meta"><span id="metaText"></span>
-  <input class="search" id="search" type="search" placeholder="Filter code&hellip; (press /)" autocomplete="off"
-         title="Filters whatever tab is in front. Each tab remembers its own filter.">
-  <span class="count" id="count"></span></div>
-<div class="toolbar" id="toolbar">
-  <!-- Each tab's button and its panel are bracketed by <!-\-tab:id-\-> markers. The export
-       dialog cuts the pairs for tabs it was told to leave out; the markers are literal
-       comments, matched exactly, because the panels nest and tag matching can be wrong. -->
+<!-- Tabs, trace point, filter and count in one row, so which run this is and how to switch
+     views both stay on screen together instead of separated by a row of buttons that read
+     as "part of the tabs" but were not. The filter rides here rather than in the toolbar
+     because this row survives a tab change, so one box can serve whichever tab is in front.
+
+     Each tab's button and its panel are bracketed by <!-\-tab:id-\-> markers. The export
+     dialog cuts the pairs for tabs it was told to leave out; the markers are literal
+     comments, matched exactly, because the panels nest and tag matching can be wrong. -->
+<div class="meta" id="meta">
   <div class="seg" id="tabSeg" role="tablist">
-    <!--tab:trace--><button class="segbtn on" id="tabTrace" type="button" role="tab" aria-selected="true" title="Line coverage and the call tree">Code Trace</button><!--/tab:trace-->
-    <!--tab:graph--><button class="segbtn" id="tabGraph" type="button" role="tab" aria-selected="false" title="Where the time went, per file">Graph</button><!--/tab:graph-->
-    <!--tab:flow--><button class="segbtn" id="tabFlow" type="button" role="tab" aria-selected="false" title="The call flow from start to end">Flow Graph</button><!--/tab:flow-->
+    <!--tab:trace--><button class="segbtn on" id="tabTrace" type="button" role="tab" aria-selected="true" title="Line coverage and the call tree">Call Tree</button><!--/tab:trace-->
+    <!--tab:graph--><button class="segbtn" id="tabGraph" type="button" role="tab" aria-selected="false" title="Where the time went, per file">Breakdown</button><!--/tab:graph-->
+    <!--tab:flow--><button class="segbtn" id="tabFlow" type="button" role="tab" aria-selected="false" title="The call flow from start to end">Flame Graph</button><!--/tab:flow-->
     <!--tab:timeline--><button class="segbtn" id="tabTimeline" type="button" role="tab" aria-selected="false" title="Where the wall clock actually went">Timeline</button><!--/tab:timeline-->
     <!--tab:findings--><button class="segbtn" id="tabFindings" type="button" role="tab" aria-selected="false" title="Things in this run worth a look">Findings <span class="tabbadge" id="findingsBadge" hidden></span></button><!--/tab:findings-->
   </div>
-
+  <span id="metaText"></span>
+  <input class="search" id="search" type="search" placeholder="Filter code&hellip; (press /)" autocomplete="off"
+         title="Filters whatever tab is in front. Each tab remembers its own filter.">
+  <span class="count" id="count"></span>
+</div>
+<div class="toolbar" id="toolbar">
   <!-- display:contents, so these stay direct flex children of the toolbar and the
        existing wrapping is untouched; hiding the group hides the lot in one go. -->
 <!--tab:trace-->  <span class="ctlgroup" id="traceControls">
@@ -756,6 +784,8 @@ Press Enter to apply, Esc to cancel.">
 
 
 <!--tab:graph-->  <span class="ctlgroup" id="graphControls" hidden>
+    <button class="toggle" id="graphMethodBtn" type="button"
+            title="Group the bars by method instead of by file, when a file's own time turns out to belong to just one of its methods">By method</button>
     <button class="toggle on" id="graphSqlBtn" type="button"
             title="Count each query against the method that issued it. Off leaves only time spent in your own code.">Include SQL</button>
     <button class="toggle" id="graphAllBtn" type="button" hidden
@@ -778,13 +808,13 @@ Press Enter to apply, Esc to cancel.">
 
 <!--tab:flow-->  <span class="ctlgroup" id="flowControls" hidden>
     <select class="sort" id="flowScopeSel"
-            title="Which steps the filter box keeps. Matching keeps the callers above a match so the chain stays whole.">
-      <option value="sub">Match &plus; callees</option>
-      <option value="only">Match only</option>
-      <option value="pkg">Match package</option>
+            title="Which steps the filter box keeps. A match always keeps its callers, so the chain back to the entry point stays whole; this only decides whether what it called is kept too.">
+      <option value="sub">Match, with callers &amp; callees</option>
+      <option value="only">Match, callers only</option>
+      <option value="pkg">Match by package</option>
     </select>
     <button class="toggle on" id="flowSqlBtn" type="button" title="Show or hide SQL steps">SQL</button>
-    <button class="toggle" id="flowGroupBtn" type="button"
+    <button class="toggle on" id="flowGroupBtn" type="button"
             title="Fold a run of identical sibling calls into one box marked with its count">Group repeats</button>
     <button class="toggle excl" id="flowExcludedBtn" type="button" hidden
             title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
@@ -792,6 +822,19 @@ Press Enter to apply, Esc to cancel.">
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
     <button class="toggle" id="flowFlameBtn" type="button"
             title="Lay the diagram out by time instead of by nesting: box width is duration">Flame</button>
+    <button class="toggle" id="flowChartBtn" type="button"
+            title="A flowchart of distinct steps, coloured by line coverage, with an animated marker that walks the run in execution order">API Flow</button>
+    <span class="zoomseg" id="chartPlaySeg" hidden>
+      <button class="toggle zoombtn" id="chartPlayBtn" type="button" title="Play the run through the flowchart">&#9654;</button>
+      <button class="toggle zoombtn" id="chartResetBtn" type="button" title="Back to the start">&#8634;</button>
+    </span>
+    <select class="sort" id="chartSpeedSel" hidden title="Playback speed">
+      <option value="0.5">0.5&times;</option>
+      <option value="1" selected>1&times;</option>
+      <option value="2">2&times;</option>
+      <option value="4">4&times;</option>
+      <option value="8">8&times;</option>
+    </select>
     <select class="sort" id="flowColorSel" title="What a frame's colour means in the flame layout">
       <option value="glowroot">Glowroot</option>
       <option value="deju">Deju</option>
@@ -807,7 +850,7 @@ Press Enter to apply, Esc to cancel.">
       <button class="toggle zoombtn" id="flowOutBtn" type="button" title="Zoom out">&minus;</button>
       <button class="toggle zoombtn" id="flowInBtn" type="button" title="Zoom in">&plus;</button>
     </span>
-    <button class="toggle" id="flowFitBtn" type="button" title="Scale the diagram to fit the window width">Fit width</button>
+    <button class="toggle on" id="flowFitBtn" type="button" title="Scale the diagram to fit the window width">Fit width</button>
     <button class="toggle" id="flowPngBtn" type="button" title="Save the diagram as a PNG image">Save PNG</button>
     <button class="toggle" id="flowSvgBtn" type="button" title="Save the diagram as an SVG image: vector, so it stays sharp at any zoom, and has no size limit">Save SVG</button>
   </span><!--/tab:flow-->
@@ -897,18 +940,18 @@ Press Enter to apply, Esc to cancel.">
 
     <h3>Filtering</h3>
     <p>The box beside the trace point filters whichever tab is in front, and each tab keeps
-    its own query, so narrowing the tree down to one class does not also empty the Flow
+    its own query, so narrowing the tree down to one class does not also empty the Flame
     Graph. What a match means differs by tab, and the box says which as you switch: source
-    text and SQL in <b>Code Trace</b>, a file or package name in <b>Graph</b>, a step label
-    in <b>Timeline</b>, a title or detail in <b>Findings</b>, and in <b>Flow Graph</b> a
+    text and SQL in <b>Call Tree</b>, a file or package name in <b>Breakdown</b>, a step label
+    in <b>Timeline</b>, a title or detail in <b>Findings</b>, and in <b>Flame Graph</b> a
     regular expression over the step signature.</p>
-    <p>The Flow Graph's dropdown decides what a match brings with it. <b>Matches +
-    callers</b> keeps everything a matching step went on to call along with the chain of
-    callers above it, so the diagram still says how the code got there. <b>Matches only</b>
-    drops the callees, for when the shape of the calls <i>into</i> a layer is the question.
-    <b>Whole package</b> matches on package names rather than signatures, which is the
-    grouping a layered codebase is actually navigated by. A pattern that will not compile
-    is used as plain text rather than reported as an error.</p>
+    <p>The Flame Graph's dropdown decides what a match brings with it. <b>Match, with
+    callers &amp; callees</b> keeps everything a matching step went on to call along with the
+    chain of callers above it, so the diagram still says how the code got there. <b>Match,
+    callers only</b> drops the callees, for when the shape of the calls <i>into</i> a layer
+    is the question. <b>Match by package</b> matches on package names rather than
+    signatures, which is the grouping a layered codebase is actually navigated by. A pattern
+    that will not compile is used as plain text rather than reported as an error.</p>
     <h3>Findings</h3>
     <p>A handful of rules run over this recording and name what stands out in it: the same
     statement issued in a loop, one query that is most of the request, the frame that spent
@@ -926,12 +969,12 @@ Press Enter to apply, Esc to cancel.">
     those calls are; <b>Collapse all</b> does it to the lot. Hovering a row reveals three
     actions: <b>line</b> opens the calling line in the IDE, <b>sql</b> opens the statement
     behind a query formatted and coloured in place, and <b>step</b> jumps to that frame in
-    the Code Trace.</p>
+    the Call Tree.</p>
     <p>One honest limit: the agent records how long each call took, not when it started, so
     positions are derived by laying calls end to end in the order they ran. Durations and
     ordering are exact; a gap where the request sat idle cannot be shown, because nothing in
     the recording distinguishes it from work.</p>
-    <h3>Graph</h3>
+    <h3>Breakdown</h3>
     <p>Time per file, slowest first. The bar has two parts: <b>own code</b> is the file's
     self time, the work its own lines did, and <b>SQL</b> is the time its queries spent in
     the database, charged to the method that issued them. Self time is the only additive
@@ -941,7 +984,7 @@ Press Enter to apply, Esc to cancel.">
     which method to optimise rather than which query. This tab deliberately ignores the
     Files picker and your excluded types: it is an accounting of where the milliseconds
     went, and dropping a file would silently remove real time from the totals.</p>
-    <h3>Flow Graph</h3>
+    <h3>Flame Graph</h3>
     <p>The call tree drawn start to end, top to bottom in execution order, indented by
     depth. Each box is one invocation; the bar inside it is that call's total time relative
     to the whole run. Hover for the full signature and timing. It is the same data as the
@@ -978,7 +1021,7 @@ Press Enter to apply, Esc to cancel.">
     so a getter that turns out to trigger a lazy load stays on screen along with the query it
     caused. <b>Excluded rows</b> in the toolbar hides those summary rows altogether, once
     you no longer need to be told what was folded away.
-    The <b>Flow Graph</b> and the <b>Timeline</b> fold the same types away by the same
+    The <b>Flame Graph</b> and the <b>Timeline</b> fold the same types away by the same
     rule, and both carry a <b>Show excluded</b> button to put them back.
     <i>Full</i> shows every recorded call, repeats included: the
     <b>&times;N more</b> folding that keeps an N+1 loop from flooding the default view is
@@ -1041,7 +1084,7 @@ Press Enter to apply, Esc to cancel.">
 <!-- What the export dialog chose. Read once at load; absent in a report written by an older
      plugin, in which case the script's own defaults apply and nothing changes. -->
 <script type="application/json" id="deju-prefs">{"openTab": "trace", "view": "tree", "density": "normal", "theme": "auto", "showTime": true, "showPercent": true, "showStep": true, "showLine": true, "sql": true, "groupRepeats": false, "collapseTree": false, "collapseSections": false}</script>
-<script type="application/json" id="deju-data">{"target": "com.example.order.OrderController#placeOrder", "startedAtIso": "2026-07-31T09:24:18.221Z", "durationMs": 48, "projectName": "example-api", "files": [{"fqClassName": "com.example.order.OrderController", "sourceFileName": "OrderController.java", "path": "src/main/java/com/example/order/OrderController.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderController.java", "lines": [{"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3, "methodTotalMicros": 47900, "methodSelfMicros": 560, "methodName": "placeOrder", "methodStart": true, "code": "    @PostMapping"}, {"line": 22, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 41, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        if (request.items().isEmpty()) {"}, {"line": 23, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "            return ResponseEntity.badRequest().build();"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 47340, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        OrderDto receipt = orders.place(request);"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        return ResponseEntity.ok(receipt);"}]}, {"fqClassName": "com.example.order.OrderService", "sourceFileName": "OrderService.java", "path": "src/main/java/com/example/order/OrderService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderService.java", "lines": [{"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 18, "methodTotalMicros": 47340, "methodSelfMicros": 350, "methodName": "place", "methodStart": true, "code": "        for (String name : request.items()) {"}, {"line": 22, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "            order.add(menu.findByName(name));   // one query per drink"}, {"line": 23, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12650, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        }"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 640, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        Money total = discounts.apply(subtotal, request.customerId());"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3980, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        loyalty.award(request.customerId(), total);"}, {"line": 27, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 2210, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        orders.save(order, total);"}, {"line": 28, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 27200, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        return OrderDto.of(order, total);"}, {"line": 29, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 310, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "    }"}]}, {"fqClassName": "com.example.menu.MenuRepository", "sourceFileName": "MenuRepository.java", "path": "src/main/java/com/example/menu/MenuRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/menu/MenuRepository.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12650, "methodTotalMicros": 12650, "methodSelfMicros": 190, "methodName": "findByName", "methodStart": true, "code": "        return jdbc.queryForObject("}]}, {"fqClassName": "com.example.pricing.PriceCalculator", "sourceFileName": "PriceCalculator.java", "path": "src/main/java/com/example/pricing/PriceCalculator.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/PriceCalculator.java", "lines": [{"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 11, "methodTotalMicros": 640, "methodSelfMicros": 90, "methodName": "total", "methodStart": true, "code": "        Money sum = Money.ZERO;"}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 17, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 512, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "            sum = sum.plus(priceOf(line.drink(), size));"}, {"line": 19, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        return sum;"}, {"line": 22, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 180, "methodTotalMicros": 512, "methodSelfMicros": 512, "methodName": "priceOf", "methodStart": true, "code": "    Money priceOf(Drink drink, Size size) {"}, {"line": 23, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 121, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        Money price = drink.basePrice();"}, {"line": 24, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 96, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        if (size == Size.LARGE) {"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 115, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        }"}]}, {"fqClassName": "com.example.pricing.DiscountPolicy", "sourceFileName": "DiscountPolicy.java", "path": "src/main/java/com/example/pricing/DiscountPolicy.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/DiscountPolicy.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 9, "methodTotalMicros": 3980, "methodSelfMicros": 70, "methodName": "apply", "methodStart": true, "code": "        Money total = subtotal;"}, {"line": 14, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 3910, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (loyalty.isMember(customerId)) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 22, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(10);"}, {"line": 17, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 27, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (total.isOver(Money.pounds(20))) {"}, {"line": 18, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(5);"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        return total;"}]}, {"fqClassName": "com.example.loyalty.LoyaltyService", "sourceFileName": "LoyaltyService.java", "path": "src/main/java/com/example/loyalty/LoyaltyService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/loyalty/LoyaltyService.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3860, "methodTotalMicros": 3910, "methodSelfMicros": 50, "methodName": "isMember", "methodStart": true, "code": "                \"select count(*) from membership where customer_id = ?\","}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "isMember", "methodStart": false, "code": "    }"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 18, "methodTotalMicros": 2210, "methodSelfMicros": 60, "methodName": "award", "methodStart": true, "code": "        int points = total.wholePounds();"}, {"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 2150, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "award", "methodStart": false, "code": "        jdbc.update(\"update customer set points = points + ? where id = ?\","}]}, {"fqClassName": "com.example.order.OrderRepository", "sourceFileName": "OrderRepository.java", "path": "src/main/java/com/example/order/OrderRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderRepository.java", "lines": [{"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3100, "methodTotalMicros": 27200, "methodSelfMicros": 200, "methodName": "save", "methodStart": true, "code": "        jdbc.update(\"insert into customer_order (customer_id, total_pence) values (?, ?)\","}, {"line": 14, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 21, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 23900, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "            jdbc.update(\"insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)\","}]}, {"fqClassName": "com.example.order.OrderDto", "sourceFileName": "OrderDto.java", "path": "src/main/java/com/example/order/OrderDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderDto.java", "lines": [{"line": 9, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 14, "methodTotalMicros": 310, "methodSelfMicros": 120, "methodName": "of", "methodStart": true, "code": "        return new OrderDto("}, {"line": 10, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.id(),"}, {"line": 11, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 11, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.currency(),"}, {"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.pence(),"}, {"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 190, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.lines().stream().map(OrderLineDto::of).toList());"}]}, {"fqClassName": "com.example.order.OrderLineDto", "sourceFileName": "OrderLineDto.java", "path": "src/main/java/com/example/order/OrderLineDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderLineDto.java", "lines": [{"line": 6, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 190, "methodTotalMicros": 190, "methodSelfMicros": 190, "methodName": "of", "methodStart": true, "code": "        return new OrderLineDto(line.drink().name(), line.pricePence());"}]}], "calls": {"n": 36, "classTable": ["com.example.order.OrderController", "com.example.order.OrderService", "com.example.menu.MenuRepository", "com.example.pricing.PriceCalculator", "com.example.pricing.DiscountPolicy", "com.example.loyalty.LoyaltyService", "com.example.order.OrderRepository", "com.example.order.OrderDto", "com.example.order.OrderLineDto"], "methodTable": ["placeOrder", "place", "findByName", "total", "priceOf", "apply", "isMember", "award", "save", "of"], "sqlTable": ["select id, name, base_price_pence from drink where name = ?", "select count(*) from membership where customer_id = ?", "update customer set points = points + ? where id = ?", "insert into customer_order (customer_id, total_pence) values (?, ?)", "insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)"], "parentSeq": [-1, 0, 1, 2, 1, 4, 1, 6, 1, 8, 1, 10, 1, 12, 12, 12, 12, 12, 1, 18, 19, 1, 21, 1, 23, 23, 23, 23, 23, 23, 1, 30, 30, 30, 30, 30], "className": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 3, 3, 3, 3, 3, 4, 5, -1, 5, -1, 6, -1, -1, -1, -1, -1, -1, 7, 8, 8, 8, 8, 8], "methodName": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 4, 4, 4, 4, 4, 5, 6, -1, 7, -1, 8, -1, -1, -1, -1, -1, -1, 9, 9, 9, 9, 9, 9], "sql": [-1, -1, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, 2, -1, 3, 4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1], "callSiteLine": [null, 25, 23, 13, 23, 13, 23, 13, 23, 13, 23, 13, 25, 17, 17, 17, 17, 17, 26, 14, 13, 27, 21, 28, 12, 15, 15, 15, 15, 15, 29, 13, 13, 13, 13, 13], "totalMicros": [47900, 47340, 8120, 8000, 1180, 1060, 1090, 970, 1150, 1030, 1110, 990, 640, 140, 96, 92, 94, 90, 3980, 3910, 3860, 2210, 2150, 27200, 3100, 4900, 4780, 4760, 4740, 4720, 310, 52, 36, 34, 34, 34]}, "callsTruncated": false, "agentVersion": "2.1.0", "pluginVersion": "2.1.0", "excludedClasses": ["com.example.order.OrderDto", "com.example.order.OrderLineDto"], "excludedOmitted": false}</script>
+<script type="application/json" id="deju-data">{"target": "com.example.order.OrderController#placeOrder", "startedAtIso": "2026-07-31T09:24:18.221Z", "durationMs": 48, "cpuMicros": 43100, "projectName": "example-api", "files": [{"fqClassName": "com.example.order.OrderController", "sourceFileName": "OrderController.java", "path": "src/main/java/com/example/order/OrderController.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderController.java", "lines": [{"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3, "methodTotalMicros": 47900, "methodSelfMicros": 560, "methodName": "placeOrder", "methodStart": true, "code": "    @PostMapping"}, {"line": 22, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 41, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        if (request.items().isEmpty()) {"}, {"line": 23, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "            return ResponseEntity.badRequest().build();"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 47340, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        OrderDto receipt = orders.place(request);"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        return ResponseEntity.ok(receipt);"}]}, {"fqClassName": "com.example.order.OrderService", "sourceFileName": "OrderService.java", "path": "src/main/java/com/example/order/OrderService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderService.java", "lines": [{"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 18, "methodTotalMicros": 47340, "methodSelfMicros": 350, "methodName": "place", "methodStart": true, "code": "        for (String name : request.items()) {"}, {"line": 22, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "            order.add(menu.findByName(name));   // one query per drink"}, {"line": 23, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12650, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        }"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 640, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        Money total = discounts.apply(subtotal, request.customerId());"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3980, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        loyalty.award(request.customerId(), total);"}, {"line": 27, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 2210, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        orders.save(order, total);"}, {"line": 28, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 27200, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        return OrderDto.of(order, total);"}, {"line": 29, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 310, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "    }"}]}, {"fqClassName": "com.example.menu.MenuRepository", "sourceFileName": "MenuRepository.java", "path": "src/main/java/com/example/menu/MenuRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/menu/MenuRepository.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12650, "methodTotalMicros": 12650, "methodSelfMicros": 190, "methodName": "findByName", "methodStart": true, "code": "        return jdbc.queryForObject("}]}, {"fqClassName": "com.example.pricing.PriceCalculator", "sourceFileName": "PriceCalculator.java", "path": "src/main/java/com/example/pricing/PriceCalculator.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/PriceCalculator.java", "lines": [{"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 11, "methodTotalMicros": 640, "methodSelfMicros": 90, "methodName": "total", "methodStart": true, "code": "        Money sum = Money.ZERO;"}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 17, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 512, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "            sum = sum.plus(priceOf(line.drink(), size));"}, {"line": 19, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        return sum;"}, {"line": 22, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 180, "methodTotalMicros": 512, "methodSelfMicros": 512, "methodName": "priceOf", "methodStart": true, "code": "    Money priceOf(Drink drink, Size size) {"}, {"line": 23, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 121, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        Money price = drink.basePrice();"}, {"line": 24, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 96, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        if (size == Size.LARGE) {"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 115, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        }"}]}, {"fqClassName": "com.example.pricing.DiscountPolicy", "sourceFileName": "DiscountPolicy.java", "path": "src/main/java/com/example/pricing/DiscountPolicy.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/DiscountPolicy.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 9, "methodTotalMicros": 3980, "methodSelfMicros": 70, "methodName": "apply", "methodStart": true, "code": "        Money total = subtotal;"}, {"line": 14, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 3910, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (loyalty.isMember(customerId)) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 22, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(10);"}, {"line": 17, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 27, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (total.isOver(Money.pounds(20))) {"}, {"line": 18, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(5);"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        return total;"}]}, {"fqClassName": "com.example.loyalty.LoyaltyService", "sourceFileName": "LoyaltyService.java", "path": "src/main/java/com/example/loyalty/LoyaltyService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/loyalty/LoyaltyService.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3860, "methodTotalMicros": 3910, "methodSelfMicros": 50, "methodName": "isMember", "methodStart": true, "code": "                \"select count(*) from membership where customer_id = ?\","}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "isMember", "methodStart": false, "code": "    }"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 18, "methodTotalMicros": 2210, "methodSelfMicros": 60, "methodName": "award", "methodStart": true, "code": "        int points = total.wholePounds();"}, {"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 2150, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "award", "methodStart": false, "code": "        jdbc.update(\"update customer set points = points + ? where id = ?\","}]}, {"fqClassName": "com.example.order.OrderRepository", "sourceFileName": "OrderRepository.java", "path": "src/main/java/com/example/order/OrderRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderRepository.java", "lines": [{"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3100, "methodTotalMicros": 27200, "methodSelfMicros": 200, "methodName": "save", "methodStart": true, "code": "        jdbc.update(\"insert into customer_order (customer_id, total_pence) values (?, ?)\","}, {"line": 14, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 21, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 23900, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "            jdbc.update(\"insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)\","}]}, {"fqClassName": "com.example.order.OrderDto", "sourceFileName": "OrderDto.java", "path": "src/main/java/com/example/order/OrderDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderDto.java", "lines": [{"line": 9, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 14, "methodTotalMicros": 310, "methodSelfMicros": 120, "methodName": "of", "methodStart": true, "code": "        return new OrderDto("}, {"line": 10, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.id(),"}, {"line": 11, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 11, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.currency(),"}, {"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.pence(),"}, {"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 190, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.lines().stream().map(OrderLineDto::of).toList());"}]}, {"fqClassName": "com.example.order.OrderLineDto", "sourceFileName": "OrderLineDto.java", "path": "src/main/java/com/example/order/OrderLineDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderLineDto.java", "lines": [{"line": 6, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 190, "methodTotalMicros": 190, "methodSelfMicros": 190, "methodName": "of", "methodStart": true, "code": "        return new OrderLineDto(line.drink().name(), line.pricePence());"}]}], "calls": {"n": 36, "classTable": ["com.example.order.OrderController", "com.example.order.OrderService", "com.example.menu.MenuRepository", "com.example.pricing.PriceCalculator", "com.example.pricing.DiscountPolicy", "com.example.loyalty.LoyaltyService", "com.example.order.OrderRepository", "com.example.order.OrderDto", "com.example.order.OrderLineDto"], "methodTable": ["placeOrder", "place", "findByName", "total", "priceOf", "apply", "isMember", "award", "save", "of"], "sqlTable": ["select id, name, base_price_pence from drink where name = ?", "select count(*) from membership where customer_id = ?", "update customer set points = points + ? where id = ?", "insert into customer_order (customer_id, total_pence) values (?, ?)", "insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)"], "parentSeq": [-1, 0, 1, 2, 1, 4, 1, 6, 1, 8, 1, 10, 1, 12, 12, 12, 12, 12, 1, 18, 19, 1, 21, 1, 23, 23, 23, 23, 23, 23, 1, 30, 30, 30, 30, 30], "className": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 3, 3, 3, 3, 3, 4, 5, -1, 5, -1, 6, -1, -1, -1, -1, -1, -1, 7, 8, 8, 8, 8, 8], "methodName": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 4, 4, 4, 4, 4, 5, 6, -1, 7, -1, 8, -1, -1, -1, -1, -1, -1, 9, 9, 9, 9, 9, 9], "sql": [-1, -1, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, 2, -1, 3, 4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1], "callSiteLine": [null, 25, 23, 13, 23, 13, 23, 13, 23, 13, 23, 13, 25, 17, 17, 17, 17, 17, 26, 14, 13, 27, 21, 28, 12, 15, 15, 15, 15, 15, 29, 13, 13, 13, 13, 13], "totalMicros": [47900, 47340, 8120, 8000, 1180, 1060, 1090, 970, 1150, 1030, 1110, 990, 640, 140, 96, 92, 94, 90, 3980, 3910, 3860, 2210, 2150, 27200, 3100, 4900, 4780, 4760, 4740, 4720, 310, 52, 36, 34, 34, 34]}, "callsTruncated": false, "agentVersion": "2.1.0", "pluginVersion": "2.1.0", "excludedClasses": ["com.example.order.OrderDto", "com.example.order.OrderLineDto"], "excludedOmitted": false}</script>
 <script>
 /*
  * Deju HTML report behaviour. Inlined verbatim into a <script> element by
@@ -1321,6 +1364,27 @@ Press Enter to apply, Esc to cancel.">
     if (p >= 10) return p.toFixed(0) + '%';
     if (p >= 0.1) return p.toFixed(1) + '%';
     return p > 0 ? '<0.1%' : '0%';
+  }
+
+  /** The same share as {@link pct}, as a raw 0..100 number for driving a CSS bar width. */
+  function pctNum(micros) {
+    if (!(runMicrosTotal > 0) || micros == null) return 0;
+    return Math.max(0, Math.min(100, (micros / runMicrosTotal) * 100));
+  }
+
+  /**
+   * A share badge with a fill bar behind it, the Glowroot-style read-at-a-glance version
+   * of {@link pct}. Only used on the Tree's frame rows (method calls, SQL), where every
+   * badge sits in the same {@code .ftime} slot and so shares a comparable track width;
+   * the Files gutter and the Timeline (which already has its own proportional bar) do not
+   * get this treatment.
+   */
+  function pctBadge(micros) {
+    var p = pct(micros);
+    if (!p) return null;
+    var b = el('span', 'fpct bar', p);
+    b.style.setProperty('--fpct-fill', pctNum(micros) + '%');
+    return b;
   }
 
   /** Time and share together, the form used wherever both fit on one line. */
@@ -2233,8 +2297,8 @@ Press Enter to apply, Esc to cancel.">
     if (node.totalMicros != null) {
       var time = el('span', 'ftime', fmt(node.totalMicros));
       time.title = 'time spent executing this query';
-      var qp = pct(node.totalMicros);
-      if (qp) time.appendChild(el('span', 'fpct', qp));
+      var qp = pctBadge(node.totalMicros);
+      if (qp) time.appendChild(qp);
       head.appendChild(time);
     }
     td.appendChild(head);
@@ -2311,8 +2375,8 @@ Press Enter to apply, Esc to cancel.">
     time.title = 'total (inclusive) time of this call';
     // The share rides inside the time element rather than beside it, so the two never wrap
     // apart and the number keeps its own meaning: "48 ms, which is a third of the request".
-    var fp = pct(node.totalMicros);
-    if (fp) time.appendChild(el('span', 'fpct', fp));
+    var fp = pctBadge(node.totalMicros);
+    if (fp) time.appendChild(fp);
     head.appendChild(time);
     head.appendChild(copyButton(function () { return frameAsText(node); }));
 
@@ -3489,16 +3553,18 @@ Press Enter to apply, Esc to cancel.">
   var landedSeq = null;
   var landedTimer = 0;
 
+  /** How long the yellow outline (not the 1.6s background fade) marks the landed row. */
+  var LAND_BORDER_MS = 60_000;
+
   function landOn(seq) {
     landedSeq = seq;
     paintLanded();
     if (landedTimer) clearTimeout(landedTimer);
-    // Slightly longer than the CSS animation, so it can never be cleared mid-fade.
     landedTimer = setTimeout(function () {
       landedSeq = null;
       landedTimer = 0;
       paintLanded();
-    }, 1800);
+    }, LAND_BORDER_MS);
   }
 
   /** Puts the mark on the row holding landedSeq right now, and takes it off every other. */
@@ -3687,15 +3753,15 @@ Press Enter to apply, Esc to cancel.">
       head: 'Layout', selects: [
         {
           key: 'openTab', label: 'Opens on', options: [
-            ['trace', 'Code Trace'], ['graph', 'Graph'], ['flow', 'Flow Graph'],
+            ['trace', 'Call Tree'], ['graph', 'Breakdown'], ['flow', 'Flame Graph'],
             ['timeline', 'Timeline'], ['findings', 'Findings']
           ], tabs: true
         },
-        { key: 'view', label: 'Code Trace view', options: [['tree', 'Tree'], ['files', 'Files']] },
+        { key: 'view', label: 'Call Tree view', options: [['tree', 'Tree'], ['files', 'Files']] },
         { key: 'density', label: 'Density', options: [['normal', 'Normal'], ['compact', 'Compact']] },
         { key: 'theme', label: 'Theme', options: [['auto', 'Follow my system'], ['light', 'Light'], ['dark', 'Dark']] }
       ],
-      note: 'Opens on and Code Trace view take effect the next time this report is opened.'
+      note: 'Opens on and Call Tree view take effect the next time this report is opened.'
     },
     {
       head: 'Starts folded', items: [
@@ -4098,6 +4164,17 @@ Press Enter to apply, Esc to cancel.">
   var durationMs = data.durationMs || 0;
   summary.appendChild(stat(durationMs + ' ms', 'Total time',
     'wall time for the whole traced call', coarserThanMs(durationMs)));
+  // -1 means the JVM could not report per-thread CPU time (rare), or the connected agent
+  // predates this field; either way there is nothing honest to show, so it is left out
+  // rather than printed as a misleading 0.
+  if (data.cpuMicros != null && data.cpuMicros >= 0) {
+    var cpuMs = data.cpuMicros / 1000;
+    var cpuPct = durationMs > 0 ? Math.round(Math.min(100, (cpuMs / durationMs) * 100)) : null;
+    summary.appendChild(stat(fmt(data.cpuMicros), 'CPU time',
+      'CPU this thread actually burned during the call, as opposed to the wall time above.'
+      + ' The gap between them is time spent blocked: I/O, a lock, or another thread.',
+      cpuPct != null ? cpuPct + '% of wall' : null));
+  }
   if (treeAvailable) {
     summary.appendChild(stat(String(calls.length), calls.length === 1 ? 'Call' : 'Calls',
       'method invocations recorded, in execution order'));
@@ -4127,12 +4204,24 @@ Press Enter to apply, Esc to cancel.">
   // ------------------------------------------------- sticky offset + startup ---
 
   var toolbar = byId('toolbar');
+  var metaBar = byId('meta');
   function measureToolbar() {
     document.documentElement.style.setProperty('--toolbarH', toolbar.offsetHeight + 'px');
   }
+  // The meta row sticks above the toolbar now that the tabs live in it, so anything that
+  // parks itself under the toolbar (sticky file headers) has to clear both.
+  function measureMeta() {
+    document.documentElement.style.setProperty('--metaH', metaBar.offsetHeight + 'px');
+  }
   measureToolbar();
-  if (window.ResizeObserver) new ResizeObserver(measureToolbar).observe(toolbar);
-  else window.addEventListener('resize', measureToolbar);
+  measureMeta();
+  if (window.ResizeObserver) {
+    new ResizeObserver(measureToolbar).observe(toolbar);
+    new ResizeObserver(measureMeta).observe(metaBar);
+  } else {
+    window.addEventListener('resize', measureToolbar);
+    window.addEventListener('resize', measureMeta);
+  }
 
   /* An older agent still loaded in the traced JVM is the usual reason a recording has no
      call tree, and it used to be completely invisible - the Tree button simply did nothing. */
@@ -4249,6 +4338,9 @@ Press Enter to apply, Esc to cancel.">
     tabFlow.classList.toggle('on', next === 'flow');
     tabTimeline.classList.toggle('on', next === 'timeline');
     tabFindings.classList.toggle('on', next === 'findings');
+    // The marker's rAF loop paints the flow canvas every frame; nothing needs that while
+    // another tab is in front, and the canvas it targets may be mid-resize on the way back.
+    if (next !== 'flow') stopChartAnim();
     tracePanel.hidden = next !== 'trace';
     graphPanel.hidden = next !== 'graph';
     flowPanel.hidden = next !== 'flow';
@@ -4461,13 +4553,61 @@ Press Enter to apply, Esc to cancel.">
       }
       row.appendChild(caret);
 
+      // Toggles the full-text block: the formatted statement for a query, or the
+      // fully-qualified signature for everything else, since the name column truncates
+      // long ones. Shared by the name itself and its button, so clicking either does it —
+      // the name is the bigger, easier target; the button is there so it can still be found
+      // once "sql"/"expand" is the only label left, with no row of text around it.
+      function toggleFull() {
+        var already = row.querySelector('.tlfull');
+        if (already) { row.removeChild(already); return; }
+        if (r.isSql) {
+          var pre = el('pre', 'tlfull');
+          paintSql(pre, nodeBySeq[r.seq] && nodeBySeq[r.seq].sql);
+          row.appendChild(pre);
+        } else {
+          var node = nodeBySeq[r.seq];
+          var full = node
+            ? (node.className || '') + '.' + methodLabel(node.methodName, node.className) + '()'
+            : r.label;
+          row.appendChild(el('pre', 'tlfull', full));
+        }
+      }
+
       var name = el('div', 'tlname');
       name.style.setProperty('--depth', Math.min(r.depth, 12));
       name.appendChild(document.createTextNode(r.label));
       name.title = r.sub + '\nstep ' + (r.seq + 1) + ' · starts at ' + fmt(r.t0)
         + ' · total ' + fmtPct(r.total) + ' · own ' + fmtPct(r.own);
-      name.addEventListener('click', function () { goToStep(r.seq); });
+      name.addEventListener('click', toggleFull);
       row.appendChild(name);
+
+      // Two more things a reader wants from a row here: the line that made the call, and
+      // the step itself in the tree. Kept beside the name rather than off at the far edge
+      // of what is often a very wide row, so reaching them is not a trip across the bars
+      // and times.
+      var acts = el('div', 'tlacts');
+      var url = callSiteUrl(r.seq);
+      if (url) {
+        var open = el('a', null, 'line');
+        open.href = url;
+        open.title = 'Open the calling line in the IDE';
+        open.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        acts.appendChild(open);
+      }
+      var fullBtn = el('button', null, r.isSql ? 'sql' : 'expand');
+      fullBtn.type = 'button';
+      fullBtn.title = r.isSql
+        ? 'Show the statement, formatted and coloured'
+        : 'Show the full, fully-qualified line';
+      fullBtn.addEventListener('click', function (ev) { ev.stopPropagation(); toggleFull(); });
+      acts.appendChild(fullBtn);
+      var step = el('button', null, 'step');
+      step.type = 'button';
+      step.title = 'Show this step in the Call Tree';
+      step.addEventListener('click', function (ev) { ev.stopPropagation(); goToStep(r.seq); });
+      acts.appendChild(step);
+      row.appendChild(acts);
 
       var track = el('div', 'tltrack');
       var bar = el('i', 'tlbar');
@@ -4486,40 +4626,6 @@ Press Enter to apply, Esc to cancel.">
       var op = pct(r.own);
       if (op) time.appendChild(el('span', 'fpct', op));
       row.appendChild(time);
-
-      // Three things a reader wants from a row here, none of which used to be reachable
-      // from it: the line that made the call, the statement behind a query, and the step
-      // itself in the tree. The whole row was one click that did the last of those, which
-      // left no room for the other two.
-      var acts = el('div', 'tlacts');
-      var url = callSiteUrl(r.seq);
-      if (url) {
-        var open = el('a', null, 'line');
-        open.href = url;
-        open.title = 'Open the calling line in the IDE';
-        open.addEventListener('click', function (ev) { ev.stopPropagation(); });
-        acts.appendChild(open);
-      }
-      if (r.isSql) {
-        var sqlBtn = el('button', null, 'sql');
-        sqlBtn.type = 'button';
-        sqlBtn.title = 'Show the statement, formatted and coloured';
-        sqlBtn.addEventListener('click', function (ev) {
-          ev.stopPropagation();
-          var already = row.querySelector('.tlsql');
-          if (already) { row.removeChild(already); return; }
-          var pre = el('pre', 'tlsql');
-          paintSql(pre, nodeBySeq[r.seq] && nodeBySeq[r.seq].sql);
-          row.appendChild(pre);
-        });
-        acts.appendChild(sqlBtn);
-      }
-      var step = el('button', null, 'step');
-      step.type = 'button';
-      step.title = 'Show this step in the Code Trace';
-      step.addEventListener('click', function (ev) { ev.stopPropagation(); goToStep(r.seq); });
-      acts.appendChild(step);
-      row.appendChild(acts);
 
       frag.appendChild(row);
     });
@@ -4871,11 +4977,16 @@ Press Enter to apply, Esc to cancel.">
   var graphRows = [];
   var graphSql = true;
   var graphAll = false;
+  // The Timers-panel read Glowroot opens on: the same bars, keyed by method instead of
+  // file, so "which method is the bottleneck" doesn't require opening a file first to
+  // find out it has six of them and only one is slow.
+  var graphByMethod = false;
   var graphBody = byId('graphBody');
   var graphEmpty = byId('graphEmpty');
   var graphNote = byId('graphNote');
   var graphSqlBtn = byId('graphSqlBtn');
   var graphAllBtn = byId('graphAllBtn');
+  var graphMethodBtn = byId('graphMethodBtn');
 
   /**
    * Time per file, split into the file's own code and the SQL it caused.
@@ -4887,7 +4998,61 @@ Press Enter to apply, Esc to cancel.">
    * belongs to no file at all, because a SQL frame has no class. So each statement is
    * charged to the method that issued it, which is the line a reader would go and change.
    */
-  function buildGraph() {
+  /**
+   * Charges one query to the row it belongs on, and grows that row's N+1 detector.
+   * Identical between the two grouping modes — a repeated statement is a repeated
+   * statement whether the bar above it says "OrderRepository.java" or "save()".
+   */
+  function chargeSql(r, c) {
+    r.sql += c.totalMicros || 0;
+    r.queries++;
+    var key = String(c.sql).replace(/\s+/g, ' ').trim().toLowerCase();
+    var g = r.dups[key];
+    if (!g) g = r.dups[key] = { n: 0, micros: 0, sql: String(c.sql).replace(/\s+/g, ' ').trim() };
+    g.n++;
+    g.micros += c.totalMicros || 0;
+  }
+
+  /** The worst-repeat-per-row pass and the note line, shared by both grouping modes. */
+  function finishGraphRows(orphanSql, unit) {
+    var worst = null;
+    graphRows.forEach(function (r) {
+      Object.keys(r.dups).forEach(function (k) {
+        var g = r.dups[k];
+        if (g.n < 2) return;
+        if (!r.dup || g.n > r.dup.n) r.dup = g;
+        if (!worst || g.n > worst.g.n) worst = { g: g, label: r.label };
+      });
+    });
+
+    var noteBits = [];
+    if (worst) {
+      noteBits.push('Possible N+1: ' + worst.g.n + ' identical queries from '
+        + worst.label + ' costing ' + fmt(worst.g.micros) + ' in total.');
+    }
+    if (orphanSql > 0) {
+      noteBits.push(fmt(orphanSql) + ' of SQL could not be charged to a ' + unit
+        + ', its caller is not in this report.');
+    }
+    if (data.callsTruncated) {
+      noteBits.push('The call list was truncated when this run was recorded, so SQL '
+        + 'totals are a lower bound.');
+    }
+    graphNote.textContent = noteBits.join(' ');
+    graphNote.hidden = noteBits.length === 0;
+  }
+
+  /**
+   * Time per file, split into the file's own code and the SQL it caused.
+   *
+   * Only methodSelfMicros is additive. A method's total time contains everything it
+   * called, so adding totals up would count the same microseconds once for every frame
+   * on the stack and make whichever file sits nearest the entry point look like the
+   * bottleneck. Self time alone, though, hides the database completely: a query's time
+   * belongs to no file at all, because a SQL frame has no class. So each statement is
+   * charged to the method that issued it, which is the line a reader would go and change.
+   */
+  function buildGraphByFile() {
     var byClass = {};
     files.forEach(function (f) { byClass[f.fqClassName] = f; });
 
@@ -4902,7 +5067,7 @@ Press Enter to apply, Esc to cancel.">
         r = rows[key] = {
           label: f.sourceFileName || simpleName(f.fqClassName) || key,
           sub: f.path || '',
-          self: 0,
+          self: 0, total: 0, calls: 0,
           sql: 0,
           queries: 0,
           dups: {},      // normalised statement -> { n, micros, sql }
@@ -4927,45 +5092,72 @@ Press Enter to apply, Esc to cancel.">
       // has no file to land on. Counting it against some other file would be a lie, so it
       // is reported separately instead.
       if (!f) { orphanSql += c.totalMicros || 0; return; }
-      var r = rowFor(f);
-      r.sql += c.totalMicros || 0;
-      r.queries++;
-      // Identical statements issued from one file are the signature of an N+1: a loop
-      // that queries once per row instead of once for the set. Whitespace and case are
-      // normalised so the same statement built two ways still groups.
-      var key = String(c.sql).replace(/\s+/g, ' ').trim().toLowerCase();
-      var g = r.dups[key];
-      if (!g) g = r.dups[key] = { n: 0, micros: 0, sql: String(c.sql).replace(/\s+/g, ' ').trim() };
-      g.n++;
-      g.micros += c.totalMicros || 0;
+      chargeSql(rowFor(f), c);
     });
 
-    // Worst repeat per file, and the run-wide worst for the note line.
-    var worst = null;
-    graphRows.forEach(function (r) {
-      Object.keys(r.dups).forEach(function (k) {
-        var g = r.dups[k];
-        if (g.n < 2) return;
-        if (!r.dup || g.n > r.dup.n) r.dup = g;
-        if (!worst || g.n > worst.g.n) worst = { g: g, file: r.label };
+    finishGraphRows(orphanSql, 'file');
+  }
+
+  /**
+   * Time per method: the same bars as {@link buildGraphByFile}, but the row a reader
+   * actually wants when a file turns out to have five methods and only one of them is
+   * slow. Self and total both come straight off {@code linesByMethod}, already summed
+   * across every invocation of that method by the agent (see Session.methodNanos); the
+   * call count is the one thing not already there, so it is the only pass over calls[].
+   */
+  function buildGraphByMethod() {
+    var rows = {};
+    function rowFor(key, cls, mth) {
+      var r = rows[key];
+      if (!r) {
+        r = rows[key] = {
+          label: (mth || '?') + '()',
+          sub: simpleName(cls) || cls || '',
+          self: 0, total: 0, calls: 0,
+          sql: 0,
+          queries: 0,
+          dups: {},
+          dup: null
+        };
+        graphRows.push(r);
+      }
+      return r;
+    }
+
+    Object.keys(linesByMethod).forEach(function (key) {
+      var hash = key.lastIndexOf('#');
+      var cls = key.slice(0, hash);
+      var mth = key.slice(hash + 1);
+      var r = rowFor(key, cls, mth);
+      linesByMethod[key].forEach(function (l) {
+        if (l.methodSelfMicros != null) r.self = l.methodSelfMicros;
+        if (l.methodTotalMicros != null) r.total = l.methodTotalMicros;
       });
     });
 
-    var noteBits = [];
-    if (worst) {
-      noteBits.push('Possible N+1: ' + worst.g.n + ' identical queries from '
-        + worst.file + ' costing ' + fmt(worst.g.micros) + ' in total.');
-    }
-    if (orphanSql > 0) {
-      noteBits.push(fmt(orphanSql) + ' of SQL could not be charged to a file, its caller '
-        + 'is not in this report.');
-    }
-    if (data.callsTruncated) {
-      noteBits.push('The call list was truncated when this run was recorded, so SQL '
-        + 'totals are a lower bound.');
-    }
-    graphNote.textContent = noteBits.join(' ');
-    graphNote.hidden = noteBits.length === 0;
+    var orphanSql = 0;
+    calls.forEach(function (c) {
+      if (c.sql) {
+        var parent = nodeBySeq[c.parentSeq];
+        var pkey = parent && parent.className && parent.methodName
+          ? parent.className + '#' + parent.methodName : null;
+        var pr = pkey ? rows[pkey] : null;
+        if (!pr) { orphanSql += c.totalMicros || 0; return; }
+        chargeSql(pr, c);
+        return;
+      }
+      if (c.className == null || c.methodName == null) return;
+      var r = rows[c.className + '#' + c.methodName];
+      if (r) r.calls++;
+    });
+
+    finishGraphRows(orphanSql, 'method');
+  }
+
+  function buildGraph() {
+    graphRows = [];
+    if (graphByMethod) buildGraphByMethod();
+    else buildGraphByFile();
   }
 
   function renderGraph() {
@@ -4981,10 +5173,12 @@ Press Enter to apply, Esc to cancel.">
       return (b.self + (useSql ? b.sql : 0)) - (a.self + (useSql ? a.sql : 0));
     });
 
+    var unit = graphByMethod ? 'method' : 'file';
+
     graphEmpty.hidden = rows.length > 0;
     graphAllBtn.hidden = rows.length <= GRAPH_TOP;
     graphAllBtn.classList.toggle('on', graphAll);
-    graphAllBtn.textContent = graphAll ? 'Show top ' + GRAPH_TOP : 'Show all files';
+    graphAllBtn.textContent = graphAll ? 'Show top ' + GRAPH_TOP : 'Show all ' + unit + 's';
 
     var shown = (graphAll || rows.length <= GRAPH_TOP) ? rows : rows.slice(0, GRAPH_TOP);
     var peak = 0;
@@ -5029,12 +5223,15 @@ Press Enter to apply, Esc to cancel.">
       row.appendChild(bar);
 
       var meta = el('div', 'graphmeta');
+      if (graphByMethod && r.calls > 0) {
+        meta.appendChild(el('span', 'qcount', r.calls + (r.calls === 1 ? ' call' : ' calls')));
+      }
       if (r.queries > 0) {
         meta.appendChild(el('span', 'qcount', r.queries + (r.queries === 1 ? ' query' : ' queries')));
       }
       if (r.dup) {
         var pill = el('span', 'nplus1', '×' + r.dup.n);
-        pill.title = r.dup.n + ' identical queries from this file, ' + fmt(r.dup.micros)
+        pill.title = r.dup.n + ' identical queries from this ' + unit + ', ' + fmt(r.dup.micros)
           + ' in total — often a query inside a loop:\n\n' + r.dup.sql;
         meta.appendChild(pill);
       }
@@ -5046,6 +5243,12 @@ Press Enter to apply, Esc to cancel.">
         time.appendChild(document.createTextNode(
           '  ' + ((total / grand) * 100).toFixed(1) + '%'));
       }
+      // Total (inclusive) time only means something once it stands alone against this one
+      // method's own self+SQL — summed across different methods on a stack it would double
+      // count, which is exactly why the bar above never uses it.
+      if (graphByMethod && r.total > total) {
+        time.appendChild(el('span', 'gtotal', fmt(r.total) + ' total'));
+      }
       row.appendChild(time);
 
       frag.appendChild(row);
@@ -5053,7 +5256,7 @@ Press Enter to apply, Esc to cancel.">
 
     graphBody.textContent = '';
     graphBody.appendChild(frag);
-    countEl.textContent = rows.length + (rows.length === 1 ? ' file' : ' files')
+    countEl.textContent = rows.length + (rows.length === 1 ? ' ' + unit : ' ' + unit + 's')
       + ' · ' + fmt(grand) + ' attributed';
   }
 
@@ -5066,18 +5269,26 @@ Press Enter to apply, Esc to cancel.">
     graphAll = !graphAll;
     renderGraph();
   });
+  graphMethodBtn.addEventListener('click', function () {
+    graphByMethod = !graphByMethod;
+    graphMethodBtn.classList.toggle('on', graphByMethod);
+    graphMethodBtn.textContent = graphByMethod ? 'By file' : 'By method';
+    graphAll = false;
+    buildGraph();
+    renderGraph();
+  });
 
   // ------------------------------------------------------------ flow graph ---
 
   var FLOW_ROW = 26;           // vertical pitch of one call
-  var FLOW_BOX = 20;           // box height inside that pitch
+  var FLOW_BOX = 20;           // box height inside that pitch, in the Tree layout
+  var FLAME_BOX = 25;          // row height in the Flame layout
   var FLOW_INDENT = 22;        // horizontal step per depth level
   var FLOW_PAD = 14;
   var FLOW_MINW = 150;
   var FLOW_MAXW = 460;
   var FLOW_GAP = 6;            // space between two boxes in tree mode
   var FLOW_LINE = 15;          // line height inside a multi-line SQL box
-  var FLOW_SQL_MAX = 8;        // clause lines shown before a statement is cut off
   var FLOW_SQL_FONT = '11px ui-monospace,SFMono-Regular,Menlo,monospace';
   /**
    * The face every frame label is drawn in.
@@ -5104,6 +5315,11 @@ Press Enter to apply, Esc to cancel.">
   var flowGroupBtn = byId('flowGroupBtn');
   var flowHotBtn = byId('flowHotBtn');
   var flowFlameBtn = byId('flowFlameBtn');
+  var flowChartBtn = byId('flowChartBtn');
+  var chartPlaySeg = byId('chartPlaySeg');
+  var chartPlayBtn = byId('chartPlayBtn');
+  var chartResetBtn = byId('chartResetBtn');
+  var chartSpeedSel = byId('chartSpeedSel');
   var flowCrumb = byId('flowCrumb');
   var flowFitBtn = byId('flowFitBtn');
   var flowOutBtn = byId('flowOutBtn');
@@ -5132,7 +5348,7 @@ Press Enter to apply, Esc to cancel.">
   var flameRoot = null;        // seq the flame view is zoomed into, null for the whole run
   var collapsedFlow = {};      // seq -> true, subtree folded away by a click
   var flowSql = true;
-  var flowGroup = false;
+  var flowGroup = true;
   var flowHot = false;
   /* Shared by the Flow Graph and the Timeline, so the two never disagree about whether the
      data classes are on screen. Off by default: excluding a type is a statement that it is
@@ -5171,6 +5387,35 @@ Press Enter to apply, Esc to cancel.">
     if (b) b.addEventListener('click', function () { setShowExcluded(!showExcluded); });
   });
   var flowFlame = false;
+
+  // -------------------------------------------------------------- API Flow chart ---
+  // A separate, lightweight layout: one box per distinct call site (not per raw call,
+  // which would be a hairball on any real trace), boxes arranged by nesting depth and
+  // joined by their real caller/callee edges, coloured by the same coverage rollup the
+  // Tree view uses. A marker walks the edges in actual execution order to animate it.
+  var flowChart = false;
+  var chartNodes = [];      // deduped: {key, cls, mth, isSql, sql, status, x,y,w,h, n, total, order, depth}
+  var chartByKey = {};
+  var chartEdges = [];      // {from, to, x1,y1,x2,y2}
+  var chartPath = [];       // chartNodes entries, one per visit, in execution order (sampled if huge)
+  var chartContentW = 0;
+  var chartContentH = 0;
+  var chartHoverKey = null;
+  var chartPlaying = false;
+  var chartPlayIdx = 0;
+  var chartProgress = 0;    // 0..1 along the edge from chartPath[chartPlayIdx] to the next
+  var chartSpeed = 1;
+  var chartRAF = 0;
+  var chartLastTick = 0;
+  var CHART_STEP_MS = 500;  // time to cross one edge at 1x speed
+  var CHART_MAX_PATH = 4000; // playback is sampled down past this so it finishes in a sane time
+  var CHART_PAD = 24;
+  var CHART_NODE_W = 200;
+  var CHART_NODE_H = 34;
+  var CHART_GAP_X = 34;
+  var CHART_GAP_Y = 54;
+  var CHART_DOT_R = 6;
+
   /**
    * Narrowest a flame frame may be drawn, in pixels.
    *
@@ -5181,7 +5426,7 @@ Press Enter to apply, Esc to cancel.">
    */
   var flameMinW = 1;
   var flameWidened = false;   // true once the floor has had to stretch the diagram
-  var flowFit = false;
+  var flowFit = true;
   var flowHover = null;        // seq under the cursor, for the highlight
   var flameSpan = 0;           // pixel width of the time axis, for the ruler
   var flameTotal = 0;          // micros that width represents
@@ -5189,6 +5434,13 @@ Press Enter to apply, Esc to cancel.">
   var flowScale = 1;
   var flowBoxW = 320;
   var flowRootTotal = 0;
+
+  /** 32-bit djb2, used only to tell two subtrees apart, never to identify one on its own. */
+  function flowHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return h;
+  }
 
   /**
    * Flattens the call tree into a pre-order array with subtree sizes.
@@ -5235,8 +5487,10 @@ Press Enter to apply, Esc to cancel.">
         // Queries are laid out on their clause lines in the box itself rather than
         // abbreviated to a hover: the statement IS the step, and a select trimmed at
         // forty characters tells you nothing about the where clause that made it slow.
+        // Uncapped: the box that draws these grows to fit them (nodeHeight), so cutting
+        // the list here would hide clauses the layout had already made room for.
         sqlLines: c.sql
-          ? formatSqlLines(tokenizeSql(splitSqlLead(c.sql).sql)).slice(0, FLOW_SQL_MAX)
+          ? formatSqlLines(tokenizeSql(splitSqlLead(c.sql).sql))
           : null,
         span: 1
       });
@@ -5246,16 +5500,22 @@ Press Enter to apply, Esc to cancel.">
       }
     }
     // Subtree sizes, backwards. Each node hops its direct children by their own spans,
-    // which are already final, so the whole pass is linear rather than quadratic.
+    // which are already final, so the whole pass is linear rather than quadratic. Shape is
+    // built the same way, one hop per direct child: two calls only merge into one flame box
+    // when they are the same method AND did the same thing underneath, so a loop that calls
+    // one method down two different branches stays two boxes rather than an averaged one.
     for (var j = flowNodes.length - 1; j >= 0; j--) {
       var n = flowNodes[j];
       var t = j + 1;
       var s = 1;
+      var shape = flowHash(n.key);
       while (t < flowNodes.length && flowNodes[t].depth > n.depth) {
+        shape = ((shape << 5) - shape + flowNodes[t].shape) | 0;
         s += flowNodes[t].span;
         t += flowNodes[t].span;
       }
       n.span = s;
+      n.shape = shape;
       flowBySeq[n.seq] = n;
       flowIdxBySeq[n.seq] = j;
     }
@@ -5302,6 +5562,7 @@ Press Enter to apply, Esc to cancel.">
    * a number that disagrees with what is on screen is worse than no number.
    */
   function updateFlowNote() {
+    if (flowChart) { updateChartNote(); return; }
     var shown = flowVisible.length;
     // Deliberately not naming a cause: SQL, grouping, a fold and the file picker can each
     // take steps out, often at the same time, and guessing which would sometimes be wrong.
@@ -5499,8 +5760,12 @@ Press Enter to apply, Esc to cancel.">
         while (j < flowNodes.length) {
           var m = flowNodes[j];
           // Adjacent in pre-order at the same depth under the same parent is exactly
-          // "next sibling", so no sibling list lookup is needed.
-          if (m.depth !== n.depth || m.parentSeq !== n.parentSeq || m.key !== n.key) break;
+          // "next sibling", so no sibling list lookup is needed. Shape, not just key: two
+          // calls to the same method only fold into one box when they did the same thing
+          // underneath, so a loop that branches internally stays visible as separate calls
+          // rather than being averaged into a single misleading box.
+          if (m.depth !== n.depth || m.parentSeq !== n.parentSeq || m.key !== n.key
+              || m.shape !== n.shape) break;
           if (!flowSql && m.isSql) break;
           reps++;
           sum += m.total;
@@ -5634,6 +5899,11 @@ Press Enter to apply, Esc to cancel.">
       sql: v('--sql-ink', '#ff9933'),
       hoverFill: dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.28)',
       badge: v('--badge-bg', '#ff9933'),
+      // Same tri-colour the Tree view marks line coverage with, reused so a step's colour
+      // in the API Flow chart means the same thing it does everywhere else in the report.
+      full: v('--full', '#2da44e'),
+      partial: v('--partial', '#bf8700'),
+      none: v('--none', '#cf4a4a'),
       // Statement syntax, the same tokens the tree colours a query with.
       tok: {
         kw: v('--k-kw', '#9b2393'),
@@ -5643,6 +5913,126 @@ Press Enter to apply, Esc to cancel.">
         ph: v('--k-ann', '#8a5a1a')
       }
     };
+  }
+
+  /**
+   * The worst line status inside one method: NONE beats PARTIAL beats FULL. A query has
+   * no lines of its own and is coloured separately, so this is never asked about one.
+   *
+   * <p>A node with no line data at all (source not exported, or the method has no lines
+   * the coverage pass tracked) defaults to FULL rather than NONE: it is on the executed
+   * call graph, so it ran, and "not touched" would say the opposite of what happened.
+   */
+  function rollupStatus(className, methodName) {
+    if (!className || !methodName) return 'FULL';
+    var lines = linesByMethod[className + '#' + methodName];
+    if (!lines || !lines.length) return 'FULL';
+    var worst = 'FULL';
+    for (var i = 0; i < lines.length; i++) {
+      var st = lines[i].status || 'NONE';
+      if (st === 'NONE') return 'NONE';
+      if (st === 'PARTIAL') worst = 'PARTIAL';
+    }
+    return worst;
+  }
+
+  /**
+   * Collapses {@link flowVisible} into the API Flow chart's graph: one node per distinct
+   * call site (the same {@code key} {@link buildFlow} already dedupes repeats with), one
+   * edge per distinct caller/callee pair, and the full visit sequence for the animation to
+   * walk. Rebuilt on every draw rather than cached: the node count is small (call sites,
+   * not calls), so redoing it is cheap next to what re-filtering the tree already costs.
+   */
+  function buildChart() {
+    chartByKey = {};
+    chartNodes = [];
+    chartEdges = [];
+    chartPath = [];
+    var edgeSeen = {};
+    var order = 0;
+    for (var i = 0; i < flowVisible.length; i++) {
+      var n = flowVisible[i];
+      var cn = chartByKey[n.key];
+      if (!cn) {
+        var raw = nodeBySeq[n.seq] || {};
+        cn = chartByKey[n.key] = {
+          key: n.key, isSql: n.isSql, sql: n.sql, cls: n.cls, mth: n.mth,
+          className: n.cname, methodName: raw.methodName,
+          status: n.isSql ? null : rollupStatus(n.cname, raw.methodName),
+          depth: n.depth, order: order++, firstSeq: n.seq,
+          n: 0, total: 0, recursive: false
+        };
+        chartNodes.push(cn);
+      }
+      cn.n++;
+      cn.total += n.total || 0;
+      chartPath.push(cn);
+      var pn = flowBySeq[n.parentSeq];
+      if (pn) {
+        if (pn.key === n.key) {
+          cn.recursive = true;
+        } else if (chartByKey[pn.key]) {
+          var ek = pn.key + '>' + n.key;
+          if (!edgeSeen[ek]) { edgeSeen[ek] = true; chartEdges.push({ from: pn.key, to: n.key }); }
+        }
+      }
+    }
+    // Sampled evenly rather than truncated, so a slow, rare tail step still gets a turn
+    // instead of the animation only ever showing the first slice of a huge run.
+    if (chartPath.length > CHART_MAX_PATH) {
+      var sampled = [];
+      var step = chartPath.length / CHART_MAX_PATH;
+      for (var p = 0; p < CHART_MAX_PATH; p++) sampled.push(chartPath[Math.floor(p * step)]);
+      sampled.push(chartPath[chartPath.length - 1]);
+      chartPath = sampled;
+    }
+    chartPlayIdx = Math.min(chartPlayIdx, Math.max(0, chartPath.length - 1));
+    chartProgress = 0;
+  }
+
+  /**
+   * Positions the chart's nodes: rows by first-seen call depth, columns by first-seen
+   * order within the row. No crossing-minimisation or force layout, deliberately: the
+   * node count here is call sites, not calls, and a simple deterministic grid is what
+   * "very lightweight" means for a diagram this small.
+   */
+  function layoutChart() {
+    var rows = {};
+    chartNodes.forEach(function (n) {
+      (rows[n.depth] || (rows[n.depth] = [])).push(n);
+    });
+    var rowDepths = Object.keys(rows).map(Number).sort(function (a, b) { return a - b; });
+    var maxRight = 0;
+    var y = CHART_PAD;
+    rowDepths.forEach(function (depth) {
+      var list = rows[depth].sort(function (a, b) { return a.order - b.order; });
+      var x = CHART_PAD;
+      list.forEach(function (n) {
+        n.x = x; n.y = y; n.w = CHART_NODE_W; n.h = CHART_NODE_H;
+        x += CHART_NODE_W + CHART_GAP_X;
+      });
+      if (x > maxRight) maxRight = x;
+      y += CHART_NODE_H + CHART_GAP_Y;
+    });
+    chartContentW = maxRight - CHART_GAP_X + CHART_PAD;
+    chartContentH = y - CHART_GAP_Y + CHART_PAD;
+    chartEdges.forEach(function (e) {
+      var a = chartByKey[e.from];
+      var b = chartByKey[e.to];
+      if (!a || !b) return;
+      e.x1 = a.x + a.w / 2; e.y1 = a.y + a.h;
+      e.x2 = b.x + b.w / 2; e.y2 = b.y;
+    });
+  }
+
+  function updateChartNote() {
+    var bits = [chartNodes.length + ' distinct step' + (chartNodes.length === 1 ? '' : 's')
+      + ' from ' + flowVisible.length + ' calls in this run'];
+    if (chartPath.length < flowVisible.length) {
+      bits.push('playback sampled to ' + chartPath.length + ' points so it stays watchable');
+    }
+    flowNote.textContent = bits.join(' · ') + '. '
+      + 'Click a step to jump to it in the Call Tree; use Play to animate the run.';
   }
 
   /**
@@ -5818,7 +6208,13 @@ Press Enter to apply, Esc to cancel.">
     var contentW;
     var contentH;
 
-    if (flowFlame) {
+    if (flowChart) {
+      buildChart();
+      layoutChart();
+      flowDrawn = chartNodes;
+      contentW = chartContentW;
+      contentH = chartContentH;
+    } else if (flowFlame) {
       layoutFlame(flowVisible);
 
       // Zoomed into a frame: a subtree is contiguous in pre-order, so the focused run is
@@ -5872,8 +6268,8 @@ Press Enter to apply, Esc to cancel.">
         // a gap between levels would break the column the eye follows from a callee back
         // down to whatever called it.
         var row = maxD - d;
-        n.y = FLOW_PAD + FLOW_RULER + row * FLOW_BOX;
-        n.h = FLOW_BOX;
+        n.y = FLOW_PAD + FLOW_RULER + row * FLAME_BOX;
+        n.h = FLAME_BOX;
         // Keyed by drawn row, not by depth: hit-testing and painting both work in screen
         // rows, and after the flip those are no longer the same number.
         (flowByDepth[row] || (flowByDepth[row] = [])).push(n);
@@ -5883,7 +6279,7 @@ Press Enter to apply, Esc to cancel.">
       flameSpan = span;
       flameTotal = total;
       contentW = FLOW_PAD * 2 + Math.max(span, laidW);
-      contentH = FLOW_PAD * 2 + FLOW_RULER + (maxD + 1) * FLOW_BOX;
+      contentH = FLOW_PAD * 2 + FLOW_RULER + (maxD + 1) * FLAME_BOX;
     } else {
       var slack = avail - FLOW_PAD * 2 - maxDepth * FLOW_INDENT;
       flowBoxW = Math.max(FLOW_MINW, Math.min(FLOW_MAXW, slack));
@@ -5922,8 +6318,11 @@ Press Enter to apply, Esc to cancel.">
     // runs whenever a file filter changes, so once the Flow tab had been opened the Code
     // Trace counter was overwritten with a step count on every keystroke.
     if (tab === 'flow') {
-      countEl.textContent = 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
-        + (flowNodes.length === 1 ? ' step' : ' steps');
+      countEl.textContent = flowChart
+        ? 'Showing ' + chartNodes.length + ' distinct step'
+          + (chartNodes.length === 1 ? '' : 's') + ' in this flow'
+        : 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
+          + (flowNodes.length === 1 ? ' step' : ' steps');
     }
 
     paintFlow();
@@ -6007,6 +6406,11 @@ Press Enter to apply, Esc to cancel.">
     ctx.font = FLOW_FONT;
     ctx.textBaseline = 'middle';
 
+    if (flowChart) {
+      renderChartFrame(ctx, c, x0, y0, x1, y1);
+      return;
+    }
+
     if (flowFlame) {
       // Only while the axis still means something. Once the floor has widened a frame past
       // its share, position no longer maps to time, and a ruler would be a scale printed
@@ -6016,8 +6420,8 @@ Press Enter to apply, Esc to cancel.">
       // so the band on screen is arithmetic and only the nodes actually in it are touched.
       // This used to walk the whole drawn array on every scroll and every hover, which on a
       // 200,000-step run meant 200,000 rejections per repaint to move one highlight.
-      var r0 = Math.max(0, Math.floor((y0 - FLOW_PAD - FLOW_RULER) / FLOW_BOX));
-      var r1 = Math.floor((y1 - FLOW_PAD - FLOW_RULER) / FLOW_BOX);
+      var r0 = Math.max(0, Math.floor((y0 - FLOW_PAD - FLOW_RULER) / FLAME_BOX));
+      var r1 = Math.floor((y1 - FLOW_PAD - FLOW_RULER) / FLAME_BOX);
       for (var r = r0; r <= r1; r++) {
         var list = flowByDepth[r];
         if (!list) continue;
@@ -6286,6 +6690,139 @@ Press Enter to apply, Esc to cancel.">
     return text.slice(0, lo) + '…';
   }
 
+  function renderChartFrame(ctx, c, x0, y0, x1, y1) {
+    ctx.strokeStyle = c.line;
+    ctx.lineWidth = 1.5;
+    for (var i = 0; i < chartEdges.length; i++) {
+      var e = chartEdges[i];
+      if (e.x1 == null) continue;
+      if (Math.max(e.x1, e.x2) < x0 || Math.min(e.x1, e.x2) > x1) continue;
+      if (Math.max(e.y1, e.y2) < y0 || Math.min(e.y1, e.y2) > y1) continue;
+      drawChartEdge(ctx, c, e);
+    }
+    ctx.lineWidth = 1;
+    ctx.font = FLOW_FONT;
+    for (var k = 0; k < chartNodes.length; k++) {
+      var n = chartNodes[k];
+      if (n.x + n.w < x0 || n.x > x1 || n.y + n.h < y0 || n.y > y1) continue;
+      drawChartNode(ctx, c, n);
+    }
+    drawChartMarker(ctx, c);
+  }
+
+  /** A caller-to-callee connector: down, across, down, with an arrowhead on the callee. */
+  function drawChartEdge(ctx, c, e) {
+    var midY = (e.y1 + e.y2) / 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(e.x1) + 0.5, Math.round(e.y1) + 0.5);
+    ctx.lineTo(Math.round(e.x1) + 0.5, Math.round(midY) + 0.5);
+    ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(midY) + 0.5);
+    ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(e.y2) + 0.5);
+    ctx.stroke();
+    var ah = 5;
+    ctx.beginPath();
+    ctx.moveTo(e.x2, e.y2);
+    ctx.lineTo(e.x2 - ah, e.y2 - ah);
+    ctx.lineTo(e.x2 + ah, e.y2 - ah);
+    ctx.closePath();
+    ctx.fillStyle = c.line;
+    ctx.fill();
+  }
+
+  function chartNodeFill(c, n) {
+    if (n.isSql) return c.sql;
+    if (n.status === 'NONE') return c.none;
+    if (n.status === 'PARTIAL') return c.partial;
+    return c.full;
+  }
+
+  function drawChartNode(ctx, c, n) {
+    var over = chartHoverKey === n.key;
+    var fill = chartNodeFill(c, n);
+
+    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+    ctx.fillStyle = c.box;
+    ctx.fill();
+
+    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    if (over) {
+      roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+      ctx.fillStyle = c.hoverFill;
+      ctx.fill();
+    }
+
+    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+    ctx.strokeStyle = over ? c.fg : fill;
+    ctx.lineWidth = over ? 2 : 1.5;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    var mid = n.y + n.h / 2;
+    var pad = 8;
+    var right = n.x + n.w - pad;
+
+    if (n.n > 1) {
+      var rep = '×' + n.n;
+      var repW = ctx.measureText(rep).width;
+      ctx.fillStyle = c.badge;
+      ctx.fillText(rep, right - repW, mid);
+      right -= repW + 6;
+    }
+    if (n.recursive) {
+      var loop = '↻';
+      var loopW = ctx.measureText(loop).width;
+      ctx.fillStyle = c.accent;
+      ctx.fillText(loop, right - loopW, mid);
+      right -= loopW + 6;
+    }
+
+    var x = n.x + pad;
+    var room = right - x;
+    if (room <= 0) return;
+    if (n.isSql) {
+      ctx.fillStyle = c.sql;
+      ctx.fillText(clip(ctx, n.mth, room), x, mid);
+      return;
+    }
+    var clsW = Math.min(ctx.measureText(n.cls).width, room);
+    ctx.fillStyle = c.cls;
+    ctx.fillText(clip(ctx, n.cls, room), x, mid);
+    if (room - clsW > 8) {
+      ctx.fillStyle = c.mth;
+      ctx.fillText(clip(ctx, n.mth, room - clsW), x + clsW, mid);
+    }
+  }
+
+  /** Where the marker sits right now: on a node when idle, sliding along an edge mid-step. */
+  function chartMarkerPos() {
+    if (!chartPath.length) return null;
+    var a = chartPath[chartPlayIdx];
+    var b = chartPath[Math.min(chartPlayIdx + 1, chartPath.length - 1)];
+    var ax = a.x + a.w / 2, ay = a.y + a.h / 2;
+    var bx = b.x + b.w / 2, by = b.y + b.h / 2;
+    var t = chartProgress;
+    return { x: ax + (bx - ax) * t, y: ay + (by - ay) * t, node: t < 0.5 ? a : b };
+  }
+
+  function drawChartMarker(ctx, c) {
+    var pos = chartMarkerPos();
+    if (!pos) return;
+    roundRect(ctx, pos.x - CHART_DOT_R, pos.y - CHART_DOT_R, CHART_DOT_R * 2, CHART_DOT_R * 2, CHART_DOT_R);
+    ctx.fillStyle = c.accent;
+    ctx.fill();
+    roundRect(ctx, pos.x - CHART_DOT_R - 2, pos.y - CHART_DOT_R - 2,
+      CHART_DOT_R * 2 + 4, CHART_DOT_R * 2 + 4, CHART_DOT_R + 2);
+    ctx.strokeStyle = c.bg;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
   function flowHit(e) {
     // The canvas covers the viewport, not the diagram, so its own top-left is wherever the
     // wrap happens to be scrolled to. Adding the scroll offset puts the pointer back into
@@ -6293,10 +6830,19 @@ Press Enter to apply, Esc to cancel.">
     var r = flowCanvas.getBoundingClientRect();
     var x = (e.clientX - r.left + flowWrap.scrollLeft) / flowScale;
     var y = (e.clientY - r.top + flowWrap.scrollTop) / flowScale;
+    if (flowChart) {
+      // Not sorted by y (chart nodes are pushed in first-appearance order, not row order),
+      // and small enough — call sites, not calls — that a linear scan costs nothing.
+      for (var ci = 0; ci < chartNodes.length; ci++) {
+        var cn = chartNodes[ci];
+        if (x >= cn.x && x <= cn.x + cn.w && y >= cn.y && y <= cn.y + cn.h) return cn;
+      }
+      return null;
+    }
     var list;
     if (flowFlame) {
       // One row per depth there, so the band narrows the search to a single level.
-      list = flowByDepth[Math.floor((y - FLOW_PAD - FLOW_RULER) / FLOW_BOX)] || [];
+      list = flowByDepth[Math.floor((y - FLOW_PAD - FLOW_RULER) / FLAME_BOX)] || [];
     } else {
       // Rows are not a fixed pitch once a query occupies several lines, so the row is
       // found by bisecting on y rather than dividing by it.
@@ -6329,6 +6875,11 @@ Press Enter to apply, Esc to cancel.">
   function onFlowClick(e) {
     var n = flowHit(e);
     if (!n) return;
+    if (flowChart) {
+      hideFlowTip();
+      goToStep(n.firstSeq);
+      return;
+    }
     if (flowFlame) {
       // Clicking the frame you are already zoomed into steps back out to its parent.
       flameRoot = (flameRoot === n.seq)
@@ -6384,9 +6935,42 @@ Press Enter to apply, Esc to cancel.">
     return b;
   }
 
+  function onChartMove(n, e) {
+    if (chartHoverKey !== n.key) { chartHoverKey = n.key; paintFlow(); }
+    flowCanvas.style.cursor = 'pointer';
+    flowTip.textContent = '';
+    if (n.isSql) {
+      var q = el('div', 't-sql');
+      paintSql(q, n.sql);
+      flowTip.appendChild(q);
+    } else {
+      flowTip.appendChild(el('div', 't-sig', (n.cls || '') + (n.mth || '')));
+    }
+    var facts = [];
+    if (n.n > 1) facts.push('called ' + n.n + '× in this run');
+    facts.push(fmtPct(n.total) + ' altogether');
+    if (!n.isSql) {
+      facts.push(n.status === 'FULL' ? 'fully executed'
+        : n.status === 'PARTIAL' ? 'only some branches taken' : 'not fully executed');
+    }
+    if (n.recursive) facts.push('calls itself');
+    flowTip.appendChild(el('div', 't-stat', facts.join(' · ')));
+    flowTip.appendChild(el('div', 't-sub', 'click to jump to this step in the Call Tree'));
+    flowTip.hidden = false;
+    var w = flowTip.offsetWidth;
+    var h = flowTip.offsetHeight;
+    var left = e.clientX + 14;
+    var top = e.clientY + 16;
+    if (left + w > window.innerWidth - 8) left = e.clientX - w - 14;
+    if (top + h > window.innerHeight - 8) top = e.clientY - h - 16;
+    flowTip.style.left = Math.max(8, left) + 'px';
+    flowTip.style.top = Math.max(8, top) + 'px';
+  }
+
   function onFlowMove(e) {
     var n = flowHit(e);
     if (!n) { hideFlowTip(); return; }
+    if (flowChart) { onChartMove(n, e); return; }
     if (flowHover !== n.seq) {
       // Repaint only on a change of box. Every pixel of movement would otherwise redraw
       // the whole canvas, and the highlight is the only thing that differs.
@@ -6448,6 +7032,7 @@ Press Enter to apply, Esc to cancel.">
   function hideFlowTip() {
     flowTip.hidden = true;
     if (flowHover !== null) { flowHover = null; if (flowBuilt) paintFlow(); }
+    if (chartHoverKey !== null) { chartHoverKey = null; if (flowBuilt) paintFlow(); }
   }
 
   function flowToggle(btn, get, set) {
@@ -6462,8 +7047,90 @@ Press Enter to apply, Esc to cancel.">
   flowToggle(flowGroupBtn, function () { return flowGroup; }, function (v) { flowGroup = v; });
   flowToggle(flowHotBtn, function () { return flowHot; }, function (v) { flowHot = v; });
   flowToggle(flowFlameBtn, function () { return flowFlame; },
-    function (v) { flowFlame = v; if (!v) flameRoot = null; });
+    function (v) {
+      flowFlame = v;
+      if (!v) flameRoot = null;
+      if (v && flowChart) setFlowChart(false);
+    });
   flowToggle(flowFitBtn, function () { return flowFit; }, function (v) { flowFit = v; });
+
+  /** Stops the marker animation and puts the Play button back to its resting state. */
+  function stopChartAnim() {
+    chartPlaying = false;
+    if (chartRAF) { cancelAnimationFrame(chartRAF); chartRAF = 0; }
+    chartLastTick = 0;
+    syncChartPlayBtn();
+  }
+
+  function syncChartPlayBtn() {
+    if (!chartPlayBtn) return;
+    chartPlayBtn.innerHTML = chartPlaying ? '&#9208;' : '&#9654;';
+    chartPlayBtn.title = chartPlaying ? 'Pause' : 'Play the run through the flowchart';
+    chartPlayBtn.classList.toggle('on', chartPlaying);
+  }
+
+  /**
+   * Advances the marker one animation frame and repaints. requestAnimationFrame rather
+   * than setInterval, so a backgrounded tab throttles or stops the animation on its own
+   * instead of racking up ticks nobody sees.
+   */
+  function chartTick(ts) {
+    if (!chartPlaying) { chartRAF = 0; return; }
+    if (!chartLastTick) chartLastTick = ts;
+    var dt = ts - chartLastTick;
+    chartLastTick = ts;
+    var stepMs = CHART_STEP_MS / chartSpeed;
+    chartProgress += dt / stepMs;
+    while (chartProgress >= 1 && chartPlayIdx < chartPath.length - 1) {
+      chartProgress -= 1;
+      chartPlayIdx++;
+    }
+    if (chartPlayIdx >= chartPath.length - 1) {
+      chartProgress = 0;
+      stopChartAnim();
+    }
+    paintFlow();
+    if (chartPlaying) chartRAF = requestAnimationFrame(chartTick);
+  }
+
+  /** Turns the API Flow chart on or off, mutually exclusive with Flame. */
+  function setFlowChart(on) {
+    flowChart = on;
+    flowChartBtn.classList.toggle('on', on);
+    if (on && flowFlame) { flowFlame = false; flameRoot = null; flowFlameBtn.classList.remove('on'); }
+    stopChartAnim();
+    chartPlayIdx = 0;
+    chartProgress = 0;
+    chartPlaySeg.hidden = !on;
+    chartSpeedSel.hidden = !on;
+    hideFlowTip();
+    drawFlow();
+  }
+  flowChartBtn.addEventListener('click', function () { setFlowChart(!flowChart); });
+
+  chartPlayBtn.addEventListener('click', function () {
+    if (!chartPath.length) return;
+    if (chartPlaying) {
+      stopChartAnim();
+      return;
+    }
+    if (chartPlayIdx >= chartPath.length - 1) { chartPlayIdx = 0; chartProgress = 0; }
+    chartPlaying = true;
+    chartLastTick = 0;
+    syncChartPlayBtn();
+    chartRAF = requestAnimationFrame(chartTick);
+  });
+
+  chartResetBtn.addEventListener('click', function () {
+    stopChartAnim();
+    chartPlayIdx = 0;
+    chartProgress = 0;
+    paintFlow();
+  });
+
+  chartSpeedSel.addEventListener('change', function () {
+    chartSpeed = parseFloat(chartSpeedSel.value) || 1;
+  });
 
   /** Applies a new pattern. Returns whether anything actually changed. */
   function setFlowFilter(text) {

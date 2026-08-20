@@ -6,7 +6,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
@@ -17,23 +19,34 @@ import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import org.deju.plugin.DejuSettings;
 import org.deju.plugin.contract.DejuPayload;
 import org.deju.plugin.contract.PayloadCodec;
 
 /**
- * Keeps the last {@value #CAPACITY} executions as {@code .idea/deju/exec-1.json} …
- * {@code exec-5.json} in a ring buffer (oldest dropped), with a small index persisted
- * in the workspace file.
+ * Keeps the last {@link DejuSettings#historyCapacity} executions as
+ * {@code .idea/deju/exec-1.json} … {@code exec-<n>.json} in a ring buffer, with a small
+ * index persisted in the workspace file. Oldest unpinned entry dropped first; see
+ * {@link #nextSlot()}.
  *
- * <p><b>Security:</b> filenames are fixed integers 1..{@value #CAPACITY}. A path is
- * <i>never</i> derived from socket/payload data, so a hostile payload cannot cause a
- * write outside {@code .idea/deju/} (no path traversal).
+ * <p>The configured capacity can change at any time (a settings edit), independent of a
+ * recording landing, so nothing here assumes {@code entries.size()} is already within
+ * bounds; {@link #trimToCurrentCapacity()} is what enforces it, called both eagerly from
+ * the settings page and lazily from every {@link #add}.
+ *
+ * <p><b>Security:</b> filenames are fixed integers 1..{@value #MAX_CAPACITY}, the hard
+ * ceiling the configurable capacity is clamped within. A path is <i>never</i> derived
+ * from socket/payload data, so a hostile payload cannot cause a write outside
+ * {@code .idea/deju/} (no path traversal), and this stays true whatever the user sets
+ * the capacity to.
  */
 @State(name = "DejuExecutionHistory", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
 public final class DejuHistoryStore
         implements PersistentStateComponent<DejuHistoryStore.IndexState> {
 
-    public static final int CAPACITY = 5;
+    public static final int MIN_CAPACITY = 1;
+    /** Hard ceiling: how the "1..N" filenames stay a small, fixed, safe range. */
+    public static final int MAX_CAPACITY = 25;
     private static final Logger LOG = Logger.getInstance(DejuHistoryStore.class);
 
     /** Serializable index (bean). */
@@ -53,9 +66,16 @@ public final class DejuHistoryStore
         return project.getService(DejuHistoryStore.class);
     }
 
+    /** The configured capacity, clamped to {@link #MIN_CAPACITY}..{@link #MAX_CAPACITY}. */
+    public static int capacity() {
+        int configured = DejuSettings.getInstance().historyCapacity;
+        return Math.max(MIN_CAPACITY, Math.min(MAX_CAPACITY, configured));
+    }
+
     /** Persists a payload into the next ring slot and returns its index entry. */
     public synchronized ExecutionEntry add(DejuPayload payload) throws IOException {
-        int slot = (int) (state.writeCount % CAPACITY) + 1; // 1..CAPACITY
+        trimToCurrentCapacity();
+        int slot = nextSlot();
         state.writeCount++;
 
         Path file = slotFile(slot);
@@ -71,17 +91,109 @@ public final class DejuHistoryStore
                 payload.totalLines(),
                 payload.getAgentVersion());
 
-        // Drop any previous entry occupying this slot, then push to the front, cap at CAPACITY.
+        // Drop any previous entry occupying this slot, then push to the front. entries can
+        // never exceed capacity() afterwards: nextSlot() only ever names a slot within it
+        // (trimToCurrentCapacity above already made room), and the removeIf means at most
+        // one entry claims any given slot.
         state.entries.removeIf(e -> e.slot == slot);
         state.entries.add(0, entry);
-        while (state.entries.size() > CAPACITY) {
-            state.entries.remove(state.entries.size() - 1);
-        }
         return entry;
+    }
+
+    /**
+     * Which slot a new recording claims: the oldest free one within the current capacity,
+     * or — once every one of those has been used — the oldest <em>unpinned</em> entry's
+     * slot, so pinning protects a run from the ordinary churn of new recordings landing.
+     *
+     * <p>If every slot is pinned there is nowhere unpinned left to take, and refusing to
+     * record would lose a run that just finished for a reason nothing on screen explains.
+     * Reusing the single oldest entry's slot instead means pinning everything only ever
+     * costs you your oldest pin, never a silently dropped recording.
+     */
+    private int nextSlot() {
+        int cap = capacity();
+        Set<Integer> used = new HashSet<>();
+        for (ExecutionEntry e : state.entries) {
+            used.add(e.slot);
+        }
+        for (int s = 1; s <= cap; s++) {
+            if (!used.contains(s)) {
+                return s;
+            }
+        }
+        // entries is most-recent-first, so the tail is the oldest. A pinned survivor from
+        // before a capacity decrease can carry a slot number above the current cap; such an
+        // entry is never picked here (trimToCurrentCapacity is what removes it, on count,
+        // not on slot number), so this can still return a slot fresh out of nextSlot's own
+        // 1..cap range only via the entries actually holding one.
+        for (int i = state.entries.size() - 1; i >= 0; i--) {
+            if (!state.entries.get(i).pinned && state.entries.get(i).slot <= cap) {
+                return state.entries.get(i).slot;
+            }
+        }
+        for (int i = state.entries.size() - 1; i >= 0; i--) {
+            if (state.entries.get(i).slot <= cap) {
+                return state.entries.get(i).slot;
+            }
+        }
+        // Every entry (if any) sits at a slot above the current cap, left over from a
+        // capacity decrease trimToCurrentCapacity hasn't caught up with yet: slot 1 is
+        // always safe to claim since nothing in-range currently holds it.
+        return 1;
+    }
+
+    /**
+     * Evicts down to the current capacity — oldest unpinned first, a pin as only a last
+     * resort — deleting the underlying files. Called before anything that assumes
+     * {@code entries.size()} is already within bounds: the configured capacity can shrink
+     * at any time, independent of a recording.
+     */
+    public synchronized void trimToCurrentCapacity() {
+        int cap = capacity();
+        while (state.entries.size() > cap) {
+            int idx = -1;
+            for (int i = state.entries.size() - 1; i >= 0; i--) {
+                if (!state.entries.get(i).pinned) {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx < 0) {
+                idx = state.entries.size() - 1; // every remaining entry is pinned
+            }
+            ExecutionEntry victim = state.entries.remove(idx);
+            try {
+                Files.deleteIfExists(slotFile(victim.slot));
+            } catch (IOException e) {
+                LOG.warn("Failed to delete execution " + victim.slot, e);
+            }
+        }
     }
 
     public synchronized List<ExecutionEntry> entries() {
         return new ArrayList<>(state.entries);
+    }
+
+    /** Pins or unpins one stored execution, protecting (or no longer protecting) it from
+     *  being overwritten by {@link #nextSlot()} once every slot has been used at least once. */
+    public synchronized void setPinned(int slot, boolean pinned) {
+        for (ExecutionEntry e : state.entries) {
+            if (e.slot == slot) {
+                e.pinned = pinned;
+                return;
+            }
+        }
+    }
+
+    /** Sets or clears a user-chosen display name for one stored execution. */
+    public synchronized void rename(int slot, String label) {
+        String trimmed = label == null ? "" : label.trim();
+        for (ExecutionEntry e : state.entries) {
+            if (e.slot == slot) {
+                e.label = trimmed;
+                return;
+            }
+        }
     }
 
     /** Deletes one stored execution: its index entry and its {@code exec-<slot>.json} file. */
@@ -98,7 +210,10 @@ public final class DejuHistoryStore
     public synchronized void deleteAll() {
         state.entries.clear();
         state.writeCount = 0;
-        for (int slot = 1; slot <= CAPACITY; slot++) {
+        // MAX_CAPACITY, not the current (possibly lower) capacity: a run left over from
+        // before a decrease can still occupy a slot above today's setting, and "delete all"
+        // should mean all.
+        for (int slot = 1; slot <= MAX_CAPACITY; slot++) {
             try {
                 Files.deleteIfExists(slotFile(slot));
             } catch (IOException e) {
@@ -107,9 +222,9 @@ public final class DejuHistoryStore
         }
     }
 
-    /** Loads a stored payload by its fixed slot (1..{@value #CAPACITY}). */
+    /** Loads a stored payload by its fixed slot (1..{@value #MAX_CAPACITY}). */
     public @Nullable DejuPayload load(int slot) {
-        if (slot < 1 || slot > CAPACITY) {
+        if (slot < 1 || slot > MAX_CAPACITY) {
             return null; // never trust an out-of-range slot
         }
         Path file = slotFile(slot);
