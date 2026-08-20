@@ -567,6 +567,7 @@ def main():
         "target": "com.example.order.OrderController#placeOrder",
         "startedAtIso": "2026-07-31T09:24:18.221Z",
         "durationMs": 48,
+        "cpuMicros": 43100,  # mostly CPU-bound: a little wait on the DB pool, no real I/O stall
         "projectName": PROJECT,
         "files": build_files(),
         "calls": encode_calls(build_calls()),

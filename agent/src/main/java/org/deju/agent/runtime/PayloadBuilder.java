@@ -36,6 +36,7 @@ final class PayloadBuilder {
         // -javaagent jar is loaded once at process start and nothing refreshes it in place.
         payload.setAgentVersion(AgentVersion.get());
         payload.setDurationMs(s.durationMs());
+        payload.setCpuMicros(s.cpuMicros());
 
         // (methodGid,line) -> number of distinct branch edges taken.
         Map<Long, Integer> coveredByLine = new HashMap<>();

@@ -278,6 +278,27 @@
     return p > 0 ? '<0.1%' : '0%';
   }
 
+  /** The same share as {@link pct}, as a raw 0..100 number for driving a CSS bar width. */
+  function pctNum(micros) {
+    if (!(runMicrosTotal > 0) || micros == null) return 0;
+    return Math.max(0, Math.min(100, (micros / runMicrosTotal) * 100));
+  }
+
+  /**
+   * A share badge with a fill bar behind it, the Glowroot-style read-at-a-glance version
+   * of {@link pct}. Only used on the Tree's frame rows (method calls, SQL), where every
+   * badge sits in the same {@code .ftime} slot and so shares a comparable track width;
+   * the Files gutter and the Timeline (which already has its own proportional bar) do not
+   * get this treatment.
+   */
+  function pctBadge(micros) {
+    var p = pct(micros);
+    if (!p) return null;
+    var b = el('span', 'fpct bar', p);
+    b.style.setProperty('--fpct-fill', pctNum(micros) + '%');
+    return b;
+  }
+
   /** Time and share together, the form used wherever both fit on one line. */
   function fmtPct(micros) {
     var p = pct(micros);
@@ -1188,8 +1209,8 @@
     if (node.totalMicros != null) {
       var time = el('span', 'ftime', fmt(node.totalMicros));
       time.title = 'time spent executing this query';
-      var qp = pct(node.totalMicros);
-      if (qp) time.appendChild(el('span', 'fpct', qp));
+      var qp = pctBadge(node.totalMicros);
+      if (qp) time.appendChild(qp);
       head.appendChild(time);
     }
     td.appendChild(head);
@@ -1266,8 +1287,8 @@
     time.title = 'total (inclusive) time of this call';
     // The share rides inside the time element rather than beside it, so the two never wrap
     // apart and the number keeps its own meaning: "48 ms, which is a third of the request".
-    var fp = pct(node.totalMicros);
-    if (fp) time.appendChild(el('span', 'fpct', fp));
+    var fp = pctBadge(node.totalMicros);
+    if (fp) time.appendChild(fp);
     head.appendChild(time);
     head.appendChild(copyButton(function () { return frameAsText(node); }));
 
@@ -2444,16 +2465,18 @@
   var landedSeq = null;
   var landedTimer = 0;
 
+  /** How long the yellow outline (not the 1.6s background fade) marks the landed row. */
+  var LAND_BORDER_MS = 60_000;
+
   function landOn(seq) {
     landedSeq = seq;
     paintLanded();
     if (landedTimer) clearTimeout(landedTimer);
-    // Slightly longer than the CSS animation, so it can never be cleared mid-fade.
     landedTimer = setTimeout(function () {
       landedSeq = null;
       landedTimer = 0;
       paintLanded();
-    }, 1800);
+    }, LAND_BORDER_MS);
   }
 
   /** Puts the mark on the row holding landedSeq right now, and takes it off every other. */
@@ -2642,15 +2665,15 @@
       head: 'Layout', selects: [
         {
           key: 'openTab', label: 'Opens on', options: [
-            ['trace', 'Code Trace'], ['graph', 'Graph'], ['flow', 'Flow Graph'],
+            ['trace', 'Call Tree'], ['graph', 'Breakdown'], ['flow', 'Flame Graph'],
             ['timeline', 'Timeline'], ['findings', 'Findings']
           ], tabs: true
         },
-        { key: 'view', label: 'Code Trace view', options: [['tree', 'Tree'], ['files', 'Files']] },
+        { key: 'view', label: 'Call Tree view', options: [['tree', 'Tree'], ['files', 'Files']] },
         { key: 'density', label: 'Density', options: [['normal', 'Normal'], ['compact', 'Compact']] },
         { key: 'theme', label: 'Theme', options: [['auto', 'Follow my system'], ['light', 'Light'], ['dark', 'Dark']] }
       ],
-      note: 'Opens on and Code Trace view take effect the next time this report is opened.'
+      note: 'Opens on and Call Tree view take effect the next time this report is opened.'
     },
     {
       head: 'Starts folded', items: [
@@ -3053,6 +3076,17 @@
   var durationMs = data.durationMs || 0;
   summary.appendChild(stat(durationMs + ' ms', 'Total time',
     'wall time for the whole traced call', coarserThanMs(durationMs)));
+  // -1 means the JVM could not report per-thread CPU time (rare), or the connected agent
+  // predates this field; either way there is nothing honest to show, so it is left out
+  // rather than printed as a misleading 0.
+  if (data.cpuMicros != null && data.cpuMicros >= 0) {
+    var cpuMs = data.cpuMicros / 1000;
+    var cpuPct = durationMs > 0 ? Math.round(Math.min(100, (cpuMs / durationMs) * 100)) : null;
+    summary.appendChild(stat(fmt(data.cpuMicros), 'CPU time',
+      'CPU this thread actually burned during the call, as opposed to the wall time above.'
+      + ' The gap between them is time spent blocked: I/O, a lock, or another thread.',
+      cpuPct != null ? cpuPct + '% of wall' : null));
+  }
   if (treeAvailable) {
     summary.appendChild(stat(String(calls.length), calls.length === 1 ? 'Call' : 'Calls',
       'method invocations recorded, in execution order'));
@@ -3082,12 +3116,24 @@
   // ------------------------------------------------- sticky offset + startup ---
 
   var toolbar = byId('toolbar');
+  var metaBar = byId('meta');
   function measureToolbar() {
     document.documentElement.style.setProperty('--toolbarH', toolbar.offsetHeight + 'px');
   }
+  // The meta row sticks above the toolbar now that the tabs live in it, so anything that
+  // parks itself under the toolbar (sticky file headers) has to clear both.
+  function measureMeta() {
+    document.documentElement.style.setProperty('--metaH', metaBar.offsetHeight + 'px');
+  }
   measureToolbar();
-  if (window.ResizeObserver) new ResizeObserver(measureToolbar).observe(toolbar);
-  else window.addEventListener('resize', measureToolbar);
+  measureMeta();
+  if (window.ResizeObserver) {
+    new ResizeObserver(measureToolbar).observe(toolbar);
+    new ResizeObserver(measureMeta).observe(metaBar);
+  } else {
+    window.addEventListener('resize', measureToolbar);
+    window.addEventListener('resize', measureMeta);
+  }
 
   /* An older agent still loaded in the traced JVM is the usual reason a recording has no
      call tree, and it used to be completely invisible - the Tree button simply did nothing. */
@@ -3204,6 +3250,9 @@
     tabFlow.classList.toggle('on', next === 'flow');
     tabTimeline.classList.toggle('on', next === 'timeline');
     tabFindings.classList.toggle('on', next === 'findings');
+    // The marker's rAF loop paints the flow canvas every frame; nothing needs that while
+    // another tab is in front, and the canvas it targets may be mid-resize on the way back.
+    if (next !== 'flow') stopChartAnim();
     tracePanel.hidden = next !== 'trace';
     graphPanel.hidden = next !== 'graph';
     flowPanel.hidden = next !== 'flow';
@@ -3416,13 +3465,61 @@
       }
       row.appendChild(caret);
 
+      // Toggles the full-text block: the formatted statement for a query, or the
+      // fully-qualified signature for everything else, since the name column truncates
+      // long ones. Shared by the name itself and its button, so clicking either does it —
+      // the name is the bigger, easier target; the button is there so it can still be found
+      // once "sql"/"expand" is the only label left, with no row of text around it.
+      function toggleFull() {
+        var already = row.querySelector('.tlfull');
+        if (already) { row.removeChild(already); return; }
+        if (r.isSql) {
+          var pre = el('pre', 'tlfull');
+          paintSql(pre, nodeBySeq[r.seq] && nodeBySeq[r.seq].sql);
+          row.appendChild(pre);
+        } else {
+          var node = nodeBySeq[r.seq];
+          var full = node
+            ? (node.className || '') + '.' + methodLabel(node.methodName, node.className) + '()'
+            : r.label;
+          row.appendChild(el('pre', 'tlfull', full));
+        }
+      }
+
       var name = el('div', 'tlname');
       name.style.setProperty('--depth', Math.min(r.depth, 12));
       name.appendChild(document.createTextNode(r.label));
       name.title = r.sub + '\nstep ' + (r.seq + 1) + ' · starts at ' + fmt(r.t0)
         + ' · total ' + fmtPct(r.total) + ' · own ' + fmtPct(r.own);
-      name.addEventListener('click', function () { goToStep(r.seq); });
+      name.addEventListener('click', toggleFull);
       row.appendChild(name);
+
+      // Two more things a reader wants from a row here: the line that made the call, and
+      // the step itself in the tree. Kept beside the name rather than off at the far edge
+      // of what is often a very wide row, so reaching them is not a trip across the bars
+      // and times.
+      var acts = el('div', 'tlacts');
+      var url = callSiteUrl(r.seq);
+      if (url) {
+        var open = el('a', null, 'line');
+        open.href = url;
+        open.title = 'Open the calling line in the IDE';
+        open.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        acts.appendChild(open);
+      }
+      var fullBtn = el('button', null, r.isSql ? 'sql' : 'expand');
+      fullBtn.type = 'button';
+      fullBtn.title = r.isSql
+        ? 'Show the statement, formatted and coloured'
+        : 'Show the full, fully-qualified line';
+      fullBtn.addEventListener('click', function (ev) { ev.stopPropagation(); toggleFull(); });
+      acts.appendChild(fullBtn);
+      var step = el('button', null, 'step');
+      step.type = 'button';
+      step.title = 'Show this step in the Call Tree';
+      step.addEventListener('click', function (ev) { ev.stopPropagation(); goToStep(r.seq); });
+      acts.appendChild(step);
+      row.appendChild(acts);
 
       var track = el('div', 'tltrack');
       var bar = el('i', 'tlbar');
@@ -3441,40 +3538,6 @@
       var op = pct(r.own);
       if (op) time.appendChild(el('span', 'fpct', op));
       row.appendChild(time);
-
-      // Three things a reader wants from a row here, none of which used to be reachable
-      // from it: the line that made the call, the statement behind a query, and the step
-      // itself in the tree. The whole row was one click that did the last of those, which
-      // left no room for the other two.
-      var acts = el('div', 'tlacts');
-      var url = callSiteUrl(r.seq);
-      if (url) {
-        var open = el('a', null, 'line');
-        open.href = url;
-        open.title = 'Open the calling line in the IDE';
-        open.addEventListener('click', function (ev) { ev.stopPropagation(); });
-        acts.appendChild(open);
-      }
-      if (r.isSql) {
-        var sqlBtn = el('button', null, 'sql');
-        sqlBtn.type = 'button';
-        sqlBtn.title = 'Show the statement, formatted and coloured';
-        sqlBtn.addEventListener('click', function (ev) {
-          ev.stopPropagation();
-          var already = row.querySelector('.tlsql');
-          if (already) { row.removeChild(already); return; }
-          var pre = el('pre', 'tlsql');
-          paintSql(pre, nodeBySeq[r.seq] && nodeBySeq[r.seq].sql);
-          row.appendChild(pre);
-        });
-        acts.appendChild(sqlBtn);
-      }
-      var step = el('button', null, 'step');
-      step.type = 'button';
-      step.title = 'Show this step in the Code Trace';
-      step.addEventListener('click', function (ev) { ev.stopPropagation(); goToStep(r.seq); });
-      acts.appendChild(step);
-      row.appendChild(acts);
 
       frag.appendChild(row);
     });
@@ -3826,11 +3889,16 @@
   var graphRows = [];
   var graphSql = true;
   var graphAll = false;
+  // The Timers-panel read Glowroot opens on: the same bars, keyed by method instead of
+  // file, so "which method is the bottleneck" doesn't require opening a file first to
+  // find out it has six of them and only one is slow.
+  var graphByMethod = false;
   var graphBody = byId('graphBody');
   var graphEmpty = byId('graphEmpty');
   var graphNote = byId('graphNote');
   var graphSqlBtn = byId('graphSqlBtn');
   var graphAllBtn = byId('graphAllBtn');
+  var graphMethodBtn = byId('graphMethodBtn');
 
   /**
    * Time per file, split into the file's own code and the SQL it caused.
@@ -3842,7 +3910,61 @@
    * belongs to no file at all, because a SQL frame has no class. So each statement is
    * charged to the method that issued it, which is the line a reader would go and change.
    */
-  function buildGraph() {
+  /**
+   * Charges one query to the row it belongs on, and grows that row's N+1 detector.
+   * Identical between the two grouping modes — a repeated statement is a repeated
+   * statement whether the bar above it says "OrderRepository.java" or "save()".
+   */
+  function chargeSql(r, c) {
+    r.sql += c.totalMicros || 0;
+    r.queries++;
+    var key = String(c.sql).replace(/\s+/g, ' ').trim().toLowerCase();
+    var g = r.dups[key];
+    if (!g) g = r.dups[key] = { n: 0, micros: 0, sql: String(c.sql).replace(/\s+/g, ' ').trim() };
+    g.n++;
+    g.micros += c.totalMicros || 0;
+  }
+
+  /** The worst-repeat-per-row pass and the note line, shared by both grouping modes. */
+  function finishGraphRows(orphanSql, unit) {
+    var worst = null;
+    graphRows.forEach(function (r) {
+      Object.keys(r.dups).forEach(function (k) {
+        var g = r.dups[k];
+        if (g.n < 2) return;
+        if (!r.dup || g.n > r.dup.n) r.dup = g;
+        if (!worst || g.n > worst.g.n) worst = { g: g, label: r.label };
+      });
+    });
+
+    var noteBits = [];
+    if (worst) {
+      noteBits.push('Possible N+1: ' + worst.g.n + ' identical queries from '
+        + worst.label + ' costing ' + fmt(worst.g.micros) + ' in total.');
+    }
+    if (orphanSql > 0) {
+      noteBits.push(fmt(orphanSql) + ' of SQL could not be charged to a ' + unit
+        + ', its caller is not in this report.');
+    }
+    if (data.callsTruncated) {
+      noteBits.push('The call list was truncated when this run was recorded, so SQL '
+        + 'totals are a lower bound.');
+    }
+    graphNote.textContent = noteBits.join(' ');
+    graphNote.hidden = noteBits.length === 0;
+  }
+
+  /**
+   * Time per file, split into the file's own code and the SQL it caused.
+   *
+   * Only methodSelfMicros is additive. A method's total time contains everything it
+   * called, so adding totals up would count the same microseconds once for every frame
+   * on the stack and make whichever file sits nearest the entry point look like the
+   * bottleneck. Self time alone, though, hides the database completely: a query's time
+   * belongs to no file at all, because a SQL frame has no class. So each statement is
+   * charged to the method that issued it, which is the line a reader would go and change.
+   */
+  function buildGraphByFile() {
     var byClass = {};
     files.forEach(function (f) { byClass[f.fqClassName] = f; });
 
@@ -3857,7 +3979,7 @@
         r = rows[key] = {
           label: f.sourceFileName || simpleName(f.fqClassName) || key,
           sub: f.path || '',
-          self: 0,
+          self: 0, total: 0, calls: 0,
           sql: 0,
           queries: 0,
           dups: {},      // normalised statement -> { n, micros, sql }
@@ -3882,45 +4004,72 @@
       // has no file to land on. Counting it against some other file would be a lie, so it
       // is reported separately instead.
       if (!f) { orphanSql += c.totalMicros || 0; return; }
-      var r = rowFor(f);
-      r.sql += c.totalMicros || 0;
-      r.queries++;
-      // Identical statements issued from one file are the signature of an N+1: a loop
-      // that queries once per row instead of once for the set. Whitespace and case are
-      // normalised so the same statement built two ways still groups.
-      var key = String(c.sql).replace(/\s+/g, ' ').trim().toLowerCase();
-      var g = r.dups[key];
-      if (!g) g = r.dups[key] = { n: 0, micros: 0, sql: String(c.sql).replace(/\s+/g, ' ').trim() };
-      g.n++;
-      g.micros += c.totalMicros || 0;
+      chargeSql(rowFor(f), c);
     });
 
-    // Worst repeat per file, and the run-wide worst for the note line.
-    var worst = null;
-    graphRows.forEach(function (r) {
-      Object.keys(r.dups).forEach(function (k) {
-        var g = r.dups[k];
-        if (g.n < 2) return;
-        if (!r.dup || g.n > r.dup.n) r.dup = g;
-        if (!worst || g.n > worst.g.n) worst = { g: g, file: r.label };
+    finishGraphRows(orphanSql, 'file');
+  }
+
+  /**
+   * Time per method: the same bars as {@link buildGraphByFile}, but the row a reader
+   * actually wants when a file turns out to have five methods and only one of them is
+   * slow. Self and total both come straight off {@code linesByMethod}, already summed
+   * across every invocation of that method by the agent (see Session.methodNanos); the
+   * call count is the one thing not already there, so it is the only pass over calls[].
+   */
+  function buildGraphByMethod() {
+    var rows = {};
+    function rowFor(key, cls, mth) {
+      var r = rows[key];
+      if (!r) {
+        r = rows[key] = {
+          label: (mth || '?') + '()',
+          sub: simpleName(cls) || cls || '',
+          self: 0, total: 0, calls: 0,
+          sql: 0,
+          queries: 0,
+          dups: {},
+          dup: null
+        };
+        graphRows.push(r);
+      }
+      return r;
+    }
+
+    Object.keys(linesByMethod).forEach(function (key) {
+      var hash = key.lastIndexOf('#');
+      var cls = key.slice(0, hash);
+      var mth = key.slice(hash + 1);
+      var r = rowFor(key, cls, mth);
+      linesByMethod[key].forEach(function (l) {
+        if (l.methodSelfMicros != null) r.self = l.methodSelfMicros;
+        if (l.methodTotalMicros != null) r.total = l.methodTotalMicros;
       });
     });
 
-    var noteBits = [];
-    if (worst) {
-      noteBits.push('Possible N+1: ' + worst.g.n + ' identical queries from '
-        + worst.file + ' costing ' + fmt(worst.g.micros) + ' in total.');
-    }
-    if (orphanSql > 0) {
-      noteBits.push(fmt(orphanSql) + ' of SQL could not be charged to a file, its caller '
-        + 'is not in this report.');
-    }
-    if (data.callsTruncated) {
-      noteBits.push('The call list was truncated when this run was recorded, so SQL '
-        + 'totals are a lower bound.');
-    }
-    graphNote.textContent = noteBits.join(' ');
-    graphNote.hidden = noteBits.length === 0;
+    var orphanSql = 0;
+    calls.forEach(function (c) {
+      if (c.sql) {
+        var parent = nodeBySeq[c.parentSeq];
+        var pkey = parent && parent.className && parent.methodName
+          ? parent.className + '#' + parent.methodName : null;
+        var pr = pkey ? rows[pkey] : null;
+        if (!pr) { orphanSql += c.totalMicros || 0; return; }
+        chargeSql(pr, c);
+        return;
+      }
+      if (c.className == null || c.methodName == null) return;
+      var r = rows[c.className + '#' + c.methodName];
+      if (r) r.calls++;
+    });
+
+    finishGraphRows(orphanSql, 'method');
+  }
+
+  function buildGraph() {
+    graphRows = [];
+    if (graphByMethod) buildGraphByMethod();
+    else buildGraphByFile();
   }
 
   function renderGraph() {
@@ -3936,10 +4085,12 @@
       return (b.self + (useSql ? b.sql : 0)) - (a.self + (useSql ? a.sql : 0));
     });
 
+    var unit = graphByMethod ? 'method' : 'file';
+
     graphEmpty.hidden = rows.length > 0;
     graphAllBtn.hidden = rows.length <= GRAPH_TOP;
     graphAllBtn.classList.toggle('on', graphAll);
-    graphAllBtn.textContent = graphAll ? 'Show top ' + GRAPH_TOP : 'Show all files';
+    graphAllBtn.textContent = graphAll ? 'Show top ' + GRAPH_TOP : 'Show all ' + unit + 's';
 
     var shown = (graphAll || rows.length <= GRAPH_TOP) ? rows : rows.slice(0, GRAPH_TOP);
     var peak = 0;
@@ -3984,12 +4135,15 @@
       row.appendChild(bar);
 
       var meta = el('div', 'graphmeta');
+      if (graphByMethod && r.calls > 0) {
+        meta.appendChild(el('span', 'qcount', r.calls + (r.calls === 1 ? ' call' : ' calls')));
+      }
       if (r.queries > 0) {
         meta.appendChild(el('span', 'qcount', r.queries + (r.queries === 1 ? ' query' : ' queries')));
       }
       if (r.dup) {
         var pill = el('span', 'nplus1', '×' + r.dup.n);
-        pill.title = r.dup.n + ' identical queries from this file, ' + fmt(r.dup.micros)
+        pill.title = r.dup.n + ' identical queries from this ' + unit + ', ' + fmt(r.dup.micros)
           + ' in total — often a query inside a loop:\n\n' + r.dup.sql;
         meta.appendChild(pill);
       }
@@ -4001,6 +4155,12 @@
         time.appendChild(document.createTextNode(
           '  ' + ((total / grand) * 100).toFixed(1) + '%'));
       }
+      // Total (inclusive) time only means something once it stands alone against this one
+      // method's own self+SQL — summed across different methods on a stack it would double
+      // count, which is exactly why the bar above never uses it.
+      if (graphByMethod && r.total > total) {
+        time.appendChild(el('span', 'gtotal', fmt(r.total) + ' total'));
+      }
       row.appendChild(time);
 
       frag.appendChild(row);
@@ -4008,7 +4168,7 @@
 
     graphBody.textContent = '';
     graphBody.appendChild(frag);
-    countEl.textContent = rows.length + (rows.length === 1 ? ' file' : ' files')
+    countEl.textContent = rows.length + (rows.length === 1 ? ' ' + unit : ' ' + unit + 's')
       + ' · ' + fmt(grand) + ' attributed';
   }
 
@@ -4021,18 +4181,26 @@
     graphAll = !graphAll;
     renderGraph();
   });
+  graphMethodBtn.addEventListener('click', function () {
+    graphByMethod = !graphByMethod;
+    graphMethodBtn.classList.toggle('on', graphByMethod);
+    graphMethodBtn.textContent = graphByMethod ? 'By file' : 'By method';
+    graphAll = false;
+    buildGraph();
+    renderGraph();
+  });
 
   // ------------------------------------------------------------ flow graph ---
 
   var FLOW_ROW = 26;           // vertical pitch of one call
-  var FLOW_BOX = 20;           // box height inside that pitch
+  var FLOW_BOX = 20;           // box height inside that pitch, in the Tree layout
+  var FLAME_BOX = 25;          // row height in the Flame layout
   var FLOW_INDENT = 22;        // horizontal step per depth level
   var FLOW_PAD = 14;
   var FLOW_MINW = 150;
   var FLOW_MAXW = 460;
   var FLOW_GAP = 6;            // space between two boxes in tree mode
   var FLOW_LINE = 15;          // line height inside a multi-line SQL box
-  var FLOW_SQL_MAX = 8;        // clause lines shown before a statement is cut off
   var FLOW_SQL_FONT = '11px ui-monospace,SFMono-Regular,Menlo,monospace';
   /**
    * The face every frame label is drawn in.
@@ -4059,6 +4227,11 @@
   var flowGroupBtn = byId('flowGroupBtn');
   var flowHotBtn = byId('flowHotBtn');
   var flowFlameBtn = byId('flowFlameBtn');
+  var flowChartBtn = byId('flowChartBtn');
+  var chartPlaySeg = byId('chartPlaySeg');
+  var chartPlayBtn = byId('chartPlayBtn');
+  var chartResetBtn = byId('chartResetBtn');
+  var chartSpeedSel = byId('chartSpeedSel');
   var flowCrumb = byId('flowCrumb');
   var flowFitBtn = byId('flowFitBtn');
   var flowOutBtn = byId('flowOutBtn');
@@ -4087,7 +4260,7 @@
   var flameRoot = null;        // seq the flame view is zoomed into, null for the whole run
   var collapsedFlow = {};      // seq -> true, subtree folded away by a click
   var flowSql = true;
-  var flowGroup = false;
+  var flowGroup = true;
   var flowHot = false;
   /* Shared by the Flow Graph and the Timeline, so the two never disagree about whether the
      data classes are on screen. Off by default: excluding a type is a statement that it is
@@ -4126,6 +4299,35 @@
     if (b) b.addEventListener('click', function () { setShowExcluded(!showExcluded); });
   });
   var flowFlame = false;
+
+  // -------------------------------------------------------------- API Flow chart ---
+  // A separate, lightweight layout: one box per distinct call site (not per raw call,
+  // which would be a hairball on any real trace), boxes arranged by nesting depth and
+  // joined by their real caller/callee edges, coloured by the same coverage rollup the
+  // Tree view uses. A marker walks the edges in actual execution order to animate it.
+  var flowChart = false;
+  var chartNodes = [];      // deduped: {key, cls, mth, isSql, sql, status, x,y,w,h, n, total, order, depth}
+  var chartByKey = {};
+  var chartEdges = [];      // {from, to, x1,y1,x2,y2}
+  var chartPath = [];       // chartNodes entries, one per visit, in execution order (sampled if huge)
+  var chartContentW = 0;
+  var chartContentH = 0;
+  var chartHoverKey = null;
+  var chartPlaying = false;
+  var chartPlayIdx = 0;
+  var chartProgress = 0;    // 0..1 along the edge from chartPath[chartPlayIdx] to the next
+  var chartSpeed = 1;
+  var chartRAF = 0;
+  var chartLastTick = 0;
+  var CHART_STEP_MS = 500;  // time to cross one edge at 1x speed
+  var CHART_MAX_PATH = 4000; // playback is sampled down past this so it finishes in a sane time
+  var CHART_PAD = 24;
+  var CHART_NODE_W = 200;
+  var CHART_NODE_H = 34;
+  var CHART_GAP_X = 34;
+  var CHART_GAP_Y = 54;
+  var CHART_DOT_R = 6;
+
   /**
    * Narrowest a flame frame may be drawn, in pixels.
    *
@@ -4136,7 +4338,7 @@
    */
   var flameMinW = 1;
   var flameWidened = false;   // true once the floor has had to stretch the diagram
-  var flowFit = false;
+  var flowFit = true;
   var flowHover = null;        // seq under the cursor, for the highlight
   var flameSpan = 0;           // pixel width of the time axis, for the ruler
   var flameTotal = 0;          // micros that width represents
@@ -4144,6 +4346,13 @@
   var flowScale = 1;
   var flowBoxW = 320;
   var flowRootTotal = 0;
+
+  /** 32-bit djb2, used only to tell two subtrees apart, never to identify one on its own. */
+  function flowHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return h;
+  }
 
   /**
    * Flattens the call tree into a pre-order array with subtree sizes.
@@ -4190,8 +4399,10 @@
         // Queries are laid out on their clause lines in the box itself rather than
         // abbreviated to a hover: the statement IS the step, and a select trimmed at
         // forty characters tells you nothing about the where clause that made it slow.
+        // Uncapped: the box that draws these grows to fit them (nodeHeight), so cutting
+        // the list here would hide clauses the layout had already made room for.
         sqlLines: c.sql
-          ? formatSqlLines(tokenizeSql(splitSqlLead(c.sql).sql)).slice(0, FLOW_SQL_MAX)
+          ? formatSqlLines(tokenizeSql(splitSqlLead(c.sql).sql))
           : null,
         span: 1
       });
@@ -4201,16 +4412,22 @@
       }
     }
     // Subtree sizes, backwards. Each node hops its direct children by their own spans,
-    // which are already final, so the whole pass is linear rather than quadratic.
+    // which are already final, so the whole pass is linear rather than quadratic. Shape is
+    // built the same way, one hop per direct child: two calls only merge into one flame box
+    // when they are the same method AND did the same thing underneath, so a loop that calls
+    // one method down two different branches stays two boxes rather than an averaged one.
     for (var j = flowNodes.length - 1; j >= 0; j--) {
       var n = flowNodes[j];
       var t = j + 1;
       var s = 1;
+      var shape = flowHash(n.key);
       while (t < flowNodes.length && flowNodes[t].depth > n.depth) {
+        shape = ((shape << 5) - shape + flowNodes[t].shape) | 0;
         s += flowNodes[t].span;
         t += flowNodes[t].span;
       }
       n.span = s;
+      n.shape = shape;
       flowBySeq[n.seq] = n;
       flowIdxBySeq[n.seq] = j;
     }
@@ -4257,6 +4474,7 @@
    * a number that disagrees with what is on screen is worse than no number.
    */
   function updateFlowNote() {
+    if (flowChart) { updateChartNote(); return; }
     var shown = flowVisible.length;
     // Deliberately not naming a cause: SQL, grouping, a fold and the file picker can each
     // take steps out, often at the same time, and guessing which would sometimes be wrong.
@@ -4454,8 +4672,12 @@
         while (j < flowNodes.length) {
           var m = flowNodes[j];
           // Adjacent in pre-order at the same depth under the same parent is exactly
-          // "next sibling", so no sibling list lookup is needed.
-          if (m.depth !== n.depth || m.parentSeq !== n.parentSeq || m.key !== n.key) break;
+          // "next sibling", so no sibling list lookup is needed. Shape, not just key: two
+          // calls to the same method only fold into one box when they did the same thing
+          // underneath, so a loop that branches internally stays visible as separate calls
+          // rather than being averaged into a single misleading box.
+          if (m.depth !== n.depth || m.parentSeq !== n.parentSeq || m.key !== n.key
+              || m.shape !== n.shape) break;
           if (!flowSql && m.isSql) break;
           reps++;
           sum += m.total;
@@ -4589,6 +4811,11 @@
       sql: v('--sql-ink', '#ff9933'),
       hoverFill: dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.28)',
       badge: v('--badge-bg', '#ff9933'),
+      // Same tri-colour the Tree view marks line coverage with, reused so a step's colour
+      // in the API Flow chart means the same thing it does everywhere else in the report.
+      full: v('--full', '#2da44e'),
+      partial: v('--partial', '#bf8700'),
+      none: v('--none', '#cf4a4a'),
       // Statement syntax, the same tokens the tree colours a query with.
       tok: {
         kw: v('--k-kw', '#9b2393'),
@@ -4598,6 +4825,126 @@
         ph: v('--k-ann', '#8a5a1a')
       }
     };
+  }
+
+  /**
+   * The worst line status inside one method: NONE beats PARTIAL beats FULL. A query has
+   * no lines of its own and is coloured separately, so this is never asked about one.
+   *
+   * <p>A node with no line data at all (source not exported, or the method has no lines
+   * the coverage pass tracked) defaults to FULL rather than NONE: it is on the executed
+   * call graph, so it ran, and "not touched" would say the opposite of what happened.
+   */
+  function rollupStatus(className, methodName) {
+    if (!className || !methodName) return 'FULL';
+    var lines = linesByMethod[className + '#' + methodName];
+    if (!lines || !lines.length) return 'FULL';
+    var worst = 'FULL';
+    for (var i = 0; i < lines.length; i++) {
+      var st = lines[i].status || 'NONE';
+      if (st === 'NONE') return 'NONE';
+      if (st === 'PARTIAL') worst = 'PARTIAL';
+    }
+    return worst;
+  }
+
+  /**
+   * Collapses {@link flowVisible} into the API Flow chart's graph: one node per distinct
+   * call site (the same {@code key} {@link buildFlow} already dedupes repeats with), one
+   * edge per distinct caller/callee pair, and the full visit sequence for the animation to
+   * walk. Rebuilt on every draw rather than cached: the node count is small (call sites,
+   * not calls), so redoing it is cheap next to what re-filtering the tree already costs.
+   */
+  function buildChart() {
+    chartByKey = {};
+    chartNodes = [];
+    chartEdges = [];
+    chartPath = [];
+    var edgeSeen = {};
+    var order = 0;
+    for (var i = 0; i < flowVisible.length; i++) {
+      var n = flowVisible[i];
+      var cn = chartByKey[n.key];
+      if (!cn) {
+        var raw = nodeBySeq[n.seq] || {};
+        cn = chartByKey[n.key] = {
+          key: n.key, isSql: n.isSql, sql: n.sql, cls: n.cls, mth: n.mth,
+          className: n.cname, methodName: raw.methodName,
+          status: n.isSql ? null : rollupStatus(n.cname, raw.methodName),
+          depth: n.depth, order: order++, firstSeq: n.seq,
+          n: 0, total: 0, recursive: false
+        };
+        chartNodes.push(cn);
+      }
+      cn.n++;
+      cn.total += n.total || 0;
+      chartPath.push(cn);
+      var pn = flowBySeq[n.parentSeq];
+      if (pn) {
+        if (pn.key === n.key) {
+          cn.recursive = true;
+        } else if (chartByKey[pn.key]) {
+          var ek = pn.key + '>' + n.key;
+          if (!edgeSeen[ek]) { edgeSeen[ek] = true; chartEdges.push({ from: pn.key, to: n.key }); }
+        }
+      }
+    }
+    // Sampled evenly rather than truncated, so a slow, rare tail step still gets a turn
+    // instead of the animation only ever showing the first slice of a huge run.
+    if (chartPath.length > CHART_MAX_PATH) {
+      var sampled = [];
+      var step = chartPath.length / CHART_MAX_PATH;
+      for (var p = 0; p < CHART_MAX_PATH; p++) sampled.push(chartPath[Math.floor(p * step)]);
+      sampled.push(chartPath[chartPath.length - 1]);
+      chartPath = sampled;
+    }
+    chartPlayIdx = Math.min(chartPlayIdx, Math.max(0, chartPath.length - 1));
+    chartProgress = 0;
+  }
+
+  /**
+   * Positions the chart's nodes: rows by first-seen call depth, columns by first-seen
+   * order within the row. No crossing-minimisation or force layout, deliberately: the
+   * node count here is call sites, not calls, and a simple deterministic grid is what
+   * "very lightweight" means for a diagram this small.
+   */
+  function layoutChart() {
+    var rows = {};
+    chartNodes.forEach(function (n) {
+      (rows[n.depth] || (rows[n.depth] = [])).push(n);
+    });
+    var rowDepths = Object.keys(rows).map(Number).sort(function (a, b) { return a - b; });
+    var maxRight = 0;
+    var y = CHART_PAD;
+    rowDepths.forEach(function (depth) {
+      var list = rows[depth].sort(function (a, b) { return a.order - b.order; });
+      var x = CHART_PAD;
+      list.forEach(function (n) {
+        n.x = x; n.y = y; n.w = CHART_NODE_W; n.h = CHART_NODE_H;
+        x += CHART_NODE_W + CHART_GAP_X;
+      });
+      if (x > maxRight) maxRight = x;
+      y += CHART_NODE_H + CHART_GAP_Y;
+    });
+    chartContentW = maxRight - CHART_GAP_X + CHART_PAD;
+    chartContentH = y - CHART_GAP_Y + CHART_PAD;
+    chartEdges.forEach(function (e) {
+      var a = chartByKey[e.from];
+      var b = chartByKey[e.to];
+      if (!a || !b) return;
+      e.x1 = a.x + a.w / 2; e.y1 = a.y + a.h;
+      e.x2 = b.x + b.w / 2; e.y2 = b.y;
+    });
+  }
+
+  function updateChartNote() {
+    var bits = [chartNodes.length + ' distinct step' + (chartNodes.length === 1 ? '' : 's')
+      + ' from ' + flowVisible.length + ' calls in this run'];
+    if (chartPath.length < flowVisible.length) {
+      bits.push('playback sampled to ' + chartPath.length + ' points so it stays watchable');
+    }
+    flowNote.textContent = bits.join(' · ') + '. '
+      + 'Click a step to jump to it in the Call Tree; use Play to animate the run.';
   }
 
   /**
@@ -4773,7 +5120,13 @@
     var contentW;
     var contentH;
 
-    if (flowFlame) {
+    if (flowChart) {
+      buildChart();
+      layoutChart();
+      flowDrawn = chartNodes;
+      contentW = chartContentW;
+      contentH = chartContentH;
+    } else if (flowFlame) {
       layoutFlame(flowVisible);
 
       // Zoomed into a frame: a subtree is contiguous in pre-order, so the focused run is
@@ -4827,8 +5180,8 @@
         // a gap between levels would break the column the eye follows from a callee back
         // down to whatever called it.
         var row = maxD - d;
-        n.y = FLOW_PAD + FLOW_RULER + row * FLOW_BOX;
-        n.h = FLOW_BOX;
+        n.y = FLOW_PAD + FLOW_RULER + row * FLAME_BOX;
+        n.h = FLAME_BOX;
         // Keyed by drawn row, not by depth: hit-testing and painting both work in screen
         // rows, and after the flip those are no longer the same number.
         (flowByDepth[row] || (flowByDepth[row] = [])).push(n);
@@ -4838,7 +5191,7 @@
       flameSpan = span;
       flameTotal = total;
       contentW = FLOW_PAD * 2 + Math.max(span, laidW);
-      contentH = FLOW_PAD * 2 + FLOW_RULER + (maxD + 1) * FLOW_BOX;
+      contentH = FLOW_PAD * 2 + FLOW_RULER + (maxD + 1) * FLAME_BOX;
     } else {
       var slack = avail - FLOW_PAD * 2 - maxDepth * FLOW_INDENT;
       flowBoxW = Math.max(FLOW_MINW, Math.min(FLOW_MAXW, slack));
@@ -4877,8 +5230,11 @@
     // runs whenever a file filter changes, so once the Flow tab had been opened the Code
     // Trace counter was overwritten with a step count on every keystroke.
     if (tab === 'flow') {
-      countEl.textContent = 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
-        + (flowNodes.length === 1 ? ' step' : ' steps');
+      countEl.textContent = flowChart
+        ? 'Showing ' + chartNodes.length + ' distinct step'
+          + (chartNodes.length === 1 ? '' : 's') + ' in this flow'
+        : 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
+          + (flowNodes.length === 1 ? ' step' : ' steps');
     }
 
     paintFlow();
@@ -4962,6 +5318,11 @@
     ctx.font = FLOW_FONT;
     ctx.textBaseline = 'middle';
 
+    if (flowChart) {
+      renderChartFrame(ctx, c, x0, y0, x1, y1);
+      return;
+    }
+
     if (flowFlame) {
       // Only while the axis still means something. Once the floor has widened a frame past
       // its share, position no longer maps to time, and a ruler would be a scale printed
@@ -4971,8 +5332,8 @@
       // so the band on screen is arithmetic and only the nodes actually in it are touched.
       // This used to walk the whole drawn array on every scroll and every hover, which on a
       // 200,000-step run meant 200,000 rejections per repaint to move one highlight.
-      var r0 = Math.max(0, Math.floor((y0 - FLOW_PAD - FLOW_RULER) / FLOW_BOX));
-      var r1 = Math.floor((y1 - FLOW_PAD - FLOW_RULER) / FLOW_BOX);
+      var r0 = Math.max(0, Math.floor((y0 - FLOW_PAD - FLOW_RULER) / FLAME_BOX));
+      var r1 = Math.floor((y1 - FLOW_PAD - FLOW_RULER) / FLAME_BOX);
       for (var r = r0; r <= r1; r++) {
         var list = flowByDepth[r];
         if (!list) continue;
@@ -5241,6 +5602,139 @@
     return text.slice(0, lo) + '…';
   }
 
+  function renderChartFrame(ctx, c, x0, y0, x1, y1) {
+    ctx.strokeStyle = c.line;
+    ctx.lineWidth = 1.5;
+    for (var i = 0; i < chartEdges.length; i++) {
+      var e = chartEdges[i];
+      if (e.x1 == null) continue;
+      if (Math.max(e.x1, e.x2) < x0 || Math.min(e.x1, e.x2) > x1) continue;
+      if (Math.max(e.y1, e.y2) < y0 || Math.min(e.y1, e.y2) > y1) continue;
+      drawChartEdge(ctx, c, e);
+    }
+    ctx.lineWidth = 1;
+    ctx.font = FLOW_FONT;
+    for (var k = 0; k < chartNodes.length; k++) {
+      var n = chartNodes[k];
+      if (n.x + n.w < x0 || n.x > x1 || n.y + n.h < y0 || n.y > y1) continue;
+      drawChartNode(ctx, c, n);
+    }
+    drawChartMarker(ctx, c);
+  }
+
+  /** A caller-to-callee connector: down, across, down, with an arrowhead on the callee. */
+  function drawChartEdge(ctx, c, e) {
+    var midY = (e.y1 + e.y2) / 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(e.x1) + 0.5, Math.round(e.y1) + 0.5);
+    ctx.lineTo(Math.round(e.x1) + 0.5, Math.round(midY) + 0.5);
+    ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(midY) + 0.5);
+    ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(e.y2) + 0.5);
+    ctx.stroke();
+    var ah = 5;
+    ctx.beginPath();
+    ctx.moveTo(e.x2, e.y2);
+    ctx.lineTo(e.x2 - ah, e.y2 - ah);
+    ctx.lineTo(e.x2 + ah, e.y2 - ah);
+    ctx.closePath();
+    ctx.fillStyle = c.line;
+    ctx.fill();
+  }
+
+  function chartNodeFill(c, n) {
+    if (n.isSql) return c.sql;
+    if (n.status === 'NONE') return c.none;
+    if (n.status === 'PARTIAL') return c.partial;
+    return c.full;
+  }
+
+  function drawChartNode(ctx, c, n) {
+    var over = chartHoverKey === n.key;
+    var fill = chartNodeFill(c, n);
+
+    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+    ctx.fillStyle = c.box;
+    ctx.fill();
+
+    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    if (over) {
+      roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+      ctx.fillStyle = c.hoverFill;
+      ctx.fill();
+    }
+
+    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+    ctx.strokeStyle = over ? c.fg : fill;
+    ctx.lineWidth = over ? 2 : 1.5;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    var mid = n.y + n.h / 2;
+    var pad = 8;
+    var right = n.x + n.w - pad;
+
+    if (n.n > 1) {
+      var rep = '×' + n.n;
+      var repW = ctx.measureText(rep).width;
+      ctx.fillStyle = c.badge;
+      ctx.fillText(rep, right - repW, mid);
+      right -= repW + 6;
+    }
+    if (n.recursive) {
+      var loop = '↻';
+      var loopW = ctx.measureText(loop).width;
+      ctx.fillStyle = c.accent;
+      ctx.fillText(loop, right - loopW, mid);
+      right -= loopW + 6;
+    }
+
+    var x = n.x + pad;
+    var room = right - x;
+    if (room <= 0) return;
+    if (n.isSql) {
+      ctx.fillStyle = c.sql;
+      ctx.fillText(clip(ctx, n.mth, room), x, mid);
+      return;
+    }
+    var clsW = Math.min(ctx.measureText(n.cls).width, room);
+    ctx.fillStyle = c.cls;
+    ctx.fillText(clip(ctx, n.cls, room), x, mid);
+    if (room - clsW > 8) {
+      ctx.fillStyle = c.mth;
+      ctx.fillText(clip(ctx, n.mth, room - clsW), x + clsW, mid);
+    }
+  }
+
+  /** Where the marker sits right now: on a node when idle, sliding along an edge mid-step. */
+  function chartMarkerPos() {
+    if (!chartPath.length) return null;
+    var a = chartPath[chartPlayIdx];
+    var b = chartPath[Math.min(chartPlayIdx + 1, chartPath.length - 1)];
+    var ax = a.x + a.w / 2, ay = a.y + a.h / 2;
+    var bx = b.x + b.w / 2, by = b.y + b.h / 2;
+    var t = chartProgress;
+    return { x: ax + (bx - ax) * t, y: ay + (by - ay) * t, node: t < 0.5 ? a : b };
+  }
+
+  function drawChartMarker(ctx, c) {
+    var pos = chartMarkerPos();
+    if (!pos) return;
+    roundRect(ctx, pos.x - CHART_DOT_R, pos.y - CHART_DOT_R, CHART_DOT_R * 2, CHART_DOT_R * 2, CHART_DOT_R);
+    ctx.fillStyle = c.accent;
+    ctx.fill();
+    roundRect(ctx, pos.x - CHART_DOT_R - 2, pos.y - CHART_DOT_R - 2,
+      CHART_DOT_R * 2 + 4, CHART_DOT_R * 2 + 4, CHART_DOT_R + 2);
+    ctx.strokeStyle = c.bg;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
   function flowHit(e) {
     // The canvas covers the viewport, not the diagram, so its own top-left is wherever the
     // wrap happens to be scrolled to. Adding the scroll offset puts the pointer back into
@@ -5248,10 +5742,19 @@
     var r = flowCanvas.getBoundingClientRect();
     var x = (e.clientX - r.left + flowWrap.scrollLeft) / flowScale;
     var y = (e.clientY - r.top + flowWrap.scrollTop) / flowScale;
+    if (flowChart) {
+      // Not sorted by y (chart nodes are pushed in first-appearance order, not row order),
+      // and small enough — call sites, not calls — that a linear scan costs nothing.
+      for (var ci = 0; ci < chartNodes.length; ci++) {
+        var cn = chartNodes[ci];
+        if (x >= cn.x && x <= cn.x + cn.w && y >= cn.y && y <= cn.y + cn.h) return cn;
+      }
+      return null;
+    }
     var list;
     if (flowFlame) {
       // One row per depth there, so the band narrows the search to a single level.
-      list = flowByDepth[Math.floor((y - FLOW_PAD - FLOW_RULER) / FLOW_BOX)] || [];
+      list = flowByDepth[Math.floor((y - FLOW_PAD - FLOW_RULER) / FLAME_BOX)] || [];
     } else {
       // Rows are not a fixed pitch once a query occupies several lines, so the row is
       // found by bisecting on y rather than dividing by it.
@@ -5284,6 +5787,11 @@
   function onFlowClick(e) {
     var n = flowHit(e);
     if (!n) return;
+    if (flowChart) {
+      hideFlowTip();
+      goToStep(n.firstSeq);
+      return;
+    }
     if (flowFlame) {
       // Clicking the frame you are already zoomed into steps back out to its parent.
       flameRoot = (flameRoot === n.seq)
@@ -5339,9 +5847,42 @@
     return b;
   }
 
+  function onChartMove(n, e) {
+    if (chartHoverKey !== n.key) { chartHoverKey = n.key; paintFlow(); }
+    flowCanvas.style.cursor = 'pointer';
+    flowTip.textContent = '';
+    if (n.isSql) {
+      var q = el('div', 't-sql');
+      paintSql(q, n.sql);
+      flowTip.appendChild(q);
+    } else {
+      flowTip.appendChild(el('div', 't-sig', (n.cls || '') + (n.mth || '')));
+    }
+    var facts = [];
+    if (n.n > 1) facts.push('called ' + n.n + '× in this run');
+    facts.push(fmtPct(n.total) + ' altogether');
+    if (!n.isSql) {
+      facts.push(n.status === 'FULL' ? 'fully executed'
+        : n.status === 'PARTIAL' ? 'only some branches taken' : 'not fully executed');
+    }
+    if (n.recursive) facts.push('calls itself');
+    flowTip.appendChild(el('div', 't-stat', facts.join(' · ')));
+    flowTip.appendChild(el('div', 't-sub', 'click to jump to this step in the Call Tree'));
+    flowTip.hidden = false;
+    var w = flowTip.offsetWidth;
+    var h = flowTip.offsetHeight;
+    var left = e.clientX + 14;
+    var top = e.clientY + 16;
+    if (left + w > window.innerWidth - 8) left = e.clientX - w - 14;
+    if (top + h > window.innerHeight - 8) top = e.clientY - h - 16;
+    flowTip.style.left = Math.max(8, left) + 'px';
+    flowTip.style.top = Math.max(8, top) + 'px';
+  }
+
   function onFlowMove(e) {
     var n = flowHit(e);
     if (!n) { hideFlowTip(); return; }
+    if (flowChart) { onChartMove(n, e); return; }
     if (flowHover !== n.seq) {
       // Repaint only on a change of box. Every pixel of movement would otherwise redraw
       // the whole canvas, and the highlight is the only thing that differs.
@@ -5403,6 +5944,7 @@
   function hideFlowTip() {
     flowTip.hidden = true;
     if (flowHover !== null) { flowHover = null; if (flowBuilt) paintFlow(); }
+    if (chartHoverKey !== null) { chartHoverKey = null; if (flowBuilt) paintFlow(); }
   }
 
   function flowToggle(btn, get, set) {
@@ -5417,8 +5959,90 @@
   flowToggle(flowGroupBtn, function () { return flowGroup; }, function (v) { flowGroup = v; });
   flowToggle(flowHotBtn, function () { return flowHot; }, function (v) { flowHot = v; });
   flowToggle(flowFlameBtn, function () { return flowFlame; },
-    function (v) { flowFlame = v; if (!v) flameRoot = null; });
+    function (v) {
+      flowFlame = v;
+      if (!v) flameRoot = null;
+      if (v && flowChart) setFlowChart(false);
+    });
   flowToggle(flowFitBtn, function () { return flowFit; }, function (v) { flowFit = v; });
+
+  /** Stops the marker animation and puts the Play button back to its resting state. */
+  function stopChartAnim() {
+    chartPlaying = false;
+    if (chartRAF) { cancelAnimationFrame(chartRAF); chartRAF = 0; }
+    chartLastTick = 0;
+    syncChartPlayBtn();
+  }
+
+  function syncChartPlayBtn() {
+    if (!chartPlayBtn) return;
+    chartPlayBtn.innerHTML = chartPlaying ? '&#9208;' : '&#9654;';
+    chartPlayBtn.title = chartPlaying ? 'Pause' : 'Play the run through the flowchart';
+    chartPlayBtn.classList.toggle('on', chartPlaying);
+  }
+
+  /**
+   * Advances the marker one animation frame and repaints. requestAnimationFrame rather
+   * than setInterval, so a backgrounded tab throttles or stops the animation on its own
+   * instead of racking up ticks nobody sees.
+   */
+  function chartTick(ts) {
+    if (!chartPlaying) { chartRAF = 0; return; }
+    if (!chartLastTick) chartLastTick = ts;
+    var dt = ts - chartLastTick;
+    chartLastTick = ts;
+    var stepMs = CHART_STEP_MS / chartSpeed;
+    chartProgress += dt / stepMs;
+    while (chartProgress >= 1 && chartPlayIdx < chartPath.length - 1) {
+      chartProgress -= 1;
+      chartPlayIdx++;
+    }
+    if (chartPlayIdx >= chartPath.length - 1) {
+      chartProgress = 0;
+      stopChartAnim();
+    }
+    paintFlow();
+    if (chartPlaying) chartRAF = requestAnimationFrame(chartTick);
+  }
+
+  /** Turns the API Flow chart on or off, mutually exclusive with Flame. */
+  function setFlowChart(on) {
+    flowChart = on;
+    flowChartBtn.classList.toggle('on', on);
+    if (on && flowFlame) { flowFlame = false; flameRoot = null; flowFlameBtn.classList.remove('on'); }
+    stopChartAnim();
+    chartPlayIdx = 0;
+    chartProgress = 0;
+    chartPlaySeg.hidden = !on;
+    chartSpeedSel.hidden = !on;
+    hideFlowTip();
+    drawFlow();
+  }
+  flowChartBtn.addEventListener('click', function () { setFlowChart(!flowChart); });
+
+  chartPlayBtn.addEventListener('click', function () {
+    if (!chartPath.length) return;
+    if (chartPlaying) {
+      stopChartAnim();
+      return;
+    }
+    if (chartPlayIdx >= chartPath.length - 1) { chartPlayIdx = 0; chartProgress = 0; }
+    chartPlaying = true;
+    chartLastTick = 0;
+    syncChartPlayBtn();
+    chartRAF = requestAnimationFrame(chartTick);
+  });
+
+  chartResetBtn.addEventListener('click', function () {
+    stopChartAnim();
+    chartPlayIdx = 0;
+    chartProgress = 0;
+    paintFlow();
+  });
+
+  chartSpeedSel.addEventListener('change', function () {
+    chartSpeed = parseFloat(chartSpeedSel.value) || 1;
+  });
 
   /** Applies a new pattern. Returns whether anything actually changed. */
   function setFlowFilter(text) {

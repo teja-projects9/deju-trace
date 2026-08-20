@@ -87,7 +87,7 @@ public final class DejuDataInventory {
             Path runs = DejuHistoryStore.getInstance(project).dataDir();
             Sum s = measure(runs, ".json");
             items.add(new Item("Recorded runs",
-                    "For each of the last " + DejuHistoryStore.CAPACITY + " traced calls: class and"
+                    "For each of the last " + DejuHistoryStore.capacity() + " traced calls: class and"
                             + " source file names, which lines ran and their branch outcome, per-line"
                             + " and per-method timings, and the text of any SQL statement executed."
                             + " No variable values, no bound SQL parameters, and no source code.",

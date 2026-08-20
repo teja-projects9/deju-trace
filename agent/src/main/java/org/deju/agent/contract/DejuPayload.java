@@ -30,6 +30,9 @@ public class DejuPayload {
      */
     private String agentVersion;
     private long durationMs;
+    /** CPU nanos-turned-micros this thread burned during the session, or -1 if the JVM
+     *  could not report per-thread CPU time. */
+    private long cpuMicros = -1;
     private List<FileCoverage> files = new ArrayList<>();
     private List<CallNode> calls = new ArrayList<>();
     private boolean callsTruncated;
@@ -76,6 +79,14 @@ public class DejuPayload {
 
     public void setDurationMs(long durationMs) {
         this.durationMs = durationMs;
+    }
+
+    public long getCpuMicros() {
+        return cpuMicros;
+    }
+
+    public void setCpuMicros(long cpuMicros) {
+        this.cpuMicros = cpuMicros;
     }
 
     public List<FileCoverage> getFiles() {

@@ -212,6 +212,7 @@ public final class HtmlReportGenerator {
         model.put("target", payload.getTarget());
         model.put("startedAtIso", payload.getStartedAtIso());
         model.put("durationMs", payload.getDurationMs());
+        model.put("cpuMicros", payload.getCpuMicros());
         // Needed to build jetbrains://idea/navigate links, which address a file by the
         // name of the open project plus a project-relative path.
         model.put("projectName", project.getName());

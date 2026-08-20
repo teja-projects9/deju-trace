@@ -77,6 +77,40 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.2.0</b>: CPU time, comparing runs, and a flame graph that stays flat</p>
+        <ul>
+          <li><b>New: CPU time.</b> The summary bar now shows how much CPU this thread
+          actually burned during the call, beside the wall-clock duration, so a slow request
+          that was mostly waiting reads differently from one that was mostly computing.</li>
+          <li><b>New: Diff&hellip; compares any two recorded runs</b> &mdash; duration, CPU
+          and call-count deltas, the methods whose own time moved the most, and which lines'
+          coverage changed. Useful before/after a fix.</li>
+          <li><b>New: Copy as Markdown</b> puts a plain-text summary of a run &mdash;
+          duration, CPU split, duplicate-query check, coverage count &mdash; on the
+          clipboard, for pasting into a PR, an issue or a chat message.</li>
+          <li><b>New: Pin a run</b> to protect it from being overwritten once every history
+          slot has been used; <b>Rename&hellip;</b> gives it a name of your own instead of the
+          auto-generated one; the history list now has a <b>search box</b> to filter by
+          either.</li>
+          <li><b>New: history capacity is a setting</b>, 1&ndash;25 instead of a fixed 5, in
+          <b>Settings &rarr; Tools &rarr; Deju Trace</b>.</li>
+          <li><b>New: Breakdown can group by method</b> as well as by file, for when one
+          file's time really belongs to just one of its methods.</li>
+          <li><b>Fixed: the flame graph's horizontal scrollbar.</b> A loop calling the same
+          thing a thousand times used to draw a thousand boxes; identical repeats now fold
+          into one, marked with their count, the way Glowroot's does.</li>
+          <li><b>New: tabs sit beside the trace point</b>, in one row instead of two, so
+          switching views no longer means hunting a second bar for what you were looking
+          at.</li>
+          <li><b>Timeline's line/SQL/step controls moved beside the step name</b> instead of
+          the row's far edge, and clicking the name now opens them too.</li>
+          <li><b>Fixed: SQL was still getting cut short</b>, both in the agent's own recording
+          cap and in the flame diagram's inline preview. Both are gone; every view now shows
+          the complete statement.</li>
+          <li>Renamed for clarity: <b>Code Trace</b> is now <b>Call Tree</b>, <b>Graph</b> is
+          now <b>Breakdown</b>, and <b>Flow Graph</b> is now <b>Flame Graph</b>, in both the
+          report and the Export dialog.</li>
+        </ul>
         <p><b>2.1.1</b>: make the report yours, and see every call</p>
         <ul>
           <li><b>New: build the report the way you want it.</b> When you export, pick which

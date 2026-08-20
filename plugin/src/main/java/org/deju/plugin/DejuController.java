@@ -25,6 +25,7 @@ import org.deju.plugin.history.DejuHistoryStore;
 import org.deju.plugin.history.ExecutionEntry;
 import org.deju.plugin.history.ExportScope;
 import org.deju.plugin.history.HtmlReportGenerator;
+import org.deju.plugin.history.MarkdownSummary;
 import org.deju.plugin.history.ReportPrefs;
 import org.deju.plugin.run.DejuAgentBundle;
 import org.deju.plugin.run.RunConfigAgentUpdater;
@@ -158,9 +159,36 @@ public final class DejuController implements AgentClient.Listener, Disposable {
         onEdt(painter::clear);
     }
 
+    /** A Markdown summary of one stored execution, or null if it's gone (e.g. just deleted). */
+    public @Nullable String markdownSummary(int slot) {
+        DejuHistoryStore store = DejuHistoryStore.getInstance(project);
+        DejuPayload payload = store.load(slot);
+        if (payload == null) {
+            return null;
+        }
+        for (ExecutionEntry entry : store.entries()) {
+            if (entry.slot == slot) {
+                return MarkdownSummary.of(entry, payload);
+            }
+        }
+        return null;
+    }
+
     /** Deletes one stored execution and refreshes the history list. */
     public void deleteExecution(int slot) {
         DejuHistoryStore.getInstance(project).delete(slot);
+        onEdt(this::notifyHistoryChanged);
+    }
+
+    /** Pins or unpins one stored execution and refreshes the history list. */
+    public void setExecutionPinned(int slot, boolean pinned) {
+        DejuHistoryStore.getInstance(project).setPinned(slot, pinned);
+        onEdt(this::notifyHistoryChanged);
+    }
+
+    /** Renames one stored execution and refreshes the history list. */
+    public void renameExecution(int slot, String label) {
+        DejuHistoryStore.getInstance(project).rename(slot, label);
         onEdt(this::notifyHistoryChanged);
     }
 

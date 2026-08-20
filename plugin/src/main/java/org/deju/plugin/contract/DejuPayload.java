@@ -14,6 +14,9 @@ public class DejuPayload {
     private String startedAtIso;
     private String agentVersion;
     private long durationMs;
+    /** -1 when the connected agent predates this field, or its JVM could not report
+     *  per-thread CPU time. */
+    private long cpuMicros = -1;
     private List<FileCoverage> files = new ArrayList<>();
     private List<CallNode> calls = new ArrayList<>();
     private boolean callsTruncated;
@@ -61,6 +64,15 @@ public class DejuPayload {
 
     public void setDurationMs(long durationMs) {
         this.durationMs = durationMs;
+    }
+
+    /** CPU time burned during the session, or -1 when the agent didn't report it. */
+    public long getCpuMicros() {
+        return cpuMicros;
+    }
+
+    public void setCpuMicros(long cpuMicros) {
+        this.cpuMicros = cpuMicros;
     }
 
     public List<FileCoverage> getFiles() {

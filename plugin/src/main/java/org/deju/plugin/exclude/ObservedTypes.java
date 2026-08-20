@@ -160,8 +160,8 @@ public final class ObservedTypes {
         Map<String, Accumulator> byClass = new LinkedHashMap<>();
 
         DejuHistoryStore store = DejuHistoryStore.getInstance(project);
-        for (int slot = 1; slot <= DejuHistoryStore.CAPACITY; slot++) {
-            DejuPayload payload = store.load(slot);
+        for (ExecutionEntry entry : store.entries()) {
+            DejuPayload payload = store.load(entry.slot);
             if (payload == null) {
                 continue;
             }

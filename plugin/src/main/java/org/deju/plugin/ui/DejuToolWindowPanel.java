@@ -45,6 +45,7 @@ import org.deju.plugin.DejuController;
 import org.deju.plugin.DejuSettings;
 import org.deju.plugin.exclude.ExcludedTypesDialog;
 import org.deju.plugin.history.DejuHistoryStore;
+import org.deju.plugin.history.DiffRunsDialog;
 import org.deju.plugin.history.ExecutionEntry;
 import org.deju.plugin.history.ExportScope;
 import org.deju.plugin.history.ExportOptionsDialog;
@@ -88,8 +89,16 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
 
     private final DefaultListModel<ExecutionEntry> historyModel = new DefaultListModel<>();
     private final JBList<ExecutionEntry> historyList = new JBList<>(historyModel);
+    /** Text set in {@link #refreshHistory()}: the capacity is a Settings field now, not a
+     *  compile-time constant, so this can no longer be built once and left alone. */
+    private final JLabel historyHeader = new JLabel();
+    private final JBTextField historySearchField = new JBTextField();
     private final JButton showButton = UiStyle.compact(new JButton("Show", AllIcons.Actions.Preview));
     private final JButton exportButton = UiStyle.compact(new JButton("Export…", AllIcons.Actions.Download));
+    private final JButton markdownButton = UiStyle.compact(new JButton("Copy as Markdown", AllIcons.Actions.Copy));
+    private final JButton pinButton = UiStyle.compact(new JButton("Pin"));
+    private final JButton renameButton = UiStyle.compact(new JButton("Rename…"));
+    private final JButton diffButton = UiStyle.compact(new JButton("Diff…"));
     private final JButton deleteButton = UiStyle.compact(new JButton("Delete", AllIcons.General.Remove));
     private final JButton deleteAllButton = UiStyle.compact(new JButton("Delete all", AllIcons.Actions.GC));
     private final JButton clearButton = UiStyle.compact(new JButton("Clear highlights", AllIcons.Actions.Cancel));
@@ -185,7 +194,14 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
     private JComponent buildHistory() {
         JBPanel<?> panel = new JBPanel<>(new BorderLayout(0, 6));
         panel.setBorder(JBUI.Borders.emptyTop(8));
-        panel.add(new JLabel("Recent runs (last " + DejuHistoryStore.CAPACITY + "):"), BorderLayout.NORTH);
+
+        JBPanel<?> north = new JBPanel<>(new BorderLayout(0, 4));
+        north.add(historyHeader, BorderLayout.NORTH);
+        historySearchField.getEmptyText().setText("Search by trace point or name…");
+        historySearchField.setToolTipText("Filters the list below by trace point or the name"
+                + " a run was given with Rename");
+        north.add(historySearchField, BorderLayout.SOUTH);
+        panel.add(north, BorderLayout.NORTH);
 
         historyList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         historyList.setCellRenderer((list, value, index, selected, focused) -> {
@@ -205,6 +221,15 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
                 + " Excluded types are skipped and the rest are capped (Settings → Tools →"
                 + " Deju Trace); what was left out is listed in a notification.");
         exportButton.setToolTipText("Export the selected run as a self-contained HTML report");
+        markdownButton.setToolTipText("Copy a plain-Markdown summary of the selected run to the"
+                + " clipboard — duration, CPU split, and the top findings — for pasting into a"
+                + " PR description, an issue, or a chat message");
+        pinButton.setToolTipText("Protect the selected run from being overwritten once every"
+                + " slot has been used at least once. A pin does not stop Delete.");
+        renameButton.setToolTipText("Give the selected run a name of your own, shown instead"
+                + " of the auto-generated description");
+        diffButton.setToolTipText("Compare any two recorded runs: duration/CPU/call-count"
+                + " deltas, the biggest method timing swings, and coverage that changed");
         deleteButton.setToolTipText("Delete the selected run");
         deleteAllButton.setToolTipText("Delete all recorded runs");
         clearButton.setToolTipText("Remove coverage highlighting and the timing column from editors");
@@ -212,6 +237,10 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
         JBPanel<?> actions = row();
         actions.add(showButton);
         actions.add(exportButton);
+        actions.add(markdownButton);
+        actions.add(pinButton);
+        actions.add(renameButton);
+        actions.add(diffButton);
         actions.add(deleteButton);
         actions.add(deleteAllButton);
         actions.add(clearButton);
@@ -234,6 +263,10 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
             }
         });
         exportButton.addActionListener(e -> exportSelected());
+        markdownButton.addActionListener(e -> copySelectedAsMarkdown());
+        pinButton.addActionListener(e -> togglePinSelected());
+        renameButton.addActionListener(e -> renameSelected());
+        diffButton.addActionListener(e -> openDiffDialog());
         deleteButton.addActionListener(e -> deleteSelected());
         deleteAllButton.addActionListener(e -> deleteAll());
         clearButton.addActionListener(e -> controller.clearHighlighting());
@@ -249,6 +282,12 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
             @Override
             protected void textChanged(@NotNull DocumentEvent e) {
                 updateTrackEnabled();
+            }
+        });
+        historySearchField.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(@NotNull DocumentEvent e) {
+                refreshHistory();
             }
         });
     }
@@ -280,6 +319,9 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
             hostField.setText(s.host);
             portField.setText(String.valueOf(s.port));
         }
+        // A history capacity decrease trims immediately when Settings is applied (see
+        // DejuConfigurable.apply), so the list here needs to catch up too.
+        refreshHistory();
     }
 
     private void toggleConnection() {
@@ -356,6 +398,62 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
         ExecutionEntry entry = historyList.getSelectedValue();
         if (entry != null) {
             controller.deleteExecution(entry.slot);
+        }
+    }
+
+    private void copySelectedAsMarkdown() {
+        ExecutionEntry entry = historyList.getSelectedValue();
+        if (entry == null) {
+            return;
+        }
+        String md = controller.markdownSummary(entry.slot);
+        if (md == null) {
+            NotificationGroupManager.getInstance()
+                    .getNotificationGroup("Deju Trace")
+                    .createNotification("Deju Trace",
+                            "That run is no longer on disk; the list will refresh.",
+                            NotificationType.WARNING)
+                    .notify(project);
+            refreshHistory();
+            return;
+        }
+        CopyPasteManager.getInstance().setContents(new StringSelection(md));
+        NotificationGroupManager.getInstance()
+                .getNotificationGroup("Deju Trace")
+                .createNotification("Deju Trace",
+                        "Copied a Markdown summary of the selected run to the clipboard.",
+                        NotificationType.INFORMATION)
+                .notify(project);
+    }
+
+    private void openDiffDialog() {
+        List<ExecutionEntry> entries = DejuHistoryStore.getInstance(project).entries();
+        if (entries.size() < 2) {
+            return;
+        }
+        ExecutionEntry selected = historyList.getSelectedValue();
+        int preferA = selected != null ? selected.slot : entries.get(0).slot;
+        int preferB = entries.get(0).slot;
+        DiffRunsDialog.show(project, entries, preferA, preferB);
+    }
+
+    private void togglePinSelected() {
+        ExecutionEntry entry = historyList.getSelectedValue();
+        if (entry != null) {
+            controller.setExecutionPinned(entry.slot, !entry.pinned);
+        }
+    }
+
+    private void renameSelected() {
+        ExecutionEntry entry = historyList.getSelectedValue();
+        if (entry == null) {
+            return;
+        }
+        String name = Messages.showInputDialog(project,
+                "Name for this run (blank to go back to the automatic description):",
+                "Rename Run", Messages.getQuestionIcon(), entry.label, null);
+        if (name != null) {
+            controller.renameExecution(entry.slot, name);
         }
     }
 
@@ -580,9 +678,18 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
     }
 
     private void updateHistoryButtons() {
-        boolean hasSelection = historyList.getSelectedValue() != null;
+        ExecutionEntry selected = historyList.getSelectedValue();
+        boolean hasSelection = selected != null;
         showButton.setEnabled(hasSelection);
         exportButton.setEnabled(hasSelection);
+        markdownButton.setEnabled(hasSelection);
+        pinButton.setEnabled(hasSelection);
+        pinButton.setText(hasSelection && selected.pinned ? "Unpin" : "Pin");
+        renameButton.setEnabled(hasSelection);
+        // Against the store's full count, not the (possibly search-filtered) list on screen:
+        // comparing any two stored runs is possible whether or not both currently match
+        // the search box.
+        diffButton.setEnabled(DejuHistoryStore.getInstance(project).entries().size() >= 2);
         deleteButton.setEnabled(hasSelection);
         deleteAllButton.setEnabled(!historyModel.isEmpty());
     }
@@ -591,8 +698,15 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
         ExecutionEntry previouslySelected = historyList.getSelectedValue();
         historyModel.clear();
         List<ExecutionEntry> entries = DejuHistoryStore.getInstance(project).entries();
+        String q = historySearchField.getText().trim().toLowerCase();
+        int total = entries.size();
+        int shown = 0;
         for (ExecutionEntry entry : entries) {
+            if (!q.isEmpty() && !matchesHistorySearch(entry, q)) {
+                continue;
+            }
             historyModel.addElement(entry);
+            shown++;
         }
         if (previouslySelected != null) {
             for (int i = 0; i < historyModel.size(); i++) {
@@ -602,7 +716,16 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
                 }
             }
         }
+        historyHeader.setText(q.isEmpty()
+                ? "Recent runs (last " + DejuHistoryStore.capacity() + "):"
+                : "Recent runs (" + shown + " of " + total + " match):");
         updateHistoryButtons();
+    }
+
+    /** A run matches a history search on its trace point, or the name it was given. */
+    private static boolean matchesHistorySearch(ExecutionEntry entry, String qLower) {
+        return (entry.target != null && entry.target.toLowerCase().contains(qLower))
+                || (entry.label != null && entry.label.toLowerCase().contains(qLower));
     }
 
     /**
@@ -615,7 +738,10 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
      */
     private static String describe(ExecutionEntry entry) {
         String when = new SimpleDateFormat("dd/MM/yy HH:mm:ss").format(new Date(entry.savedAtMillis));
-        return when + "  ·  " + shortTarget(entry.target)
+        String what = entry.label != null && !entry.label.isEmpty()
+                ? entry.label : shortTarget(entry.target);
+        String pin = entry.pinned ? "📌 " : ""; // 📌, plain text so no icon lookup can fail
+        return pin + when + "  ·  " + what
                 + "   (" + entry.fileCount + " files, " + entry.lineCount + " lines)";
     }
 
