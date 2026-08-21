@@ -4323,10 +4323,13 @@
   var flowHotBtn = byId('flowHotBtn');
   var flowFlameBtn = byId('flowFlameBtn');
   var flowChartBtn = byId('flowChartBtn');
+  var chartOrientBtn = byId('chartOrientBtn');
   var chartPlaySeg = byId('chartPlaySeg');
   var chartPlayBtn = byId('chartPlayBtn');
   var chartResetBtn = byId('chartResetBtn');
   var chartSpeedSel = byId('chartSpeedSel');
+  var chartSpeedCustom = byId('chartSpeedCustom');
+  var chartSpeedVal = byId('chartSpeedVal');
   var flowCrumb = byId('flowCrumb');
   var flowFitBtn = byId('flowFitBtn');
   var flowOutBtn = byId('flowOutBtn');
@@ -4414,14 +4417,25 @@
   var chartSpeed = 1;
   var chartRAF = 0;
   var chartLastTick = 0;
+  // Which step of this playback run reached a given node first, and how many distinct
+  // nodes have been reached so far. Keyed by node key rather than kept on the node itself,
+  // since buildChart() throws chartNodes away and rebuilds them on every redraw.
+  var chartVisitOrder = {};
+  var chartVisitCount = 0;
   var CHART_STEP_MS = 500;  // time to cross one edge at 1x speed
   var CHART_MAX_PATH = 4000; // playback is sampled down past this so it finishes in a sane time
   var CHART_PAD = 24;
   var CHART_NODE_W = 200;
   var CHART_NODE_H = 34;
-  var CHART_GAP_X = 34;
-  var CHART_GAP_Y = 54;
+  // Named for the two roles a gap plays, not for an axis, since the two orientations
+  // swap which axis each one falls on. LEVEL_GAP separates one call depth from the next —
+  // it carries the elbow an edge bends through, so it stays generous. SIB_GAP separates
+  // boxes that never route anything (siblings, or two wrapped rows of them), so it can
+  // stay tight even when a level has forty of them.
+  var CHART_LEVEL_GAP = 64;
+  var CHART_SIB_GAP = 16;
   var CHART_DOT_R = 6;
+  var chartVertical = false;  // false: depth -> columns (left to right). true: depth -> rows (top to bottom).
 
   /**
    * Narrowest a flame frame may be drawn, in pixels.
@@ -4906,6 +4920,7 @@
       sql: v('--sql-ink', '#ff9933'),
       hoverFill: dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.28)',
       badge: v('--badge-bg', '#ff9933'),
+      heat: v('--heat', 'rgba(74,144,217,.18)'),
       // Same tri-colour the Tree view marks line coverage with, reused so a step's colour
       // in the API Flow chart means the same thing it does everywhere else in the report.
       full: v('--full', '#2da44e'),
@@ -4997,32 +5012,148 @@
     chartProgress = 0;
   }
 
+  /** Wipes the numbered trail a previous playback left, for a fresh run to write over. */
+  function resetChartVisits() {
+    chartVisitOrder = {};
+    chartVisitCount = 0;
+  }
+
+  /** Gives the node at this step its number, the first time playback ever reaches it. */
+  function markChartVisit(idx) {
+    var node = chartPath[idx];
+    if (!node || chartVisitOrder[node.key] != null) return;
+    chartVisitCount++;
+    chartVisitOrder[node.key] = chartVisitCount;
+  }
+
   /**
-   * Positions the chart's nodes: rows by first-seen call depth, columns by first-seen
-   * order within the row. No crossing-minimisation or force layout, deliberately: the
+   * Two synthetic bookends, added after every rebuild: not calls, so they carry no timing
+   * or coverage and never enter the playback path, but the depth given to each — one
+   * below the shallowest real step, one past the deepest — drops it into its own column
+   * or band in either orientation for free, on exactly the same layout code as everything
+   * else. Start points at every depth-0 step (normally just the trace point); End
+   * gathers every step nothing calls onward from, however many there turn out to be.
+   */
+  function addChartTerminals() {
+    var hasOutgoing = {};
+    var maxDepth = 0;
+    chartEdges.forEach(function (e) { hasOutgoing[e.from] = true; });
+    chartNodes.forEach(function (n) { if (n.depth > maxDepth) maxDepth = n.depth; });
+
+    var start = { key: '__start__', term: 'start', label: 'Start', depth: -1, order: 0,
+                  n: 0, total: 0, calls: 0, isSql: false, recursive: false };
+    var end = { key: '__end__', term: 'end', label: 'End', depth: maxDepth + 1, order: 0,
+                n: 0, total: 0, calls: 0, isSql: false, recursive: false };
+    chartByKey[start.key] = start;
+    chartByKey[end.key] = end;
+
+    chartNodes.forEach(function (n) {
+      if (n.depth === 0) chartEdges.push({ from: start.key, to: n.key });
+      if (!hasOutgoing[n.key]) chartEdges.push({ from: n.key, to: end.key });
+    });
+    chartNodes.unshift(start);
+    chartNodes.push(end);
+  }
+
+  function layoutChart(avail) {
+    if (chartVertical) layoutChartVertical(avail);
+    else layoutChartHorizontal();
+  }
+
+  /**
+   * Positions the chart's nodes: columns by first-seen call depth, rows by first-seen
+   * order within the column. No crossing-minimisation or force layout, deliberately: the
    * node count here is call sites, not calls, and a simple deterministic grid is what
    * "very lightweight" means for a diagram this small.
+   *
+   * <p>Depth drives the axis the viewport can't grow past its own width in without
+   * shrinking every label to fit — a call tree is rarely more than a handful of levels
+   * deep, however many methods live at any one of them. Siblings stack downward instead,
+   * where forty repositories at the same depth just means a taller diagram to scroll,
+   * never a narrower box to read.
    */
-  function layoutChart() {
-    var rows = {};
+  function layoutChartHorizontal() {
+    var cols = {};
     chartNodes.forEach(function (n) {
-      (rows[n.depth] || (rows[n.depth] = [])).push(n);
+      (cols[n.depth] || (cols[n.depth] = [])).push(n);
     });
-    var rowDepths = Object.keys(rows).map(Number).sort(function (a, b) { return a - b; });
-    var maxRight = 0;
-    var y = CHART_PAD;
-    rowDepths.forEach(function (depth) {
-      var list = rows[depth].sort(function (a, b) { return a.order - b.order; });
-      var x = CHART_PAD;
+    var colDepths = Object.keys(cols).map(Number).sort(function (a, b) { return a - b; });
+    var maxBottom = 0;
+    var x = CHART_PAD;
+    colDepths.forEach(function (depth) {
+      var list = cols[depth].sort(function (a, b) { return a.order - b.order; });
+      var y = CHART_PAD;
       list.forEach(function (n) {
         n.x = x; n.y = y; n.w = CHART_NODE_W; n.h = CHART_NODE_H;
-        x += CHART_NODE_W + CHART_GAP_X;
+        y += CHART_NODE_H + CHART_SIB_GAP;
       });
-      if (x > maxRight) maxRight = x;
-      y += CHART_NODE_H + CHART_GAP_Y;
+      if (y > maxBottom) maxBottom = y;
+      x += CHART_NODE_W + CHART_LEVEL_GAP;
     });
-    chartContentW = maxRight - CHART_GAP_X + CHART_PAD;
-    chartContentH = y - CHART_GAP_Y + CHART_PAD;
+    chartContentW = x - CHART_LEVEL_GAP + CHART_PAD;
+    chartContentH = maxBottom - CHART_SIB_GAP + CHART_PAD;
+    chartEdges.forEach(function (e) {
+      var a = chartByKey[e.from];
+      var b = chartByKey[e.to];
+      if (!a || !b) return;
+      e.x1 = a.x + a.w; e.y1 = a.y + a.h / 2;
+      e.x2 = b.x; e.y2 = b.y + b.h / 2;
+    });
+  }
+
+  /**
+   * The top-to-bottom alternative: bands by call depth running down the page instead of
+   * across it, with a real flowchart's Start/End at the ends. Depth no longer buys the
+   * crowding fix on its own — a band can still hold forty siblings — so a band wraps onto
+   * more rows once it would run past the viewport, exactly the way this chart used to
+   * grow sideways before the horizontal layout replaced it.
+   *
+   * <p>Two passes rather than one: every row in a band centres on the width of the widest
+   * row anywhere in the diagram, and that width isn't known until every band has been
+   * measured. Getting that wrong would centre each row on its own width instead, leaving a
+   * ladder of boxes that all drift sideways against each other rather than reading as one
+   * diagram.
+   */
+  function layoutChartVertical(avail) {
+    var bands = {};
+    chartNodes.forEach(function (n) {
+      (bands[n.depth] || (bands[n.depth] = [])).push(n);
+    });
+    var depths = Object.keys(bands).map(Number).sort(function (a, b) { return a - b; });
+    var usableW = Math.max(CHART_NODE_W, (avail || 900) - CHART_PAD * 2);
+    var perRow = Math.max(1, Math.floor((usableW + CHART_SIB_GAP) / (CHART_NODE_W + CHART_SIB_GAP)));
+
+    var plan = [];
+    var maxRowW = CHART_NODE_W;
+    depths.forEach(function (depth) {
+      var list = bands[depth].sort(function (a, b) { return a.order - b.order; });
+      var rowCount = Math.ceil(list.length / perRow);
+      for (var r = 0; r < rowCount; r++) {
+        var count = Math.min(perRow, list.length - r * perRow);
+        var w = count * CHART_NODE_W + (count - 1) * CHART_SIB_GAP;
+        if (w > maxRowW) maxRowW = w;
+      }
+      plan.push({ list: list, rowCount: rowCount });
+    });
+
+    var y = CHART_PAD;
+    plan.forEach(function (band) {
+      for (var i = 0; i < band.list.length; i++) {
+        var row = Math.floor(i / perRow);
+        var col = i % perRow;
+        var thisRowCount = Math.min(perRow, band.list.length - row * perRow);
+        var thisRowW = thisRowCount * CHART_NODE_W + (thisRowCount - 1) * CHART_SIB_GAP;
+        var startX = CHART_PAD + (maxRowW - thisRowW) / 2;
+        var n = band.list[i];
+        n.x = startX + col * (CHART_NODE_W + CHART_SIB_GAP);
+        n.y = y + row * (CHART_NODE_H + CHART_SIB_GAP);
+        n.w = CHART_NODE_W; n.h = CHART_NODE_H;
+      }
+      y += band.rowCount * CHART_NODE_H + (band.rowCount - 1) * CHART_SIB_GAP + CHART_LEVEL_GAP;
+    });
+
+    chartContentW = maxRowW + CHART_PAD * 2;
+    chartContentH = y - CHART_LEVEL_GAP + CHART_PAD;
     chartEdges.forEach(function (e) {
       var a = chartByKey[e.from];
       var b = chartByKey[e.to];
@@ -5032,8 +5163,14 @@
     });
   }
 
+  /** chartNodes minus Start/End, which are bookends, not steps this run took. */
+  function chartStepCount() {
+    return Math.max(0, chartNodes.length - 2);
+  }
+
   function updateChartNote() {
-    var bits = [chartNodes.length + ' distinct step' + (chartNodes.length === 1 ? '' : 's')
+    var stepCount = chartStepCount();
+    var bits = [stepCount + ' distinct step' + (stepCount === 1 ? '' : 's')
       + ' from ' + flowVisible.length + ' calls in this run'];
     if (chartPath.length < flowVisible.length) {
       bits.push('playback sampled to ' + chartPath.length + ' points so it stays watchable');
@@ -5217,7 +5354,8 @@
 
     if (flowChart) {
       buildChart();
-      layoutChart();
+      addChartTerminals();
+      layoutChart(avail);
       flowDrawn = chartNodes;
       contentW = chartContentW;
       contentH = chartContentH;
@@ -5326,8 +5464,8 @@
     // Trace counter was overwritten with a step count on every keystroke.
     if (tab === 'flow') {
       countEl.textContent = flowChart
-        ? 'Showing ' + chartNodes.length + ' distinct step'
-          + (chartNodes.length === 1 ? '' : 's') + ' in this flow'
+        ? 'Showing ' + chartStepCount() + ' distinct step'
+          + (chartStepCount() === 1 ? '' : 's') + ' in this flow'
         : 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
           + (flowNodes.length === 1 ? ' step' : ' steps');
     }
@@ -5717,20 +5855,43 @@
     drawChartMarker(ctx, c);
   }
 
-  /** A caller-to-callee connector: down, across, down, with an arrowhead on the callee. */
+  /**
+   * A caller-to-callee connector, elbowed through the gap between one depth and the next.
+   * Horizontal mode bends the elbow vertically (right, down-or-up, right) since depth runs
+   * left to right there; vertical mode bends it horizontally (down, across, down) since
+   * depth runs top to bottom instead — the arrowhead always ends up pointing into whichever
+   * side of the callee's box actually faces its caller.
+   */
   function drawChartEdge(ctx, c, e) {
-    var midY = (e.y1 + e.y2) / 2;
+    var ah = 5;
+    if (chartVertical) {
+      var midY = (e.y1 + e.y2) / 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(e.x1) + 0.5, Math.round(e.y1) + 0.5);
+      ctx.lineTo(Math.round(e.x1) + 0.5, Math.round(midY) + 0.5);
+      ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(midY) + 0.5);
+      ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(e.y2) + 0.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(e.x2, e.y2);
+      ctx.lineTo(e.x2 - ah, e.y2 - ah);
+      ctx.lineTo(e.x2 + ah, e.y2 - ah);
+      ctx.closePath();
+      ctx.fillStyle = c.line;
+      ctx.fill();
+      return;
+    }
+    var midX = (e.x1 + e.x2) / 2;
     ctx.beginPath();
     ctx.moveTo(Math.round(e.x1) + 0.5, Math.round(e.y1) + 0.5);
-    ctx.lineTo(Math.round(e.x1) + 0.5, Math.round(midY) + 0.5);
-    ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(midY) + 0.5);
+    ctx.lineTo(Math.round(midX) + 0.5, Math.round(e.y1) + 0.5);
+    ctx.lineTo(Math.round(midX) + 0.5, Math.round(e.y2) + 0.5);
     ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(e.y2) + 0.5);
     ctx.stroke();
-    var ah = 5;
     ctx.beginPath();
     ctx.moveTo(e.x2, e.y2);
     ctx.lineTo(e.x2 - ah, e.y2 - ah);
-    ctx.lineTo(e.x2 + ah, e.y2 - ah);
+    ctx.lineTo(e.x2 - ah, e.y2 + ah);
     ctx.closePath();
     ctx.fillStyle = c.line;
     ctx.fill();
@@ -5743,7 +5904,68 @@
     return c.full;
   }
 
+  /**
+   * The numbered circle a step earns once playback has passed through it: not just where
+   * the marker is now, but the trail of where it has already been, so a reader can look at
+   * a paused or finished run and reconstruct the order without replaying it.
+   */
+  function drawChartVisitBadge(ctx, c, n) {
+    var num = chartVisitOrder[n.key];
+    if (num == null) return;
+    // No ctx.save()/restore() or ctx.arc(): the SVG export runs every draw call through a
+    // context shim (svgContext, below) that stands in for a canvas well enough for paths,
+    // fills and text, but was never built to implement those two — every property this
+    // touches has to be set back by hand instead. textAlign is one such property the shim
+    // does not honour at all, so the label is centred with measureText rather than relied
+    // on to centre itself.
+    var r = 9;
+    var cx = n.x, cy = n.y;
+    roundRect(ctx, cx - r, cy - r, r * 2, r * 2, r);
+    ctx.fillStyle = c.accent;
+    ctx.fill();
+    roundRect(ctx, cx - r, cy - r, r * 2, r * 2, r);
+    ctx.strokeStyle = c.bg;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.font = 'bold 10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    var label = String(num);
+    var w = ctx.measureText(label).width;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, cx - w / 2, cy + 1);
+    ctx.font = FLOW_FONT;
+  }
+
+  /** Start or End: a pill rather than a rounded rect, so a real flowchart's bookends read
+   *  as bookends and not as one more step in the run. Centred in the same grid cell an
+   *  ordinary node would occupy, so it needs no special case anywhere in either layout. */
+  function drawChartTerminator(ctx, c, n) {
+    var over = chartHoverKey === n.key;
+    var w = 108, h = 34;
+    var cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+    var x = cx - w / 2, y = cy - h / 2;
+    roundRect(ctx, x, y, w, h, h / 2);
+    ctx.fillStyle = c.heat;
+    ctx.fill();
+    if (over) {
+      roundRect(ctx, x, y, w, h, h / 2);
+      ctx.fillStyle = c.hoverFill;
+      ctx.fill();
+    }
+    roundRect(ctx, x, y, w, h, h / 2);
+    ctx.strokeStyle = c.accent;
+    ctx.lineWidth = over ? 2.5 : 1.5;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.font = 'bold 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    var lw = ctx.measureText(n.label).width;
+    ctx.fillStyle = c.accent;
+    ctx.fillText(n.label, cx - lw / 2, cy + 1);
+    ctx.font = FLOW_FONT;
+  }
+
   function drawChartNode(ctx, c, n) {
+    if (n.term) { drawChartTerminator(ctx, c, n); return; }
     var over = chartHoverKey === n.key;
     var fill = chartNodeFill(c, n);
 
@@ -5768,6 +5990,8 @@
     ctx.lineWidth = over ? 2 : 1.5;
     ctx.stroke();
     ctx.lineWidth = 1;
+
+    drawChartVisitBadge(ctx, c, n);
 
     var mid = n.y + n.h / 2;
     var pad = 8;
@@ -5883,6 +6107,7 @@
     var n = flowHit(e);
     if (!n) return;
     if (flowChart) {
+      if (n.term) return;   // Start/End aren't a step this run actually took
       hideFlowTip();
       goToStep(n.firstSeq);
       return;
@@ -5944,8 +6169,22 @@
 
   function onChartMove(n, e) {
     if (chartHoverKey !== n.key) { chartHoverKey = n.key; paintFlow(); }
-    flowCanvas.style.cursor = 'pointer';
     flowTip.textContent = '';
+    if (n.term) {
+      // Not a step this run took, so none of the per-call facts below apply to it — a
+      // plain caption is honest about what it is instead of showing "0× · not executed".
+      flowCanvas.style.cursor = 'default';
+      flowTip.appendChild(el('div', 't-sig', n.term === 'start' ? 'Start of the run' : 'End of the run'));
+      flowTip.hidden = false;
+      var tw = flowTip.offsetWidth, th = flowTip.offsetHeight;
+      var tleft = e.clientX + 14, ttop = e.clientY + 16;
+      if (tleft + tw > window.innerWidth - 8) tleft = e.clientX - tw - 14;
+      if (ttop + th > window.innerHeight - 8) ttop = e.clientY - th - 16;
+      flowTip.style.left = Math.max(8, tleft) + 'px';
+      flowTip.style.top = Math.max(8, ttop) + 'px';
+      return;
+    }
+    flowCanvas.style.cursor = 'pointer';
     if (n.isSql) {
       var q = el('div', 't-sql');
       paintSql(q, n.sql);
@@ -5961,6 +6200,7 @@
         : n.status === 'PARTIAL' ? 'only some branches taken' : 'not fully executed');
     }
     if (n.recursive) facts.push('calls itself');
+    if (chartVisitOrder[n.key] != null) facts.push('step ' + chartVisitOrder[n.key] + ' in the playback');
     flowTip.appendChild(el('div', 't-stat', facts.join(' · ')));
     flowTip.appendChild(el('div', 't-sub', 'click to jump to this step in the Call Tree'));
     flowTip.hidden = false;
@@ -6091,6 +6331,7 @@
     while (chartProgress >= 1 && chartPlayIdx < chartPath.length - 1) {
       chartProgress -= 1;
       chartPlayIdx++;
+      markChartVisit(chartPlayIdx);
     }
     if (chartPlayIdx >= chartPath.length - 1) {
       chartProgress = 0;
@@ -6108,12 +6349,28 @@
     stopChartAnim();
     chartPlayIdx = 0;
     chartProgress = 0;
+    resetChartVisits();
+    if (on) markChartVisit(0);
+    chartOrientBtn.hidden = !on;
     chartPlaySeg.hidden = !on;
     chartSpeedSel.hidden = !on;
+    chartSpeedCustom.hidden = !on || chartSpeedSel.value !== 'custom';
+    chartSpeedVal.hidden = chartSpeedCustom.hidden;
     hideFlowTip();
     drawFlow();
   }
   flowChartBtn.addEventListener('click', function () { setFlowChart(!flowChart); });
+
+  chartOrientBtn.addEventListener('click', function () {
+    chartVertical = !chartVertical;
+    chartOrientBtn.classList.toggle('on', chartVertical);
+    chartOrientBtn.textContent = chartVertical ? 'Left → right' : 'Top → bottom';
+    chartOrientBtn.title = chartVertical
+      ? 'Switch back to the left-to-right layout'
+      : 'Switch to a top-to-bottom layout with Start/End';
+    hideFlowTip();
+    drawFlow();
+  });
 
   chartPlayBtn.addEventListener('click', function () {
     if (!chartPath.length) return;
@@ -6121,7 +6378,12 @@
       stopChartAnim();
       return;
     }
-    if (chartPlayIdx >= chartPath.length - 1) { chartPlayIdx = 0; chartProgress = 0; }
+    if (chartPlayIdx >= chartPath.length - 1) {
+      chartPlayIdx = 0;
+      chartProgress = 0;
+      resetChartVisits();
+      markChartVisit(0);
+    }
     chartPlaying = true;
     chartLastTick = 0;
     syncChartPlayBtn();
@@ -6132,12 +6394,21 @@
     stopChartAnim();
     chartPlayIdx = 0;
     chartProgress = 0;
+    resetChartVisits();
+    markChartVisit(0);
     paintFlow();
   });
 
-  chartSpeedSel.addEventListener('change', function () {
-    chartSpeed = parseFloat(chartSpeedSel.value) || 1;
-  });
+  function applyChartSpeed() {
+    var custom = chartSpeedSel.value === 'custom';
+    chartSpeedCustom.hidden = !custom;
+    chartSpeedVal.hidden = !custom;
+    var v = custom ? parseFloat(chartSpeedCustom.value) : parseFloat(chartSpeedSel.value);
+    chartSpeed = v > 0 ? v : 1;
+    if (custom) chartSpeedVal.textContent = chartSpeed.toFixed(2) + '×';
+  }
+  chartSpeedSel.addEventListener('change', applyChartSpeed);
+  chartSpeedCustom.addEventListener('input', applyChartSpeed);
 
   /** Applies a new pattern. Returns whether anything actually changed. */
   function setFlowFilter(text) {

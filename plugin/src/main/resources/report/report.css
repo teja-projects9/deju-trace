@@ -413,6 +413,13 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .zoomseg{display:inline-flex;gap:.25rem;}
 .zoombtn{min-width:2rem;text-align:center;font-weight:600;padding:.32rem .5rem;}
 
+/* The fine-grained playback speed, shown only once "Custom…" is picked in the select
+   beside it: a preset list tops out at 0.5x, and a first watch of an unfamiliar run often
+   wants slower than that. */
+.chartspeed-custom{width:7rem;accent-color:var(--accent);cursor:pointer;}
+.chartspeed-val{font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums;
+  min-width:3.4em;}
+
 .graphrow{display:grid;grid-template-columns:minmax(7rem,var(--graph-name-w,15rem)) 1fr auto auto;
   gap:.6rem;align-items:center;padding:.22rem 0;font-size:.8rem;}
 .graphmeta{display:flex;align-items:center;gap:.35rem;white-space:nowrap;
