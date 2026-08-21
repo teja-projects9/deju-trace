@@ -413,8 +413,8 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .zoomseg{display:inline-flex;gap:.25rem;}
 .zoombtn{min-width:2rem;text-align:center;font-weight:600;padding:.32rem .5rem;}
 
-.graphrow{display:grid;grid-template-columns:minmax(7rem,15rem) 1fr auto auto;gap:.6rem;
-  align-items:center;padding:.22rem 0;font-size:.8rem;}
+.graphrow{display:grid;grid-template-columns:minmax(7rem,var(--graph-name-w,15rem)) 1fr auto auto;
+  gap:.6rem;align-items:center;padding:.22rem 0;font-size:.8rem;}
 .graphmeta{display:flex;align-items:center;gap:.35rem;white-space:nowrap;
   font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;}
 /* A repeat count earns a warning colour: the same statement issued N times is the one
@@ -422,9 +422,24 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 .graphmeta .nplus1{font-weight:700;color:var(--none);border:1px solid var(--none);
   border-radius:99px;padding:.02rem .35rem;cursor:help;}
 .graphrow + .graphrow{border-top:1px solid var(--hairline);}
-.graphname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+/* The list sits in a positioning context of its own so the resize handle — a sibling of
+   graphBody, not a child — survives every renderGraph() wiping the rows out from under it. */
+.graphlist{position:relative;}
+.graphname{display:flex;align-items:flex-start;gap:.1rem;font-weight:600;}
+.graphname .graphlabel{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;}
 .graphname .sub{display:block;font-weight:400;font-size:.68rem;color:var(--muted);
   overflow:hidden;text-overflow:ellipsis;}
+.graphname .rowcopy{flex:none;align-self:flex-start;}
+/* A thin drag handle pinned to the boundary the name column currently ends at, recomputed
+   from the rendered row rather than assumed, since minmax()'s floor can still win on a
+   narrow window. Widened past its visible line so the grab target isn't a single pixel. */
+.graphresizer{position:absolute;top:0;bottom:0;width:10px;margin-left:-5px;
+  cursor:col-resize;z-index:2;touch-action:none;}
+.graphresizer::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;
+  background:var(--hairline);transform:translateX(-50%);}
+.graphresizer:hover::after,.graphresizer.active::after,.graphresizer:focus-visible::after{
+  background:var(--accent);width:2px;}
 .graphbar{display:flex;height:.85rem;border-radius:4px;background:var(--panel);
   overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);}
 .graphbar i{display:block;height:100%;}
@@ -558,7 +573,7 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
    never nudges the timing next to it. */
 .rowcopy{margin-left:.4rem;padding:0 .25rem;border:0;background:none;cursor:pointer;
   color:var(--muted);font-size:.75rem;line-height:1;opacity:0;transition:opacity .12s;}
-tr:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
+tr:hover .rowcopy,.graphrow:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
 .rowcopy:hover{color:var(--fg);}
 
 .fold.grouped .fcount{color:var(--accent);}
