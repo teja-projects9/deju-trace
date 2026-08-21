@@ -693,11 +693,11 @@
    * rendered row rather than per recorded row, which is affordable now that only a
    * screenful is ever in the document.
    */
-  function copyButton(textOf) {
+  function copyButton(textOf, title) {
     var b = el('button', 'rowcopy', '⧉');
     b.type = 'button';
-    b.title = 'Copy this step as text';
-    b.setAttribute('aria-label', 'Copy this step as text');
+    b.title = title || 'Copy this step as text';
+    b.setAttribute('aria-label', title || 'Copy this step as text');
     b.addEventListener('click', function (ev) {
       ev.stopPropagation();          // the row itself collapses on click
       copyText(textOf(), function (ok) { flash(b, ok ? '✓' : '✕'); });
@@ -3900,6 +3900,84 @@
   var graphAllBtn = byId('graphAllBtn');
   var graphMethodBtn = byId('graphMethodBtn');
 
+  // ---------------------------------------------------- graph name column resize ---
+  //
+  // The name column is a CSS grid track capped by --graph-name-w (report.css), so dragging
+  // this handle is nothing but moving that one number; the handle itself just tracks where
+  // the rendered column actually ended up, since the minmax() floor can still win on a
+  // narrow window regardless of what was dragged.
+
+  var GRAPH_NAME_W_KEY = 'deju.report.graphNameW';
+  var GRAPH_NAME_MIN = 100;    // px
+  var GRAPH_NAME_MAX = 480;    // px
+  var graphList = byId('graphList');
+  var graphResizer = byId('graphResizer');
+  var graphDrag = null;
+
+  function setGraphNameW(px) {
+    var clamped = Math.max(GRAPH_NAME_MIN, Math.min(GRAPH_NAME_MAX, px));
+    graphList.style.setProperty('--graph-name-w', clamped + 'px');
+    return clamped;
+  }
+
+  function persistGraphNameW(px) {
+    try { window.localStorage.setItem(GRAPH_NAME_W_KEY, String(px)); } catch (e) { /* no storage */ }
+  }
+
+  (function () {
+    try {
+      var stored = parseFloat(window.localStorage.getItem(GRAPH_NAME_W_KEY));
+      if (stored > 0) setGraphNameW(stored);
+    } catch (e) { /* no storage */ }
+  }());
+
+  /** Snaps the handle to the boundary the first row's name cell actually rendered at. */
+  function positionGraphResizer() {
+    var row = graphBody.firstElementChild;
+    var cell = row && row.querySelector('.graphname');
+    if (!cell) { graphResizer.style.display = 'none'; return; }
+    graphResizer.style.display = '';
+    var listRect = graphList.getBoundingClientRect();
+    var cellRect = cell.getBoundingClientRect();
+    graphResizer.style.left = (cellRect.right - listRect.left) + 'px';
+  }
+
+  graphResizer.addEventListener('pointerdown', function (ev) {
+    var row = graphBody.firstElementChild;
+    var cell = row && row.querySelector('.graphname');
+    graphDrag = { startX: ev.clientX, startW: cell ? cell.getBoundingClientRect().width : GRAPH_NAME_MIN };
+    graphResizer.setPointerCapture(ev.pointerId);
+    graphResizer.classList.add('active');
+    ev.preventDefault();
+    graphResizer.focus();   // preventDefault above suppresses the mousedown's own focus step
+  });
+  graphResizer.addEventListener('pointermove', function (ev) {
+    if (!graphDrag) return;
+    setGraphNameW(graphDrag.startW + (ev.clientX - graphDrag.startX));
+    positionGraphResizer();
+  });
+  function endGraphDrag(ev) {
+    if (!graphDrag) return;
+    persistGraphNameW(setGraphNameW(graphDrag.startW + (ev.clientX - graphDrag.startX)));
+    graphDrag = null;
+    graphResizer.classList.remove('active');
+    positionGraphResizer();
+  }
+  graphResizer.addEventListener('pointerup', endGraphDrag);
+  graphResizer.addEventListener('pointercancel', endGraphDrag);
+  graphResizer.addEventListener('keydown', function (ev) {
+    var cell = graphBody.firstElementChild && graphBody.firstElementChild.querySelector('.graphname');
+    if (!cell) return;
+    var step = 0;
+    if (ev.key === 'ArrowLeft') step = -16;
+    else if (ev.key === 'ArrowRight') step = 16;
+    else return;
+    ev.preventDefault();
+    persistGraphNameW(setGraphNameW(cell.getBoundingClientRect().width + step));
+    positionGraphResizer();
+  });
+  window.addEventListener('resize', function () { if (!graphPanel.hidden) positionGraphResizer(); });
+
   /**
    * Time per file, split into the file's own code and the SQL it caused.
    *
@@ -3979,6 +4057,8 @@
         r = rows[key] = {
           label: f.sourceFileName || simpleName(f.fqClassName) || key,
           sub: f.path || '',
+          className: f.fqClassName || null,
+          methodName: null,
           self: 0, total: 0, calls: 0,
           sql: 0,
           queries: 0,
@@ -4025,6 +4105,8 @@
         r = rows[key] = {
           label: (mth || '?') + '()',
           sub: simpleName(cls) || cls || '',
+          className: cls || null,
+          methodName: mth || null,
           self: 0, total: 0, calls: 0,
           sql: 0,
           queries: 0,
@@ -4109,11 +4191,15 @@
       var row = el('div', 'graphrow');
 
       var name = el('div', 'graphname');
-      name.appendChild(document.createTextNode(r.label));
+      var label = el('span', 'graphlabel');
+      label.appendChild(document.createTextNode(r.label));
       if (r.sub) {
         name.title = r.sub;
-        name.appendChild(el('span', 'sub', r.sub));
+        label.appendChild(el('span', 'sub', r.sub));
       }
+      name.appendChild(label);
+      name.appendChild(copyButton(function () { return graphCopyText(r); },
+        r.methodName ? 'Copy class and method name' : 'Copy class name'));
       row.appendChild(name);
 
       // Widths are percentages of the widest bar, so the longest row always fills the
@@ -4170,6 +4256,15 @@
     graphBody.appendChild(frag);
     countEl.textContent = rows.length + (rows.length === 1 ? ' ' + unit : ' ' + unit + 's')
       + ' · ' + fmt(grand) + ' attributed';
+    positionGraphResizer();
+  }
+
+  /** What the row's copy button puts on the clipboard: the fully-qualified class, and the
+   *  method too once the Breakdown is grouped by method rather than by file. */
+  function graphCopyText(r) {
+    var cls = r.className || r.sub || r.label;
+    if (!r.methodName) return cls;
+    return cls + '.' + methodLabel(r.methodName, r.className) + '()';
   }
 
   graphSqlBtn.addEventListener('click', function () {
