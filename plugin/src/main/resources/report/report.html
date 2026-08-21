@@ -187,6 +187,8 @@ Press Enter to apply, Esc to cancel.">
             title="Lay the diagram out by time instead of by nesting: box width is duration">Flame</button>
     <button class="toggle" id="flowChartBtn" type="button"
             title="A flowchart of distinct steps, coloured by line coverage, with an animated marker that walks the run in execution order">API Flow</button>
+    <button class="toggle" id="chartOrientBtn" type="button" hidden
+            title="Switch the flowchart between a left-to-right layout and a top-to-bottom one with Start/End">Top &rarr; bottom</button>
     <span class="zoomseg" id="chartPlaySeg" hidden>
       <button class="toggle zoombtn" id="chartPlayBtn" type="button" title="Play the run through the flowchart">&#9654;</button>
       <button class="toggle zoombtn" id="chartResetBtn" type="button" title="Back to the start">&#8634;</button>
@@ -197,7 +199,12 @@ Press Enter to apply, Esc to cancel.">
       <option value="2">2&times;</option>
       <option value="4">4&times;</option>
       <option value="8">8&times;</option>
+      <option value="custom">Custom&hellip;</option>
     </select>
+    <input class="chartspeed-custom" id="chartSpeedCustom" type="range" hidden
+           min="0.05" max="8" step="0.05" value="0.5"
+           title="Drag for a slower or faster walk-through than the presets allow, down to a twentieth of normal speed">
+    <span class="chartspeed-val" id="chartSpeedVal" hidden>0.50&times;</span>
     <select class="sort" id="flowColorSel" title="What a frame's colour means in the flame layout">
       <option value="glowroot">Glowroot</option>
       <option value="deju">Deju</option>
@@ -244,7 +251,11 @@ Press Enter to apply, Esc to cancel.">
     <span><i class="sw sw-self"></i>Own code</span>
     <span><i class="sw sw-sql"></i>SQL</span>
   </div>
-  <div id="graphBody"></div>
+  <div class="graphlist" id="graphList">
+    <div id="graphBody"></div>
+    <div class="graphresizer" id="graphResizer" role="separator" aria-orientation="vertical"
+         aria-label="Resize the name column" tabindex="0" title="Drag to resize the name column"></div>
+  </div>
   <div class="empty" id="graphEmpty" hidden>This run recorded no per-file timing.</div>
 </section><!--/tab:graph-->
 

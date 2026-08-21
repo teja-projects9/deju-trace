@@ -77,6 +77,27 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.3.0</b>: a flowchart with a start and an end</p>
+        <ul>
+          <li><b>New: API Flow can run top to bottom.</b> A button beside <b>API Flow</b>
+          switches the diagram from left-to-right to a traditional top-down flowchart. A
+          level with many siblings wraps onto more rows instead of stretching the diagram
+          sideways, the same crowding fix the left-to-right layout already had.</li>
+          <li><b>New: Start and End.</b> Every API Flow diagram, in either layout, now
+          brackets the run with where it began and where every branch of it stopped.</li>
+          <li><b>New: Play leaves numbered footprints.</b> Each step gets a number the
+          first time the marker reaches it, in the order it reached them, so a paused or
+          finished run still shows what happened when without replaying it.</li>
+          <li><b>New: play slower.</b> The speed dropdown's presets stopped at 0.5&times;;
+          a <b>Custom&hellip;</b> option now adds a slider down to a twentieth of that, for
+          a first watch of an unfamiliar run.</li>
+          <li><b>New: Breakdown's name column resizes.</b> Drag the handle next to it, or
+          focus it and use the arrow keys, to see more of a long file or package path. The
+          width is remembered next time.</li>
+          <li><b>New: copy a class or method name.</b> Each Breakdown row has a copy button
+          beside its name &mdash; the class alone grouped <b>By file</b>, class and method
+          together grouped <b>By method</b>.</li>
+        </ul>
         <p><b>2.2.0</b>: CPU time, comparing runs, and a flame graph that stays flat</p>
         <ul>
           <li><b>New: CPU time.</b> The summary bar now shows how much CPU this thread
