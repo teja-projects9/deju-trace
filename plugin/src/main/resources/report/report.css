@@ -403,15 +403,26 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 
 .panelnote{color:var(--muted);font-size:.76rem;margin:0 0 .75rem;}
 
+.flownoterow{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+  flex-wrap:wrap;}
+.flownoterow .panelnote{margin:0 0 .75rem;}
+.flownoterow .graphlegend{margin:0 0 .75rem;}
+
 .graphlegend{display:flex;gap:1rem;align-items:center;font-size:.74rem;color:var(--muted);
   margin:0 0 .6rem;}
 .graphlegend span{display:inline-flex;align-items:center;gap:.35rem;}
 .sw{width:.7rem;height:.7rem;border-radius:3px;display:inline-block;}
 .sw-self{background:var(--accent);}
 .sw-sql{background:var(--sql-ink);}
+.sw-full{background:var(--full);}
+.sw-partial{background:var(--partial);}
+.sw-none{background:var(--none);}
 
-.zoomseg{display:inline-flex;gap:.25rem;}
+.zoomseg{display:inline-flex;gap:.4rem;align-items:center;}
 .zoombtn{min-width:2rem;text-align:center;font-weight:600;padding:.32rem .5rem;}
+.zoom-slider{width:6rem;accent-color:var(--accent);cursor:pointer;}
+.zoom-value{min-width:5rem;padding:.42rem .3rem;text-align:center;}
+.zoom-pct{font-size:.8rem;color:var(--muted);}
 
 /* The fine-grained playback speed, shown only once "Custom…" is picked in the select
    beside it: a preset list tops out at 0.5x, and a first watch of an unfamiliar run often
@@ -503,19 +514,40 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
   font-size:.66rem;font-weight:700;line-height:1.5;text-align:center;vertical-align:baseline;}
 .segbtn.hasfindings .tabbadge{background:var(--none);}
 
+.findgroup{margin:0 0 1.1rem;}
+.findgroup-head{display:flex;align-items:center;gap:.4rem;width:100%;margin:0 0 .5rem;
+  padding:.15rem 0;font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--muted);background:none;border:none;
+  cursor:pointer;text-align:left;}
+.findgroup-head:hover{color:var(--fg);}
+.findgroup-chevron{flex:0 0 auto;width:1em;color:var(--muted);}
+.findgroup-label{flex:0 0 auto;}
+.findgroup-count{flex:0 0 auto;min-width:1.3em;padding:.05rem .4rem;border-radius:999px;
+  background:var(--control);color:var(--muted);font-size:.7rem;text-align:center;}
+.findgroup.high .findgroup-label,.findgroup.high .findgroup-count{color:var(--none);}
+.findgroup.med .findgroup-label,.findgroup.med .findgroup-count{color:var(--partial);}
+.findgroup.high .findgroup-count{background:color-mix(in srgb,var(--none) 16%,var(--control));}
+.findgroup.med .findgroup-count{background:color-mix(in srgb,var(--partial) 16%,var(--control));}
+.findgroup-body[hidden]{display:none;}
+
 .finding{border:1px solid var(--border);border-left:3px solid var(--muted);
-  border-radius:var(--radius);background:var(--panel);padding:.6rem .8rem;margin:0 0 .5rem;}
+  border-radius:var(--radius);background:var(--panel);padding:.65rem .85rem;margin:0 0 .55rem;
+  transition:border-color .12s ease,box-shadow .12s ease;}
+.finding:hover{border-color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.finding:last-child{margin-bottom:0;}
 .finding.high{border-left-color:var(--none);}
 .finding.med{border-left-color:var(--partial);}
 .finding.info{border-left-color:var(--accent);}
-.finding .fsev{display:inline-block;font-size:.64rem;font-weight:700;letter-spacing:.04em;
-  text-transform:uppercase;color:var(--muted);}
-.finding.high .fsev{color:var(--none);}
-.finding.med .fsev{color:var(--partial);}
-.finding h4{margin:.15rem 0 .3rem;font-size:.92rem;font-weight:650;}
+.finding .fsev{display:inline-block;font-size:.62rem;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted);background:var(--control);
+  padding:.1rem .45rem;border-radius:999px;}
+.finding.high .fsev{color:var(--none);background:color-mix(in srgb,var(--none) 14%,var(--control));}
+.finding.med .fsev{color:var(--partial);background:color-mix(in srgb,var(--partial) 14%,var(--control));}
+.finding h4{margin:.4rem 0 .3rem;font-size:.92rem;font-weight:650;}
 .finding p{margin:0;color:var(--muted);font-size:.8rem;line-height:1.5;
   white-space:normal;overflow-wrap:anywhere;}
-.finding .act{margin-top:.45rem;}
+.finding .sqltext{margin:.5rem 0 0;}
+.finding .act{margin-top:.5rem;}
 
 /* ------------------------------------------------------------------ timeline --- */
 

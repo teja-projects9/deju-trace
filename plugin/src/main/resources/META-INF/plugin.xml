@@ -77,6 +77,30 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.4.0</b>: a flowchart, a flame graph, and findings that read like a report</p>
+        <ul>
+          <li>Renamed for clarity: <b>API Flow</b> is now <b>Flow Chart</b>, and it is the
+          default view when the Flow tab opens.</li>
+          <li><b>Flow Chart, Flame Graph and Steps are now tabs</b> of their own, not toggle
+          buttons sharing a toolbar with everything else, so switching between them reads
+          the way switching the report's other tabs already does.</li>
+          <li><b>New: each Flow Chart box shows its share of the run.</b> Every step is the
+          same size regardless of how long it took; a percentage now says which ones
+          actually mattered.</li>
+          <li><b>Fixed: the Flow Chart's Play marker now rides the actual line</b> into the
+          next box instead of cutting a straight line through whatever sat between them, and
+          a loop that hit the same call many times in a row now animates as one step marked
+          with its count instead of idling through every repeat.</li>
+          <li><b>Flame Graph redrawn in the classic style</b> &mdash; a warm, independently
+          randomised colour per frame, a pale background wash, and no time ruler, the way
+          Brendan Gregg's original reads. Searching now highlights matches in place and
+          shows the percentage of the run they cover, instead of hiding everything else.</li>
+          <li><b>Fixed: the Flame Graph zoom box</b> stopped reflecting the zoom actually
+          applied and always read back "100"; it now shows the real value.</li>
+          <li><b>Findings are grouped by severity</b> and collapsible, and a query inside
+          one is now syntax-highlighted the same way it is everywhere else in the
+          report.</li>
+        </ul>
         <p><b>2.3.0</b>: a flowchart with a start and an end</p>
         <ul>
           <li><b>New: API Flow can run top to bottom.</b> A button beside <b>API Flow</b>

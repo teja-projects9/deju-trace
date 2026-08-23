@@ -411,15 +411,26 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
 
 .panelnote{color:var(--muted);font-size:.76rem;margin:0 0 .75rem;}
 
+.flownoterow{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+  flex-wrap:wrap;}
+.flownoterow .panelnote{margin:0 0 .75rem;}
+.flownoterow .graphlegend{margin:0 0 .75rem;}
+
 .graphlegend{display:flex;gap:1rem;align-items:center;font-size:.74rem;color:var(--muted);
   margin:0 0 .6rem;}
 .graphlegend span{display:inline-flex;align-items:center;gap:.35rem;}
 .sw{width:.7rem;height:.7rem;border-radius:3px;display:inline-block;}
 .sw-self{background:var(--accent);}
 .sw-sql{background:var(--sql-ink);}
+.sw-full{background:var(--full);}
+.sw-partial{background:var(--partial);}
+.sw-none{background:var(--none);}
 
-.zoomseg{display:inline-flex;gap:.25rem;}
+.zoomseg{display:inline-flex;gap:.4rem;align-items:center;}
 .zoombtn{min-width:2rem;text-align:center;font-weight:600;padding:.32rem .5rem;}
+.zoom-slider{width:6rem;accent-color:var(--accent);cursor:pointer;}
+.zoom-value{min-width:5rem;padding:.42rem .3rem;text-align:center;}
+.zoom-pct{font-size:.8rem;color:var(--muted);}
 
 /* The fine-grained playback speed, shown only once "Custom…" is picked in the select
    beside it: a preset list tops out at 0.5x, and a first watch of an unfamiliar run often
@@ -511,19 +522,40 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
   font-size:.66rem;font-weight:700;line-height:1.5;text-align:center;vertical-align:baseline;}
 .segbtn.hasfindings .tabbadge{background:var(--none);}
 
+.findgroup{margin:0 0 1.1rem;}
+.findgroup-head{display:flex;align-items:center;gap:.4rem;width:100%;margin:0 0 .5rem;
+  padding:.15rem 0;font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--muted);background:none;border:none;
+  cursor:pointer;text-align:left;}
+.findgroup-head:hover{color:var(--fg);}
+.findgroup-chevron{flex:0 0 auto;width:1em;color:var(--muted);}
+.findgroup-label{flex:0 0 auto;}
+.findgroup-count{flex:0 0 auto;min-width:1.3em;padding:.05rem .4rem;border-radius:999px;
+  background:var(--control);color:var(--muted);font-size:.7rem;text-align:center;}
+.findgroup.high .findgroup-label,.findgroup.high .findgroup-count{color:var(--none);}
+.findgroup.med .findgroup-label,.findgroup.med .findgroup-count{color:var(--partial);}
+.findgroup.high .findgroup-count{background:color-mix(in srgb,var(--none) 16%,var(--control));}
+.findgroup.med .findgroup-count{background:color-mix(in srgb,var(--partial) 16%,var(--control));}
+.findgroup-body[hidden]{display:none;}
+
 .finding{border:1px solid var(--border);border-left:3px solid var(--muted);
-  border-radius:var(--radius);background:var(--panel);padding:.6rem .8rem;margin:0 0 .5rem;}
+  border-radius:var(--radius);background:var(--panel);padding:.65rem .85rem;margin:0 0 .55rem;
+  transition:border-color .12s ease,box-shadow .12s ease;}
+.finding:hover{border-color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.finding:last-child{margin-bottom:0;}
 .finding.high{border-left-color:var(--none);}
 .finding.med{border-left-color:var(--partial);}
 .finding.info{border-left-color:var(--accent);}
-.finding .fsev{display:inline-block;font-size:.64rem;font-weight:700;letter-spacing:.04em;
-  text-transform:uppercase;color:var(--muted);}
-.finding.high .fsev{color:var(--none);}
-.finding.med .fsev{color:var(--partial);}
-.finding h4{margin:.15rem 0 .3rem;font-size:.92rem;font-weight:650;}
+.finding .fsev{display:inline-block;font-size:.62rem;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted);background:var(--control);
+  padding:.1rem .45rem;border-radius:999px;}
+.finding.high .fsev{color:var(--none);background:color-mix(in srgb,var(--none) 14%,var(--control));}
+.finding.med .fsev{color:var(--partial);background:color-mix(in srgb,var(--partial) 14%,var(--control));}
+.finding h4{margin:.4rem 0 .3rem;font-size:.92rem;font-weight:650;}
 .finding p{margin:0;color:var(--muted);font-size:.8rem;line-height:1.5;
   white-space:normal;overflow-wrap:anywhere;}
-.finding .act{margin-top:.45rem;}
+.finding .sqltext{margin:.5rem 0 0;}
+.finding .act{margin-top:.5rem;}
 
 /* ------------------------------------------------------------------ timeline --- */
 
@@ -706,7 +738,7 @@ tr.landed td,.file.landed h2,.tlrow.landed{
   <div class="seg" id="tabSeg" role="tablist">
     <!--tab:trace--><button class="segbtn on" id="tabTrace" type="button" role="tab" aria-selected="true" title="Line coverage and the call tree">Call Tree</button><!--/tab:trace-->
     <!--tab:graph--><button class="segbtn" id="tabGraph" type="button" role="tab" aria-selected="false" title="Where the time went, per file">Breakdown</button><!--/tab:graph-->
-    <!--tab:flow--><button class="segbtn" id="tabFlow" type="button" role="tab" aria-selected="false" title="The call flow from start to end">Flame Graph</button><!--/tab:flow-->
+    <!--tab:flow--><button class="segbtn" id="tabFlow" type="button" role="tab" aria-selected="false" title="The call flow from start to end: as steps, a flame graph, or a flowchart">Flow</button><!--/tab:flow-->
     <!--tab:timeline--><button class="segbtn" id="tabTimeline" type="button" role="tab" aria-selected="false" title="Where the wall clock actually went">Timeline</button><!--/tab:timeline-->
     <!--tab:findings--><button class="segbtn" id="tabFindings" type="button" role="tab" aria-selected="false" title="Things in this run worth a look">Findings <span class="tabbadge" id="findingsBadge" hidden></span></button><!--/tab:findings-->
   </div>
@@ -829,6 +861,14 @@ Press Enter to apply, Esc to cancel.">
   </span><!--/tab:findings-->
 
 <!--tab:flow-->  <span class="ctlgroup" id="flowControls" hidden>
+    <div class="seg" id="flowViewSeg" role="tablist">
+      <button class="segbtn on" id="flowChartBtn" type="button" role="tab" aria-selected="true"
+              title="A flowchart of distinct steps, coloured by line coverage, with an animated marker that walks the run in execution order">Flow Chart</button>
+      <button class="segbtn" id="flowFlameBtn" type="button" role="tab" aria-selected="false"
+              title="Lay the diagram out by time instead of by nesting: box width is duration">Flame Graph</button>
+      <button class="segbtn" id="flowStepsBtn" type="button" role="tab" aria-selected="false"
+              title="Every call in execution order, nested by depth">Steps</button>
+    </div>
     <select class="sort" id="flowScopeSel"
             title="Which steps the filter box keeps. A match always keeps its callers, so the chain back to the entry point stays whole; this only decides whether what it called is kept too.">
       <option value="sub">Match, with callers &amp; callees</option>
@@ -840,19 +880,15 @@ Press Enter to apply, Esc to cancel.">
             title="Fold a run of identical sibling calls into one box marked with its count">Group repeats</button>
     <button class="toggle excl" id="flowExcludedBtn" type="button" hidden
             title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
-    <button class="toggle" id="flowHotBtn" type="button"
+    <button class="toggle" id="flowHotBtn" type="button" hidden
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
-    <button class="toggle" id="flowFlameBtn" type="button"
-            title="Lay the diagram out by time instead of by nesting: box width is duration">Flame</button>
-    <button class="toggle" id="flowChartBtn" type="button"
-            title="A flowchart of distinct steps, coloured by line coverage, with an animated marker that walks the run in execution order">API Flow</button>
-    <button class="toggle" id="chartOrientBtn" type="button" hidden
-            title="Switch the flowchart between a left-to-right layout and a top-to-bottom one with Start/End">Top &rarr; bottom</button>
-    <span class="zoomseg" id="chartPlaySeg" hidden>
+    <button class="toggle on" id="chartOrientBtn" type="button"
+            title="Switch back to the left-to-right layout">Left &rarr; right</button>
+    <span class="zoomseg" id="chartPlaySeg">
       <button class="toggle zoombtn" id="chartPlayBtn" type="button" title="Play the run through the flowchart">&#9654;</button>
       <button class="toggle zoombtn" id="chartResetBtn" type="button" title="Back to the start">&#8634;</button>
     </span>
-    <select class="sort" id="chartSpeedSel" hidden title="Playback speed">
+    <select class="sort" id="chartSpeedSel" title="Playback speed">
       <option value="0.5">0.5&times;</option>
       <option value="1" selected>1&times;</option>
       <option value="2">2&times;</option>
@@ -864,20 +900,18 @@ Press Enter to apply, Esc to cancel.">
            min="0.05" max="8" step="0.05" value="0.5"
            title="Drag for a slower or faster walk-through than the presets allow, down to a twentieth of normal speed">
     <span class="chartspeed-val" id="chartSpeedVal" hidden>0.50&times;</span>
-    <select class="sort" id="flowColorSel" title="What a frame's colour means in the flame layout">
-      <option value="glowroot">Glowroot</option>
-      <option value="deju">Deju</option>
-      <option value="pkg">By package</option>
-    </select>
-    <select class="sort" id="flowMinWSel" title="Narrowest a frame may be drawn in the flame layout. Above 1px the diagram stops being a true time axis, and every frame becomes visible instead.">
+    <select class="sort" id="flowMinWSel" hidden title="Narrowest a frame may be drawn in the flame layout. Above 1px the diagram stops being a true time axis, and every frame becomes visible instead.">
       <option value="1">Every frame 1px</option>
       <option value="3">Every frame 3px</option>
       <option value="12">Every frame 12px</option>
       <option value="34">Every frame labelled</option>
     </select>
     <span class="zoomseg">
-      <button class="toggle zoombtn" id="flowOutBtn" type="button" title="Zoom out">&minus;</button>
-      <button class="toggle zoombtn" id="flowInBtn" type="button" title="Zoom in">&plus;</button>
+      <input class="zoom-slider" id="flowZoomSlider" type="range" min="40" max="300" step="5" value="100"
+             title="Drag to zoom the diagram">
+      <input class="search zoom-value" id="flowZoomValue" type="text" inputmode="numeric" size="3" value="100" maxlength="3"
+             title="Type a zoom percentage. Press Enter to apply, Esc to cancel.">
+      <span class="zoom-pct">%</span>
     </span>
     <button class="toggle on" id="flowFitBtn" type="button" title="Scale the diagram to fit the window width">Fit width</button>
     <button class="toggle" id="flowPngBtn" type="button" title="Save the diagram as a PNG image">Save PNG</button>
@@ -919,7 +953,15 @@ Press Enter to apply, Esc to cancel.">
 </section><!--/tab:graph-->
 
 <!--tab:flow--><section id="flowPanel" role="tabpanel" hidden>
-  <p class="panelnote" id="flowNote"></p>
+  <div class="flownoterow">
+    <p class="panelnote" id="flowNote"></p>
+    <div class="graphlegend" id="chartLegend">
+      <span><i class="sw sw-full"></i>Fully executed</span>
+      <span><i class="sw sw-partial"></i>Only some branches taken</span>
+      <span><i class="sw sw-none"></i>Entered method, line not executed</span>
+      <span><i class="sw sw-sql"></i>SQL query</span>
+    </div>
+  </div>
   <div class="flowcrumb" id="flowCrumb" hidden></div>
   <div class="flowwrap" id="flowWrap"></div>
   <div class="flowtip" id="flowTip" hidden></div>
@@ -4759,14 +4801,19 @@ Press Enter to apply, Esc to cancel.">
   var findingsNote = byId('findingsNote');
   var findingsBadge = byId('findingsBadge');
   var findings = [];
+  // Collapsed by severity, not remembered across a reload: a long "for information" group
+  // is the one worth folding away on open, without it staying folded the next time the
+  // report is opened and hiding a finding that matters on a different run.
+  var findingsCollapsed = { info: true };
 
   /** Repeats of one call worth mentioning, and queries worth mentioning, start here. */
   var FIND_REPEAT_CALLS = 20;      // same method this many times over
   var FIND_N_PLUS_ONE = 3;         // identical statements from one file
   var FIND_SHARE = 0.15;           // a step must own this share of the run to be "hot"
 
-  function addFinding(sev, title, detail, seq) {
-    findings.push({ sev: sev, title: title, detail: detail, seq: seq == null ? null : seq });
+  function addFinding(sev, title, detail, seq, sql) {
+    findings.push({ sev: sev, title: title, detail: detail, seq: seq == null ? null : seq,
+      sql: sql || null });
   }
 
   function buildFindings() {
@@ -4805,8 +4852,8 @@ Press Enter to apply, Esc to cancel.">
           g.n + ' identical queries from ' + g.owner,
           'The same statement ran ' + g.n + ' times and cost ' + fmt(g.micros)
           + ' altogether. That is the shape of a query inside a loop; fetching the set in '
-          + 'one statement would replace all ' + g.n + '.\n' + shorten(g.sql, 240),
-          g.first);
+          + 'one statement would replace all ' + g.n + '.',
+          g.first, shorten(g.sql, 240));
       });
   }
 
@@ -4823,9 +4870,8 @@ Press Enter to apply, Esc to cancel.">
     addFinding(share >= 0.3 ? 'high' : 'med',
       'One query took ' + fmt(worst.totalMicros),
       (runMicros > 0 ? 'That is ' + Math.round(share * 100) + '% of the whole request. ' : '')
-      + 'Worth an execution plan before anything else in this trace.\n'
-      + shorten(String(worst.sql).replace(/\s+/g, ' ').trim(), 240),
-      worst.seq);
+      + 'Worth an execution plan before anything else in this trace.',
+      worst.seq, shorten(String(worst.sql).replace(/\s+/g, ' ').trim(), 240));
   }
 
   /**
@@ -4938,7 +4984,7 @@ Press Enter to apply, Esc to cancel.">
     findingsBadge.hidden = findings.length === 0;
     var fq = queryFor('findings').trim().toLowerCase();
     var shown = fq === '' ? findings : findings.filter(function (f) {
-      return (f.title + ' ' + f.detail).toLowerCase().indexOf(fq) !== -1;
+      return (f.title + ' ' + f.detail + ' ' + (f.sql || '')).toLowerCase().indexOf(fq) !== -1;
     });
     findingsEmpty.hidden = shown.length > 0;
     findingsEmpty.textContent = findings.length === 0
@@ -4950,29 +4996,76 @@ Press Enter to apply, Esc to cancel.">
     findingsNote.hidden = shown.length === 0;
 
     var frag = document.createDocumentFragment();
-    shown.forEach(function (f) {
-      var card = el('div', 'finding ' + f.sev);
-      card.appendChild(el('span', 'fsev', f.sev === 'high' ? 'Look here'
-        : (f.sev === 'med' ? 'Worth a look' : 'For information')));
-      card.appendChild(el('h4', null, f.title));
-      // The detail carries <b> from a couple of rules and a statement from others, so it
-      // is split on the tags we emit ourselves and everything else is a text node. Traced
-      // SQL never reaches innerHTML.
-      var p = el('p');
-      appendRich(p, f.detail);
-      card.appendChild(p);
-      if (f.seq != null) {
-        var go = el('button', 'act', 'Show the step');
-        go.type = 'button';
-        go.addEventListener('click', function () { goToStep(f.seq); });
-        card.appendChild(go);
-      }
-      frag.appendChild(card);
+    FINDING_SEVS.forEach(function (grp) {
+      var items = shown.filter(function (f) { return f.sev === grp.sev; });
+      if (!items.length) return;
+      frag.appendChild(buildFindingGroup(grp, items));
     });
     findingsBody.textContent = '';
     findingsBody.appendChild(frag);
     countEl.textContent = findings.length
       + (findings.length === 1 ? ' finding' : ' findings');
+  }
+
+  /** Severity groups in the order the list already sorts by: worst first. */
+  var FINDING_SEVS = [
+    { sev: 'high', label: 'Look here' },
+    { sev: 'med', label: 'Worth a look' },
+    { sev: 'info', label: 'For information' }
+  ];
+
+  /**
+   * One severity's section: a header naming it and how many findings it holds, and its
+   * cards underneath. Collapsible per severity, so a long "for information" tail can fold
+   * away without taking the findings that actually need attention with it.
+   */
+  function buildFindingGroup(grp, items) {
+    var collapsed = !!findingsCollapsed[grp.sev];
+    var section = el('div', 'findgroup ' + grp.sev);
+    var head = el('button', 'findgroup-head');
+    head.type = 'button';
+    head.setAttribute('aria-expanded', String(!collapsed));
+    head.appendChild(el('span', 'findgroup-chevron', collapsed ? '▸' : '▾'));
+    head.appendChild(el('span', 'findgroup-label', grp.label));
+    head.appendChild(el('span', 'findgroup-count', String(items.length)));
+    head.addEventListener('click', function () {
+      findingsCollapsed[grp.sev] = !collapsed;
+      renderFindings();
+    });
+    section.appendChild(head);
+
+    var body = el('div', 'findgroup-body');
+    body.hidden = collapsed;
+    items.forEach(function (f) { body.appendChild(buildFindingCard(f)); });
+    section.appendChild(body);
+    return section;
+  }
+
+  function buildFindingCard(f) {
+    var card = el('div', 'finding ' + f.sev);
+    card.appendChild(el('span', 'fsev', f.sev === 'high' ? 'Look here'
+      : (f.sev === 'med' ? 'Worth a look' : 'For information')));
+    card.appendChild(el('h4', null, f.title));
+    // The detail carries <b> from a couple of rules and a statement from others, so it
+    // is split on the tags we emit ourselves and everything else is a text node. Traced
+    // SQL never reaches innerHTML.
+    var p = el('p');
+    appendRich(p, f.detail);
+    card.appendChild(p);
+    if (f.sql) {
+      // Same tokenized, coloured rendering the Call Tree and Flame tooltip give a query,
+      // so a statement reads the same way wherever this report shows one.
+      var code = el('pre', 'sqltext');
+      paintSql(code, f.sql);
+      card.appendChild(code);
+    }
+    if (f.seq != null) {
+      var go = el('button', 'act', 'Show the step');
+      go.type = 'button';
+      go.addEventListener('click', function () { goToStep(f.seq); });
+      card.appendChild(go);
+    }
+    return card;
   }
 
   /**
@@ -4995,7 +5088,8 @@ Press Enter to apply, Esc to cancel.">
   function findingsAsText() {
     return findings.map(function (f) {
       return '[' + f.sev.toUpperCase() + '] ' + f.title + '\n'
-        + f.detail.replace(/<\/?b>/g, '') + '\n';
+        + f.detail.replace(/<\/?b>/g, '') + '\n'
+        + (f.sql ? f.sql + '\n' : '');
     }).join('\n');
   }
 
@@ -5442,9 +5536,11 @@ Press Enter to apply, Esc to cancel.">
   var flowSqlBtn = byId('flowSqlBtn');
   var flowGroupBtn = byId('flowGroupBtn');
   var flowHotBtn = byId('flowHotBtn');
+  var flowStepsBtn = byId('flowStepsBtn');
   var flowFlameBtn = byId('flowFlameBtn');
   var flowChartBtn = byId('flowChartBtn');
   var chartOrientBtn = byId('chartOrientBtn');
+  var chartLegend = byId('chartLegend');
   var chartPlaySeg = byId('chartPlaySeg');
   var chartPlayBtn = byId('chartPlayBtn');
   var chartResetBtn = byId('chartResetBtn');
@@ -5453,12 +5549,11 @@ Press Enter to apply, Esc to cancel.">
   var chartSpeedVal = byId('chartSpeedVal');
   var flowCrumb = byId('flowCrumb');
   var flowFitBtn = byId('flowFitBtn');
-  var flowOutBtn = byId('flowOutBtn');
-  var flowInBtn = byId('flowInBtn');
+  var flowZoomSlider = byId('flowZoomSlider');
+  var flowZoomValue = byId('flowZoomValue');
   var flowPngBtn = byId('flowPngBtn');
   var flowSvgBtn = byId('flowSvgBtn');
   var flowScopeSel = byId('flowScopeSel');
-  var flowColorSel = byId('flowColorSel');
 
   var flowSpacer = null;       // sized to the whole diagram; the canvas is not
   var flowContentW = 0;        // diagram size in its own coordinates, pre-scale
@@ -5475,7 +5570,8 @@ Press Enter to apply, Esc to cancel.">
   var flowFilterText = '';
   var flowFilterLiteral = false;   // the pattern would not compile, so it is a substring
   var flowScope = 'sub';       // how a match pulls its neighbours in: sub | only | pkg
-  var flowColorMode = 'glowroot';
+  var flowMatchSelf = null;    // index -> 1 when the pattern filter's own text matched this step
+  var flowMatchTotal = 0;      // summed micros of every outermost matched subtree
   var flameRoot = null;        // seq the flame view is zoomed into, null for the whole run
   var collapsedFlow = {};      // seq -> true, subtree folded away by a click
   var flowSql = true;
@@ -5519,16 +5615,21 @@ Press Enter to apply, Esc to cancel.">
   });
   var flowFlame = false;
 
-  // -------------------------------------------------------------- API Flow chart ---
+  // -------------------------------------------------------------- Flow Chart ---
   // A separate, lightweight layout: one box per distinct call site (not per raw call,
   // which would be a hairball on any real trace), boxes arranged by nesting depth and
   // joined by their real caller/callee edges, coloured by the same coverage rollup the
   // Tree view uses. A marker walks the edges in actual execution order to animate it.
-  var flowChart = false;
+  var flowChart = true;        // the default layout for the Flow tab
   var chartNodes = [];      // deduped: {key, cls, mth, isSql, sql, status, x,y,w,h, n, total, order, depth}
   var chartByKey = {};
   var chartEdges = [];      // {from, to, x1,y1,x2,y2}
-  var chartPath = [];       // chartNodes entries, one per visit, in execution order (sampled if huge)
+  var chartEdgeByKey = {};  // "fromKey>toKey" -> edge, so the marker can walk the same line it draws
+  var chartPath = [];       // {node, reps} per distinct visit, in execution order (sampled if huge);
+                             // a call site hit several times in a row (a tight loop) collapses into
+                             // one entry so Play doesn't idle through every repeat
+  var chartPathSampled = false; // true only when CHART_MAX_PATH truncation actually kicked in
+  var chartLastKey = null;  // key of whichever call actually ran last, the only one that leads to End
   var chartContentW = 0;
   var chartContentH = 0;
   var chartHoverKey = null;
@@ -5538,11 +5639,6 @@ Press Enter to apply, Esc to cancel.">
   var chartSpeed = 1;
   var chartRAF = 0;
   var chartLastTick = 0;
-  // Which step of this playback run reached a given node first, and how many distinct
-  // nodes have been reached so far. Keyed by node key rather than kept on the node itself,
-  // since buildChart() throws chartNodes away and rebuilds them on every redraw.
-  var chartVisitOrder = {};
-  var chartVisitCount = 0;
   var CHART_STEP_MS = 500;  // time to cross one edge at 1x speed
   var CHART_MAX_PATH = 4000; // playback is sampled down past this so it finishes in a sane time
   var CHART_PAD = 24;
@@ -5556,7 +5652,11 @@ Press Enter to apply, Esc to cancel.">
   var CHART_LEVEL_GAP = 64;
   var CHART_SIB_GAP = 16;
   var CHART_DOT_R = 6;
-  var chartVertical = false;  // false: depth -> columns (left to right). true: depth -> rows (top to bottom).
+  // Start/End draw as a pill narrower than the grid cell they're centred in (see
+  // drawChartTerminator); an edge that stops at the cell's own edge instead of the pill's
+  // actual visible edge leaves a gap wherever the two don't line up.
+  var CHART_TERM_W = 108;
+  var chartVertical = true;  // false: depth -> columns (left to right). true: depth -> rows (top to bottom).
 
   /**
    * Narrowest a flame frame may be drawn, in pixels.
@@ -5570,8 +5670,6 @@ Press Enter to apply, Esc to cancel.">
   var flameWidened = false;   // true once the floor has had to stretch the diagram
   var flowFit = true;
   var flowHover = null;        // seq under the cursor, for the highlight
-  var flameSpan = 0;           // pixel width of the time axis, for the ruler
-  var flameTotal = 0;          // micros that width represents
   var flowZoom = 1;
   var flowScale = 1;
   var flowBoxW = 320;
@@ -5714,7 +5812,14 @@ Press Enter to apply, Esc to cancel.">
     if (!showExcluded && hasExclusions) {
       bits.push('excluded types are folded away');
     }
-    if (flowFilterText.trim()) {
+    if (flowFilterText.trim() && flowFlame) {
+      // Flame highlights a search rather than hiding around it, the way Brendan Gregg's own
+      // flame graph search does: everything stays on screen, matches turn magenta, and the
+      // number that matters is how much of the run they cover, not how many steps matched.
+      var pct = flowRootTotal > 0 ? (flowMatchTotal / flowRootTotal) * 100 : 0;
+      bits.push((flowFilterLiteral ? 'text' : 'pattern') + ' "' + flowFilterText.trim()
+        + '" highlighted, ' + (pct >= 0.1 ? pct.toFixed(1) : '<0.1') + '% of total time');
+    } else if (flowFilterText.trim()) {
       bits.push('filtered by ' + (flowFilterLiteral ? 'text' : 'pattern')
         + ' "' + flowFilterText.trim() + '"'
         + (flowScope === 'only' ? ', matches and their callers'
@@ -5782,6 +5887,8 @@ Press Enter to apply, Esc to cancel.">
   function computeFlowFilter() {
     flowKeep = null;
     flowFilterLiteral = false;
+    flowMatchSelf = null;
+    flowMatchTotal = 0;
     var q = flowFilterText.trim();
     if (!q || !flowNodes.length) return;
 
@@ -5800,6 +5907,18 @@ Press Enter to apply, Esc to cancel.">
       var node = flowNodes[i];
       var hay = flowScope === 'pkg' ? packageOf(node.owner) : (node.sig || '');
       if (re.test(hay)) { self[i] = 1; up[i] = 1; }
+    }
+    flowMatchSelf = self;
+    // Flame's search highlights rather than hides, and the "% of time matched" badge has to
+    // avoid double-counting a match nested inside another match — so this walks forward
+    // (parents always come first) tracking whether the nearest matched ancestor is the node
+    // itself, and only sums a subtree's whole duration at the outermost match in its chain.
+    var nearestSelf = new Int8Array(n);
+    for (var m = 0; m < n; m++) {
+      var pIdx = flowParentIdx[m];
+      var ancestorMatched = pIdx >= 0 && nearestSelf[pIdx];
+      nearestSelf[m] = self[m] || ancestorMatched ? 1 : 0;
+      if (self[m] && !ancestorMatched) flowMatchTotal += flowNodes[m].total;
     }
     // Backwards: a parent is always at a lower index, so one sweep carries every match up
     // to the root.
@@ -5882,8 +6001,11 @@ Press Enter to apply, Esc to cancel.">
     while (i < flowNodes.length) {
       var n = flowNodes[i];
       // Nothing under a dropped step can have matched — "kept" already propagated upward
-      // from every match — so its whole subtree goes with it.
-      if (flowKeep && !flowKeep[flowIdxBySeq[n.seq]]) { i += n.span; continue; }
+      // from every match — so its whole subtree goes with it. Flame is the exception: a
+      // search there highlights matches in place rather than hiding the rest, the way
+      // Brendan Gregg's own flame graph search behaves, so it never drops a step for this
+      // reason.
+      if (flowKeep && !flowFlame && !flowKeep[flowIdxBySeq[n.seq]]) { i += n.span; continue; }
       // Unticking a file hides its calls and everything they went on to do, which is what
       // the same picker already means in the Tree. Dropping the frame but keeping its
       // children would leave callees floating under a caller that is no longer drawn.
@@ -6043,7 +6165,7 @@ Press Enter to apply, Esc to cancel.">
       badge: v('--badge-bg', '#ff9933'),
       heat: v('--heat', 'rgba(74,144,217,.18)'),
       // Same tri-colour the Tree view marks line coverage with, reused so a step's colour
-      // in the API Flow chart means the same thing it does everywhere else in the report.
+      // in the Flow Chart means the same thing it does everywhere else in the report.
       full: v('--full', '#2da44e'),
       partial: v('--partial', '#bf8700'),
       none: v('--none', '#cf4a4a'),
@@ -6079,8 +6201,49 @@ Press Enter to apply, Esc to cancel.">
     return worst;
   }
 
+  var CHART_LOOP_WINDOW = 6; // longest repeating call pattern the animation folds into one lap
+
   /**
-   * Collapses {@link flowVisible} into the API Flow chart's graph: one node per distinct
+   * Folds a straight run of node visits down to one lap per repeating call pattern, so the
+   * Play marker steps through a loop body once instead of idling through every iteration —
+   * a tight loop like the same query fired 100 times back to back, or a call and its one
+   * child alternating 100 times, both collapse the same way. At each position it looks for
+   * the window length (1..{@link CHART_LOOP_WINDOW}) whose repeat covers the most ground,
+   * emits one path entry per node in that window tagged with how many laps it ran, then
+   * jumps past the whole repeated span; a span with no repeat just passes through untouched.
+   */
+  function collapseChartLoops(raw) {
+    var out = [];
+    var i = 0;
+    var n = raw.length;
+    while (i < n) {
+      var bestLen = 1, bestReps = 1;
+      var maxWindow = Math.min(CHART_LOOP_WINDOW, Math.floor((n - i) / 2));
+      for (var len = 1; len <= maxWindow; len++) {
+        var reps = 1;
+        while (i + (reps + 1) * len <= n) {
+          var same = true;
+          for (var k = 0; k < len; k++) {
+            if (raw[i + reps * len + k] !== raw[i + (reps - 1) * len + k]) { same = false; break; }
+          }
+          if (!same) break;
+          reps++;
+        }
+        if (reps >= 2 && reps * len > bestReps * bestLen) { bestLen = len; bestReps = reps; }
+      }
+      if (bestReps >= 2) {
+        for (var w = 0; w < bestLen; w++) out.push({ node: raw[i + w], reps: bestReps });
+        i += bestLen * bestReps;
+      } else {
+        out.push({ node: raw[i], reps: 1 });
+        i++;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Collapses {@link flowVisible} into the Flow Chart's graph: one node per distinct
    * call site (the same {@code key} {@link buildFlow} already dedupes repeats with), one
    * edge per distinct caller/callee pair, and the full visit sequence for the animation to
    * walk. Rebuilt on every draw rather than cached: the node count is small (call sites,
@@ -6090,9 +6253,10 @@ Press Enter to apply, Esc to cancel.">
     chartByKey = {};
     chartNodes = [];
     chartEdges = [];
-    chartPath = [];
-    var edgeSeen = {};
+    chartEdgeByKey = {};
+    chartLastKey = null;
     var order = 0;
+    var rawPath = [];
     for (var i = 0; i < flowVisible.length; i++) {
       var n = flowVisible[i];
       var cn = chartByKey[n.key];
@@ -6102,27 +6266,35 @@ Press Enter to apply, Esc to cancel.">
           key: n.key, isSql: n.isSql, sql: n.sql, cls: n.cls, mth: n.mth,
           className: n.cname, methodName: raw.methodName,
           status: n.isSql ? null : rollupStatus(n.cname, raw.methodName),
-          depth: n.depth, order: order++, firstSeq: n.seq,
+          depth: n.depth, order: order, num: order + 1, firstSeq: n.seq,
           n: 0, total: 0, recursive: false
         };
+        order++;
         chartNodes.push(cn);
       }
       cn.n++;
       cn.total += n.total || 0;
-      chartPath.push(cn);
+      rawPath.push(cn);
+      chartLastKey = n.key;
       var pn = flowBySeq[n.parentSeq];
       if (pn) {
         if (pn.key === n.key) {
           cn.recursive = true;
         } else if (chartByKey[pn.key]) {
           var ek = pn.key + '>' + n.key;
-          if (!edgeSeen[ek]) { edgeSeen[ek] = true; chartEdges.push({ from: pn.key, to: n.key }); }
+          if (!chartEdgeByKey[ek]) {
+            var edge = { from: pn.key, to: n.key };
+            chartEdgeByKey[ek] = edge;
+            chartEdges.push(edge);
+          }
         }
       }
     }
+    chartPath = collapseChartLoops(rawPath);
     // Sampled evenly rather than truncated, so a slow, rare tail step still gets a turn
     // instead of the animation only ever showing the first slice of a huge run.
-    if (chartPath.length > CHART_MAX_PATH) {
+    chartPathSampled = chartPath.length > CHART_MAX_PATH;
+    if (chartPathSampled) {
       var sampled = [];
       var step = chartPath.length / CHART_MAX_PATH;
       for (var p = 0; p < CHART_MAX_PATH; p++) sampled.push(chartPath[Math.floor(p * step)]);
@@ -6133,45 +6305,37 @@ Press Enter to apply, Esc to cancel.">
     chartProgress = 0;
   }
 
-  /** Wipes the numbered trail a previous playback left, for a fresh run to write over. */
-  function resetChartVisits() {
-    chartVisitOrder = {};
-    chartVisitCount = 0;
-  }
-
-  /** Gives the node at this step its number, the first time playback ever reaches it. */
-  function markChartVisit(idx) {
-    var node = chartPath[idx];
-    if (!node || chartVisitOrder[node.key] != null) return;
-    chartVisitCount++;
-    chartVisitOrder[node.key] = chartVisitCount;
-  }
-
   /**
    * Two synthetic bookends, added after every rebuild: not calls, so they carry no timing
    * or coverage and never enter the playback path, but the depth given to each — one
    * below the shallowest real step, one past the deepest — drops it into its own column
    * or band in either orientation for free, on exactly the same layout code as everything
-   * else. Start points at every depth-0 step (normally just the trace point); End
-   * gathers every step nothing calls onward from, however many there turn out to be.
+   * else. Start points at every depth-0 step (normally just the trace point); End takes
+   * one edge, from whichever call actually ran last.
+   *
+   * <p>Every other leaf (a step nothing calls onward from) just stops: it returns to its
+   * own caller, not to the end of the run, so drawing it as a shortcut into End would claim
+   * a thing that isn't true — the diagram used to do exactly that, and it read as if
+   * unrelated branches all fed into each other. Only the one call that was chronologically
+   * last is an actual dead end for the run as a whole.
    */
   function addChartTerminals() {
-    var hasOutgoing = {};
     var maxDepth = 0;
-    chartEdges.forEach(function (e) { hasOutgoing[e.from] = true; });
     chartNodes.forEach(function (n) { if (n.depth > maxDepth) maxDepth = n.depth; });
 
     var start = { key: '__start__', term: 'start', label: 'Start', depth: -1, order: 0,
-                  n: 0, total: 0, calls: 0, isSql: false, recursive: false };
+                  num: 0, n: 0, total: 0, calls: 0, isSql: false, recursive: false };
     var end = { key: '__end__', term: 'end', label: 'End', depth: maxDepth + 1, order: 0,
-                n: 0, total: 0, calls: 0, isSql: false, recursive: false };
+                num: chartNodes.length + 1, n: 0, total: 0, calls: 0, isSql: false, recursive: false };
     chartByKey[start.key] = start;
     chartByKey[end.key] = end;
 
     chartNodes.forEach(function (n) {
       if (n.depth === 0) chartEdges.push({ from: start.key, to: n.key });
-      if (!hasOutgoing[n.key]) chartEdges.push({ from: n.key, to: end.key });
     });
+    if (chartLastKey && chartByKey[chartLastKey]) {
+      chartEdges.push({ from: chartLastKey, to: end.key });
+    }
     chartNodes.unshift(start);
     chartNodes.push(end);
   }
@@ -6212,14 +6376,29 @@ Press Enter to apply, Esc to cancel.">
       x += CHART_NODE_W + CHART_LEVEL_GAP;
     });
     chartContentW = x - CHART_LEVEL_GAP + CHART_PAD;
-    chartContentH = maxBottom - CHART_SIB_GAP + CHART_PAD;
+    var railY = maxBottom + CHART_PAD;
+    chartContentH = railY + CHART_PAD;
+    var end = chartByKey['__end__'];
     chartEdges.forEach(function (e) {
       var a = chartByKey[e.from];
       var b = chartByKey[e.to];
       if (!a || !b) return;
-      e.x1 = a.x + a.w; e.y1 = a.y + a.h / 2;
-      e.x2 = b.x; e.y2 = b.y + b.h / 2;
+      e.x1 = a.term ? a.x + a.w / 2 + CHART_TERM_W / 2 : a.x + a.w;
+      e.y1 = a.y + a.h / 2;
+      if (end && b === end) {
+        // The run's actual last call can sit in any column short of the deepest one, so a
+        // direct line to End would cut across every column in between at whatever angle the
+        // two centres happen to imply, crossing straight through boxes it has nothing to do
+        // with. Routing it under everything instead — down, along a rail below the last
+        // row, then up into End's own underside — means it only ever touches End itself.
+        e.rail = true;
+        e.railY = railY;
+        e.x2 = end.x + end.w / 2; e.y2 = end.y + end.h;
+      } else {
+        e.x2 = b.x; e.y2 = b.y + b.h / 2;
+      }
     });
+    layoutChartEdgeBends(true);
   }
 
   /**
@@ -6273,14 +6452,62 @@ Press Enter to apply, Esc to cancel.">
       y += band.rowCount * CHART_NODE_H + (band.rowCount - 1) * CHART_SIB_GAP + CHART_LEVEL_GAP;
     });
 
-    chartContentW = maxRowW + CHART_PAD * 2;
+    var railX = maxRowW + CHART_PAD;
+    chartContentW = railX + CHART_PAD;
     chartContentH = y - CHART_LEVEL_GAP + CHART_PAD;
+    var end = chartByKey['__end__'];
     chartEdges.forEach(function (e) {
       var a = chartByKey[e.from];
       var b = chartByKey[e.to];
       if (!a || !b) return;
-      e.x1 = a.x + a.w / 2; e.y1 = a.y + a.h;
-      e.x2 = b.x + b.w / 2; e.y2 = b.y;
+      if (end && b === end) {
+        // Same reasoning as the horizontal layout's rail (see layoutChartHorizontal): the
+        // last call can be in any band short of the deepest one, so a direct line up there
+        // would cross bands that have nothing to do with it. Out to a rail past the widest
+        // row, down to End's band, then in through End's own side instead.
+        e.rail = true;
+        e.railX = railX;
+        e.x1 = a.x + a.w; e.y1 = a.y + a.h / 2;
+        e.x2 = end.x + end.w / 2 + CHART_TERM_W / 2; e.y2 = end.y + end.h / 2;
+      } else {
+        e.x1 = a.x + a.w / 2; e.y1 = a.y + a.h;
+        e.x2 = b.x + b.w / 2; e.y2 = b.y;
+      }
+    });
+    layoutChartEdgeBends(false);
+  }
+
+  /**
+   * Every edge crossing the same column gap (horizontal layout) or band gap (vertical)
+   * used to bend at the exact same shared midpoint, so a handful of sibling calls into the
+   * next column stacked their elbows on one vertical line and read as a single connector
+   * running past boxes it never actually touched. Edges are grouped by the gap they cross
+   * and each gets its own lane spaced across that gap, ordered by the other axis so lanes
+   * that are already close together don't cross more than they have to.
+   */
+  function layoutChartEdgeBends(horizontal) {
+    var groups = {};
+    chartEdges.forEach(function (e) {
+      if (e.x1 == null || e.rail) return;
+      var key = horizontal
+        ? Math.round(e.x1) + '|' + Math.round(e.x2)
+        : Math.round(e.y1) + '|' + Math.round(e.y2);
+      (groups[key] || (groups[key] = [])).push(e);
+    });
+    Object.keys(groups).forEach(function (key) {
+      var list = groups[key];
+      if (list.length === 1) {
+        var only = list[0];
+        only.bend = horizontal ? (only.x1 + only.x2) / 2 : (only.y1 + only.y2) / 2;
+        return;
+      }
+      list.sort(function (p, q) {
+        return horizontal ? ((p.y1 + p.y2) - (q.y1 + q.y2)) : ((p.x1 + p.x2) - (q.x1 + q.x2));
+      });
+      list.forEach(function (e, i) {
+        var frac = (i + 1) / (list.length + 1);
+        e.bend = horizontal ? e.x1 + frac * (e.x2 - e.x1) : e.y1 + frac * (e.y2 - e.y1);
+      });
     });
   }
 
@@ -6293,7 +6520,7 @@ Press Enter to apply, Esc to cancel.">
     var stepCount = chartStepCount();
     var bits = [stepCount + ' distinct step' + (stepCount === 1 ? '' : 's')
       + ' from ' + flowVisible.length + ' calls in this run'];
-    if (chartPath.length < flowVisible.length) {
+    if (chartPathSampled) {
       bits.push('playback sampled to ' + chartPath.length + ' points so it stays watchable');
     }
     flowNote.textContent = bits.join(' · ') + '. '
@@ -6301,95 +6528,61 @@ Press Enter to apply, Esc to cancel.">
   }
 
   /**
-   * Categorical fills for flame frames, one slot per owner.
+   * Random warm fills for flame frames, the way Brendan Gregg's original flamegraph.pl
+   * colours a CPU flame graph: every frame gets its own independently rolled hue in the
+   * hot range (high red, wandering green, almost no blue) rather than a colour tied to
+   * its identity. Two calls to the same method land on two different fills, on purpose —
+   * width and position carry identity here, not colour.
    *
-   * <p>Three schemes rather than one, because the diagram gets read two ways. Glowroot's
-   * warm ramp is what a JVM developer recognises on sight, so it is the default; the Deju
-   * scheme is the report's own palette, for a screenshot that has to sit beside the
-   * product; "by package" gives up per-class identity for per-layer identity, which is the
-   * only honest answer once a run touches two hundred classes and no palette can name them
-   * all.
+   * <p>Seeded off the call's own sequence number so the same frame paints the same colour
+   * on every repaint, scroll and PNG export, instead of flickering on each redraw the way
+   * an unseeded Math.random() would.
    *
-   * <p>SQL keeps a fill of its own in every scheme, and in the warm ones it is deliberately
-   * the only cool colour on the canvas. Telling a query apart from a method is the one
-   * distinction this diagram cannot afford to lose, and a warm ramp has no shade left over
-   * that could carry it.
-   *
-   * <p>Slots are handed out in first-appearance order, so a class keeps its colour whatever
-   * the filters hide. Past the eight base fills the scheme cycles through three lightness
-   * steps of itself rather than stopping: thirty-two distinguishable fills, and only then
-   * grey. The previous six-slot cap was principled about never recycling a hue, but on a
-   * real trace it painted the seventh class onward — nearly all of them — the same grey,
-   * which loses far more than a repeated colour at two different lightnesses ever did.
+   * <p>SQL keeps a fill of its own, deliberately the only cool colour on the canvas:
+   * telling a query apart from a method is the one distinction this diagram cannot afford
+   * to lose, and a warm ramp has no shade left over that could carry it.
    */
-  var FLAME_SCHEMES = {
-    glowroot: {
-      light: ['#e8703a', '#d9534f', '#ec9a3c', '#c0392b', '#e2854a', '#b7472a',
-              '#f0a95c', '#9c3520'],
-      dark:  ['#f0844f', '#e06a64', '#f2ab55', '#d1503f', '#ea9462', '#c85a3c',
-              '#f5bb74', '#b8543c'],
-      sqlLight: '#3d6ea8', sqlDark: '#6f9fdd'
-    },
-    deju: {
-      light: ['#2f6fd0', '#2e9e4f', '#c9457a', '#6c5ce7', '#0f9b9b', '#d94a3d',
-              '#8a6d3b', '#4a3aa7'],
-      dark:  ['#5b93e0', '#4bb56a', '#df6a99', '#8f81f0', '#2bb3b3', '#e8695c',
-              '#b8955c', '#9085e9'],
-      // Deju's own SQL ink is already the brand orange and is nowhere in the eight above,
-      // so the tree's colour carries straight over.
-      sqlLight: null, sqlDark: null
-    }
-  };
-  var FLAME_OTHER_LIGHT = '#8b8f94';   // past every cycle, deliberately colourless
-  var FLAME_OTHER_DARK = '#6b7075';
-  var FLAME_CYCLES = [0, 0.30, -0.26, 0.55];   // lightness steps applied per wrap
+  var FLAME_SQL_LIGHT = '#3d6ea8';
+  var FLAME_SQL_DARK = '#6f9fdd';
+  var FLAME_MATCH_LIGHT = '#e619b0';   // classic flamegraph.pl search magenta
+  var FLAME_MATCH_DARK = '#ff5fd6';
 
-  var ownerSlot = {};
-  var ownerSlotCount = 0;
-
-  /** Resets slot assignment: a scheme change has to re-deal from the top of the new list. */
-  function resetFlameSlots() {
-    ownerSlot = {};
-    ownerSlotCount = 0;
+  /** A tiny seeded PRNG (mulberry32), so a colour rolled once stays put across repaints. */
+  function mulberry32(seed) {
+    var s = seed | 0;
+    return function () {
+      s = (s + 0x6D2B79F5) | 0;
+      var t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
 
-  /** Lifts a fill toward white (positive) or down toward black (negative). */
-  function shade(hex, amt) {
-    if (!amt) return hex;
-    var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-    if (!m) return hex;
-    var out = '#';
-    for (var i = 1; i <= 3; i++) {
-      var v = parseInt(m[i], 16);
-      v = amt >= 0 ? v + (255 - v) * amt : v * (1 + amt);
-      out += ('0' + Math.max(0, Math.min(255, Math.round(v))).toString(16)).slice(-2);
-    }
-    return out;
+  var flameColorCache = {};
+
+  /** One independently-rolled warm rgb() per call, cached by seq so it never re-rolls. */
+  function flameFrameColor(seq) {
+    var hit = flameColorCache[seq];
+    if (hit) return hit;
+    var rnd = mulberry32(seq + 1);
+    var r = 205 + Math.floor(50 * rnd());
+    var g = Math.floor(230 * rnd());
+    var b = Math.floor(55 * rnd());
+    return flameColorCache[seq] = 'rgb(' + r + ',' + g + ',' + b + ')';
   }
 
-  /** The package a class belongs to, which is what "by package" colours by. */
+  /** The package a class belongs to, which is what "whole package" search scope matches on. */
   function packageOf(fq) {
     var i = String(fq || '').lastIndexOf('.');
     return i > 0 ? fq.slice(0, i) : (fq || '(default)');
   }
 
-  function flameScheme() {
-    return FLAME_SCHEMES[flowColorMode === 'deju' ? 'deju' : 'glowroot'];
-  }
-
-  function classFill(name, dark) {
-    var slot = ownerSlot[name];
-    if (slot === undefined) slot = ownerSlot[name] = ownerSlotCount++;
-    var sc = flameScheme();
-    var pal = dark ? sc.dark : sc.light;
-    var cycle = Math.floor(slot / pal.length);
-    if (cycle >= FLAME_CYCLES.length) return dark ? FLAME_OTHER_DARK : FLAME_OTHER_LIGHT;
-    return shade(pal[slot % pal.length], FLAME_CYCLES[cycle]);
-  }
-
-  /** What a frame is coloured by: its class normally, its package in "by package" mode. */
-  function fillKey(n) {
-    return flowColorMode === 'pkg' ? packageOf(n.owner) : (n.owner || '');
+  /** Re-expresses a fill as translucent, to dim whatever the active search didn't match. */
+  function withAlpha(color, a) {
+    var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
+    if (m) return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + a + ')';
+    m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(color);
+    return m ? 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',' + a + ')' : color;
   }
 
   /**
@@ -6397,47 +6590,19 @@ Press Enter to apply, Esc to cancel.">
    *
    * With solid fills the label can no longer wear the class and method colours the tree
    * uses; on #008300 they would be invisible. Perceived luminance picks near-black or
-   * white per box, which is the only way one text rule works across six fills.
+   * white per box, which is the only way one text rule works across every random fill.
    */
   function inkOn(fill) {
+    var r, g, b;
     var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(fill);
-    if (!m) return '#ffffff';
-    var lum = parseInt(m[1], 16) * 0.299 + parseInt(m[2], 16) * 0.587
-      + parseInt(m[3], 16) * 0.114;
-    return lum > 150 ? '#12161a' : '#ffffff';
-  }
-
-  /**
-   * The time axis across the top of the flame view, with its gridlines.
-   *
-   * Width means duration in this layout and nothing else on screen says how much, so the
-   * ruler is what turns "that box is wide" into "that box is 27 ms". Steps are the usual
-   * 1/2/5 progression, chosen so roughly seven of them fit.
-   */
-  function drawRuler(ctx, c, span, total, height) {
-    if (total <= 0 || span <= 0) return;
-    var raw = total / 7;
-    var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
-    var norm = raw / mag;
-    var step = (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
-
-    ctx.font = '10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-    ctx.textBaseline = 'middle';
-    for (var t = 0; t <= total + 1e-9; t += step) {
-      var x = FLOW_PAD + (t / total) * span;
-      ctx.strokeStyle = c.line;
-      ctx.globalAlpha = 0.35;
-      ctx.beginPath();
-      ctx.moveTo(Math.round(x) + 0.5, FLOW_PAD + FLOW_RULER - 6);
-      ctx.lineTo(Math.round(x) + 0.5, height - FLOW_PAD);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = c.muted;
-      var label = fmt(t);
-      var w = ctx.measureText(label).width;
-      // The last tick would hang off the right edge, so it tucks back inside.
-      ctx.fillText(label, Math.min(x + 3, FLOW_PAD + span - w), FLOW_PAD + 6);
+    if (m) { r = parseInt(m[1], 16); g = parseInt(m[2], 16); b = parseInt(m[3], 16); }
+    else {
+      m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(fill);
+      if (!m) return '#ffffff';
+      r = +m[1]; g = +m[2]; b = +m[3];
     }
+    var lum = r * 0.299 + g * 0.587 + b * 0.114;
+    return lum > 150 ? '#12161a' : '#ffffff';
   }
 
   function drawFlow() {
@@ -6542,8 +6707,6 @@ Press Enter to apply, Esc to cancel.">
       });
       flowDrawn = drawn;
       indexDrawn();
-      flameSpan = span;
-      flameTotal = total;
       contentW = FLOW_PAD * 2 + Math.max(span, laidW);
       contentH = FLOW_PAD * 2 + FLOW_RULER + (maxD + 1) * FLAME_BOX;
     } else {
@@ -6568,6 +6731,7 @@ Press Enter to apply, Esc to cancel.">
     // Flame already spent the zoom on its time axis, so the canvas itself stays 1:1 there.
     flowScale = flowFlame ? 1
       : (flowFit && contentW > avail ? avail / contentW : flowZoom);
+    syncZoomControls();
     // Again, now that the layout has run: whether the width floor had to stretch anything
     // is not known until the frames have been sized, and it is the note's job to say so.
     updateFlowNote();
@@ -6666,7 +6830,22 @@ Press Enter to apply, Esc to cancel.">
     var c = flowColors();
     // Painted rather than cleared: a transparent canvas exports to a PNG that is
     // unreadable on anything but the theme it was taken in.
-    ctx.fillStyle = c.bg;
+    if (flowFlame) {
+      // The pale grey-to-yellow wash a classic CPU flame graph paints behind its stack.
+      // Built against the diagram's own coordinates, not the viewport slice being painted,
+      // so the wash stays put as the canvas scrolls instead of sliding under it.
+      var grad = ctx.createLinearGradient(0, 0, 0, flowContentH);
+      if (c.dark) {
+        grad.addColorStop(0, '#242322');
+        grad.addColorStop(1, '#2e2a1c');
+      } else {
+        grad.addColorStop(0, '#eeeeee');
+        grad.addColorStop(1, '#eeeeb0');
+      }
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = c.bg;
+    }
     ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
 
     ctx.font = FLOW_FONT;
@@ -6678,10 +6857,17 @@ Press Enter to apply, Esc to cancel.">
     }
 
     if (flowFlame) {
-      // Only while the axis still means something. Once the floor has widened a frame past
-      // its share, position no longer maps to time, and a ruler would be a scale printed
-      // against distances it does not describe.
-      if (!flameWidened) drawRuler(ctx, c, flameSpan, flameTotal, flowContentH);
+      // No time ruler: a classic flame graph reads width as a share of what's beside it,
+      // not a position against a clock, so a ms axis would claim a precision the reference
+      // deliberately leaves out. The title takes the same band instead.
+      if (y0 < FLOW_PAD + FLOW_RULER) {
+        ctx.font = '600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+        ctx.fillStyle = c.muted;
+        ctx.textAlign = 'center';
+        ctx.fillText('Flame Graph', (x0 + x1) / 2, FLOW_PAD + FLOW_RULER / 2);
+        ctx.textAlign = 'left';
+        ctx.font = FLOW_FONT;
+      }
       // Flame rows are a fixed pitch and every node on one is already indexed by that row,
       // so the band on screen is arithmetic and only the nodes actually in it are touched.
       // This used to walk the whole drawn array on every scroll and every hover, which on a
@@ -6789,12 +6975,18 @@ Press Enter to apply, Esc to cancel.">
     // be decoration competing with the coverage colours the report uses on code rows.
     var ink = null;
     if (flowFlame) {
-      var sc = flameScheme();
-      var sqlFill = c.dark ? (sc.sqlDark || c.sql) : (sc.sqlLight || c.sql);
-      var fill = n.isSql ? sqlFill : classFill(fillKey(n), c.dark);
+      var searching = flowFilterText.trim() !== '' && flowMatchSelf;
+      var isMatch = searching && flowMatchSelf[flowIdxBySeq[n.seq]];
+      var fill;
+      if (isMatch) {
+        fill = c.dark ? FLAME_MATCH_DARK : FLAME_MATCH_LIGHT;
+      } else {
+        fill = n.isSql ? (c.dark ? FLAME_SQL_DARK : FLAME_SQL_LIGHT) : flameFrameColor(n.seq);
+        if (searching) fill = withAlpha(fill, 0.35);
+      }
       ctx.fillStyle = fill;
       ctx.fill();
-      ink = inkOn(fill);
+      ink = searching && !isMatch ? withAlpha(inkOn(fill), 0.5) : inkOn(fill);
     }
     if (over) {
       ctx.fillStyle = c.hoverFill;
@@ -6832,33 +7024,24 @@ Press Enter to apply, Esc to cancel.">
     var mid = n.y + h / 2;
     var right = n.x + n.w - 7;
 
-    // Width already says how long a flame box took, but only relative to whatever is beside
-    // it; the number is what makes it comparable to anything else in the report, and the
-    // share is what makes it comparable without remembering the run total. Both go in when
-    // the box can hold them, the time alone when it cannot.
-    var time = fmt(n.shown);
-    if (flowFlame) {
-      var sharePct = flameTotal > 0
-        ? (n.shown / flameTotal) * 100 : 0;
-      var shareTxt = sharePct >= 10 ? sharePct.toFixed(0) + '%'
-        : sharePct >= 0.1 ? sharePct.toFixed(1) + '%' : '';
-      if (shareTxt && ctx.measureText(time + '  ' + shareTxt).width < n.w - 60) {
-        time = time + '  ' + shareTxt;
-      }
-    }
-    var timeW = ctx.measureText(time).width;
-    ctx.fillStyle = ink || c.muted;
-    if (ink) ctx.globalAlpha = 0.75;
-    ctx.fillText(time, right - timeW, mid);
-    ctx.globalAlpha = 1;
-    right -= timeW + 6;
+    // Flame frames carry only a name, the way a classic flame graph reads: width already
+    // says how long the call took, and the exact number, the share, the repeat count are
+    // all one hover away in the tooltip. Printing them on every box too is the clutter the
+    // reference deliberately leaves out.
+    if (!flowFlame) {
+      var time = fmt(n.shown);
+      var timeW = ctx.measureText(time).width;
+      ctx.fillStyle = ink || c.muted;
+      ctx.fillText(time, right - timeW, mid);
+      right -= timeW + 6;
 
-    if (n.reps > 1) {
-      var rep = '×' + n.reps;
-      var repW = ctx.measureText(rep).width;
-      ctx.fillStyle = c.badge;
-      ctx.fillText(rep, right - repW, mid);
-      right -= repW + 6;
+      if (n.reps > 1) {
+        var rep = '×' + n.reps;
+        var repW = ctx.measureText(rep).width;
+        ctx.fillStyle = c.badge;
+        ctx.fillText(rep, right - repW, mid);
+        right -= repW + 6;
+      }
     }
 
     var x = n.x + 7;
@@ -6957,13 +7140,18 @@ Press Enter to apply, Esc to cancel.">
   }
 
   function renderChartFrame(ctx, c, x0, y0, x1, y1) {
-    ctx.strokeStyle = c.line;
+    // Connectors get the stronger --muted grey rather than the very pale --border one
+    // everything else uses for hairlines: a directional path someone has to trace by eye
+    // needs more contrast than a table rule does.
+    ctx.strokeStyle = c.muted;
     ctx.lineWidth = 1.5;
     for (var i = 0; i < chartEdges.length; i++) {
       var e = chartEdges[i];
       if (e.x1 == null) continue;
-      if (Math.max(e.x1, e.x2) < x0 || Math.min(e.x1, e.x2) > x1) continue;
-      if (Math.max(e.y1, e.y2) < y0 || Math.min(e.y1, e.y2) > y1) continue;
+      var exHi = Math.max(e.x1, e.x2), eyHi = Math.max(e.y1, e.y2);
+      if (e.rail) { if (chartVertical) exHi = Math.max(exHi, e.railX); else eyHi = Math.max(eyHi, e.railY); }
+      if (exHi < x0 || Math.min(e.x1, e.x2) > x1) continue;
+      if (eyHi < y0 || Math.min(e.y1, e.y2) > y1) continue;
       drawChartEdge(ctx, c, e);
     }
     ctx.lineWidth = 1;
@@ -6983,39 +7171,103 @@ Press Enter to apply, Esc to cancel.">
    * depth runs top to bottom instead — the arrowhead always ends up pointing into whichever
    * side of the callee's box actually faces its caller.
    */
-  function drawChartEdge(ctx, c, e) {
-    var ah = 5;
-    if (chartVertical) {
-      var midY = (e.y1 + e.y2) / 2;
-      ctx.beginPath();
-      ctx.moveTo(Math.round(e.x1) + 0.5, Math.round(e.y1) + 0.5);
-      ctx.lineTo(Math.round(e.x1) + 0.5, Math.round(midY) + 0.5);
-      ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(midY) + 0.5);
-      ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(e.y2) + 0.5);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(e.x2, e.y2);
-      ctx.lineTo(e.x2 - ah, e.y2 - ah);
-      ctx.lineTo(e.x2 + ah, e.y2 - ah);
-      ctx.closePath();
-      ctx.fillStyle = c.line;
-      ctx.fill();
-      return;
+  var CHART_ELBOW_R = 7;
+
+  /**
+   * A multi-point path with each interior corner rounded via arcTo, instead of the sharp
+   * right angles a series of lineTo calls would give — square corners on several closely
+   * stacked connectors read as a jumble of jagged segments; rounded ones read as one
+   * deliberate path, the way a drawn flowchart or a real diagramming tool would render it.
+   */
+  function elbowPath(ctx, pts) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length - 1; i++) {
+      ctx.arcTo(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, CHART_ELBOW_R);
     }
-    var midX = (e.x1 + e.x2) / 2;
-    ctx.beginPath();
-    ctx.moveTo(Math.round(e.x1) + 0.5, Math.round(e.y1) + 0.5);
-    ctx.lineTo(Math.round(midX) + 0.5, Math.round(e.y1) + 0.5);
-    ctx.lineTo(Math.round(midX) + 0.5, Math.round(e.y2) + 0.5);
-    ctx.lineTo(Math.round(e.x2) + 0.5, Math.round(e.y2) + 0.5);
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
     ctx.stroke();
+  }
+
+  function arrowhead(ctx, c, tipX, tipY, dx, dy) {
+    var ah = 5;
     ctx.beginPath();
-    ctx.moveTo(e.x2, e.y2);
-    ctx.lineTo(e.x2 - ah, e.y2 - ah);
-    ctx.lineTo(e.x2 - ah, e.y2 + ah);
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - dx * ah + dy * ah, tipY - dy * ah - dx * ah);
+    ctx.lineTo(tipX - dx * ah - dy * ah, tipY - dy * ah + dx * ah);
     ctx.closePath();
-    ctx.fillStyle = c.line;
+    ctx.fillStyle = c.muted;
     ctx.fill();
+  }
+
+  /**
+   * The elbow's corner points, shared by drawChartEdge and the Play marker so the dot
+   * rides the exact line drawn on screen instead of cutting a straight shortcut through
+   * whatever boxes happen to sit between two steps.
+   */
+  function chartEdgePoints(e) {
+    if (e.rail && chartVertical) {
+      // Out to a rail past the widest row, down to End's band, then left into End's side.
+      return [
+        { x: e.x1, y: e.y1 }, { x: e.railX, y: e.y1 },
+        { x: e.railX, y: e.y2 }, { x: e.x2, y: e.y2 }
+      ];
+    }
+    if (e.rail) {
+      // Down past the last row to a rail, across, then up into End's underside.
+      return [
+        { x: e.x1, y: e.y1 }, { x: e.x1, y: e.railY },
+        { x: e.x2, y: e.railY }, { x: e.x2, y: e.y2 }
+      ];
+    }
+    if (chartVertical) {
+      var midY = e.bend != null ? e.bend : (e.y1 + e.y2) / 2;
+      return [
+        { x: e.x1, y: e.y1 }, { x: e.x1, y: midY },
+        { x: e.x2, y: midY }, { x: e.x2, y: e.y2 }
+      ];
+    }
+    var midX = e.bend != null ? e.bend : (e.x1 + e.x2) / 2;
+    return [
+      { x: e.x1, y: e.y1 }, { x: midX, y: e.y1 },
+      { x: midX, y: e.y2 }, { x: e.x2, y: e.y2 }
+    ];
+  }
+
+  function chartEdgeArrowDir(e) {
+    if (e.rail && chartVertical) return { dx: -1, dy: 0 };
+    if (e.rail) return { dx: 0, dy: -1 };
+    if (chartVertical) return { dx: 0, dy: 1 };
+    return { dx: 1, dy: 0 };
+  }
+
+  function drawChartEdge(ctx, c, e) {
+    elbowPath(ctx, chartEdgePoints(e));
+    var dir = chartEdgeArrowDir(e);
+    arrowhead(ctx, c, e.x2, e.y2, dir.dx, dir.dy);
+  }
+
+  /** Total length of a polyline, for placing a point a given fraction along it by arc length. */
+  function polylineLen(pts) {
+    var total = 0;
+    for (var i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    return total;
+  }
+
+  function pointOnPolyline(pts, t) {
+    var total = polylineLen(pts);
+    if (total <= 0) return pts[0];
+    var target = total * Math.max(0, Math.min(1, t));
+    var acc = 0;
+    for (var i = 1; i < pts.length; i++) {
+      var segLen = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      if (acc + segLen >= target || i === pts.length - 1) {
+        var segT = segLen > 0 ? (target - acc) / segLen : 0;
+        return { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * segT, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * segT };
+      }
+      acc += segLen;
+    }
+    return pts[pts.length - 1];
   }
 
   function chartNodeFill(c, n) {
@@ -7026,12 +7278,11 @@ Press Enter to apply, Esc to cancel.">
   }
 
   /**
-   * The numbered circle a step earns once playback has passed through it: not just where
-   * the marker is now, but the trail of where it has already been, so a reader can look at
-   * a paused or finished run and reconstruct the order without replaying it.
+   * The numbered circle every step carries, Start at 0 through End at the last number, so a
+   * reader can read the run's order straight off the diagram without animating anything.
    */
-  function drawChartVisitBadge(ctx, c, n) {
-    var num = chartVisitOrder[n.key];
+  function drawChartNumBadge(ctx, c, n, bx, by) {
+    var num = n.num;
     if (num == null) return;
     // No ctx.save()/restore() or ctx.arc(): the SVG export runs every draw call through a
     // context shim (svgContext, below) that stands in for a canvas well enough for paths,
@@ -7040,7 +7291,7 @@ Press Enter to apply, Esc to cancel.">
     // does not honour at all, so the label is centred with measureText rather than relied
     // on to centre itself.
     var r = 9;
-    var cx = n.x, cy = n.y;
+    var cx = bx, cy = by;
     roundRect(ctx, cx - r, cy - r, r * 2, r * 2, r);
     ctx.fillStyle = c.accent;
     ctx.fill();
@@ -7062,7 +7313,7 @@ Press Enter to apply, Esc to cancel.">
    *  ordinary node would occupy, so it needs no special case anywhere in either layout. */
   function drawChartTerminator(ctx, c, n) {
     var over = chartHoverKey === n.key;
-    var w = 108, h = 34;
+    var w = CHART_TERM_W, h = 34;
     var cx = n.x + n.w / 2, cy = n.y + n.h / 2;
     var x = cx - w / 2, y = cy - h / 2;
     roundRect(ctx, x, y, w, h, h / 2);
@@ -7083,6 +7334,7 @@ Press Enter to apply, Esc to cancel.">
     ctx.fillStyle = c.accent;
     ctx.fillText(n.label, cx - lw / 2, cy + 1);
     ctx.font = FLOW_FONT;
+    drawChartNumBadge(ctx, c, n, x, y);
   }
 
   function drawChartNode(ctx, c, n) {
@@ -7112,12 +7364,25 @@ Press Enter to apply, Esc to cancel.">
     ctx.stroke();
     ctx.lineWidth = 1;
 
-    drawChartVisitBadge(ctx, c, n);
+    drawChartNumBadge(ctx, c, n, n.x, n.y);
 
     var mid = n.y + n.h / 2;
     var pad = 8;
     var right = n.x + n.w - pad;
 
+    // Every box is the same size regardless of how long its step took, unlike the Flame
+    // layout where width already says that — so the one thing this diagram cannot show by
+    // shape alone, it says in text instead: the share of the whole run this step's calls
+    // account for, worst offenders included even when they're a single fast-looking box.
+    if (n.total > 0 && flowRootTotal > 0) {
+      var pct = (n.total / flowRootTotal) * 100;
+      var pctTxt = (pct >= 10 ? Math.round(pct) : pct >= 1 ? pct.toFixed(1)
+        : pct >= 0.1 ? '<1' : '<0.1') + '%';
+      var pctW = ctx.measureText(pctTxt).width;
+      ctx.fillStyle = c.muted;
+      ctx.fillText(pctTxt, right - pctW, mid);
+      right -= pctW + 6;
+    }
     if (n.n > 1) {
       var rep = '×' + n.n;
       var repW = ctx.measureText(rep).width;
@@ -7150,15 +7415,29 @@ Press Enter to apply, Esc to cancel.">
     }
   }
 
-  /** Where the marker sits right now: on a node when idle, sliding along an edge mid-step. */
+  /**
+   * Where the marker sits right now: parked on a node when idle, sliding along the exact
+   * edge line into the next node mid-step. A step whose call site ran back-to-back several
+   * times (a tight loop) is one entry in {@link chartPath} with {@code reps} > 1 — the
+   * marker just parks there once rather than idling through every repeat.
+   */
   function chartMarkerPos() {
     if (!chartPath.length) return null;
     var a = chartPath[chartPlayIdx];
     var b = chartPath[Math.min(chartPlayIdx + 1, chartPath.length - 1)];
-    var ax = a.x + a.w / 2, ay = a.y + a.h / 2;
-    var bx = b.x + b.w / 2, by = b.y + b.h / 2;
+    if (a.node === b.node) {
+      return { x: a.node.x + a.node.w / 2, y: a.node.y + a.node.h / 2, node: a.node, reps: a.reps };
+    }
+    var edge = chartEdgeByKey[a.node.key + '>' + b.node.key];
     var t = chartProgress;
-    return { x: ax + (bx - ax) * t, y: ay + (by - ay) * t, node: t < 0.5 ? a : b };
+    if (!edge) {
+      var ax = a.node.x + a.node.w / 2, ay = a.node.y + a.node.h / 2;
+      var bx = b.node.x + b.node.w / 2, by = b.node.y + b.node.h / 2;
+      return { x: ax + (bx - ax) * t, y: ay + (by - ay) * t, node: t < 0.5 ? a.node : b.node, reps: 1 };
+    }
+    var pos = pointOnPolyline(chartEdgePoints(edge), t);
+    var atNode = t < 0.5 ? a.node : b.node;
+    return { x: pos.x, y: pos.y, node: atNode, reps: t < 0.5 ? a.reps : b.reps };
   }
 
   function drawChartMarker(ctx, c) {
@@ -7173,6 +7452,19 @@ Press Enter to apply, Esc to cancel.">
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.lineWidth = 1;
+    if (pos.reps > 1) {
+      var label = pos.reps + ' times';
+      ctx.font = 'bold 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      var w = ctx.measureText(label).width;
+      var lx = pos.x - w / 2, ly = pos.y - CHART_DOT_R - 16;
+      roundRect(ctx, lx - 5, ly - 13, w + 10, 16, 8);
+      ctx.fillStyle = c.accent;
+      ctx.fill();
+      ctx.fillStyle = c.bg;
+      ctx.textAlign = 'center';
+      ctx.fillText(label, pos.x, ly - 5);
+      ctx.textAlign = 'left';
+    }
   }
 
   function flowHit(e) {
@@ -7321,7 +7613,7 @@ Press Enter to apply, Esc to cancel.">
         : n.status === 'PARTIAL' ? 'only some branches taken' : 'not fully executed');
     }
     if (n.recursive) facts.push('calls itself');
-    if (chartVisitOrder[n.key] != null) facts.push('step ' + chartVisitOrder[n.key] + ' in the playback');
+    if (n.num != null) facts.push('step ' + n.num + ' of the run');
     flowTip.appendChild(el('div', 't-stat', facts.join(' · ')));
     flowTip.appendChild(el('div', 't-sub', 'click to jump to this step in the Call Tree'));
     flowTip.hidden = false;
@@ -7411,15 +7703,22 @@ Press Enter to apply, Esc to cancel.">
       drawFlow();
     });
   }
+  /**
+   * The flow tab has three mutually exclusive layouts (plain nesting, Flame, Flow Chart),
+   * and several controls only mean something in one of them: Hot path has nothing to
+   * highlight in the Flow Chart (it colours by coverage, not by the tree drawNode()
+   * walks), and frame colour/minimum width are meaningless outside Flame, whose boxes are
+   * the only ones sized by duration. Leaving them clickable in a layout where they do
+   * nothing invites exactly the "why doesn't this button do anything" confusion it caused.
+   */
+  function syncFlowSubViewControls() {
+    flowHotBtn.hidden = flowChart;
+    if (flowMinWSel) flowMinWSel.hidden = !flowFlame;
+  }
+
   flowToggle(flowSqlBtn, function () { return flowSql; }, function (v) { flowSql = v; });
   flowToggle(flowGroupBtn, function () { return flowGroup; }, function (v) { flowGroup = v; });
   flowToggle(flowHotBtn, function () { return flowHot; }, function (v) { flowHot = v; });
-  flowToggle(flowFlameBtn, function () { return flowFlame; },
-    function (v) {
-      flowFlame = v;
-      if (!v) flameRoot = null;
-      if (v && flowChart) setFlowChart(false);
-    });
   flowToggle(flowFitBtn, function () { return flowFit; }, function (v) { flowFit = v; });
 
   /** Stops the marker animation and puts the Play button back to its resting state. */
@@ -7452,7 +7751,6 @@ Press Enter to apply, Esc to cancel.">
     while (chartProgress >= 1 && chartPlayIdx < chartPath.length - 1) {
       chartProgress -= 1;
       chartPlayIdx++;
-      markChartVisit(chartPlayIdx);
     }
     if (chartPlayIdx >= chartPath.length - 1) {
       chartProgress = 0;
@@ -7462,25 +7760,38 @@ Press Enter to apply, Esc to cancel.">
     if (chartPlaying) chartRAF = requestAnimationFrame(chartTick);
   }
 
-  /** Turns the API Flow chart on or off, mutually exclusive with Flame. */
-  function setFlowChart(on) {
-    flowChart = on;
-    flowChartBtn.classList.toggle('on', on);
-    if (on && flowFlame) { flowFlame = false; flameRoot = null; flowFlameBtn.classList.remove('on'); }
+  /**
+   * The three layouts (Steps, Flame, Flow Chart) as one radio choice, driven by a sub-tab
+   * row the same way the top-level tabs work — a click always selects a view rather than
+   * toggling one flag independently of the other two, which is what let Flame and Flow
+   * Chart both end up on at once back when they were separate toggle buttons.
+   */
+  var FLOW_VIEW_BTNS = { steps: flowStepsBtn, flame: flowFlameBtn, chart: flowChartBtn };
+  function setFlowView(view) {
+    flowFlame = view === 'flame';
+    flowChart = view === 'chart';
+    if (!flowFlame) flameRoot = null;
+    Object.keys(FLOW_VIEW_BTNS).forEach(function (v) {
+      var on = v === view;
+      FLOW_VIEW_BTNS[v].classList.toggle('on', on);
+      FLOW_VIEW_BTNS[v].setAttribute('aria-selected', String(on));
+    });
     stopChartAnim();
     chartPlayIdx = 0;
     chartProgress = 0;
-    resetChartVisits();
-    if (on) markChartVisit(0);
-    chartOrientBtn.hidden = !on;
-    chartPlaySeg.hidden = !on;
-    chartSpeedSel.hidden = !on;
-    chartSpeedCustom.hidden = !on || chartSpeedSel.value !== 'custom';
+    chartOrientBtn.hidden = !flowChart;
+    chartPlaySeg.hidden = !flowChart;
+    chartLegend.hidden = !flowChart;
+    chartSpeedSel.hidden = !flowChart;
+    chartSpeedCustom.hidden = !flowChart || chartSpeedSel.value !== 'custom';
     chartSpeedVal.hidden = chartSpeedCustom.hidden;
+    syncFlowSubViewControls();
     hideFlowTip();
     drawFlow();
   }
-  flowChartBtn.addEventListener('click', function () { setFlowChart(!flowChart); });
+  flowStepsBtn.addEventListener('click', function () { setFlowView('steps'); });
+  flowFlameBtn.addEventListener('click', function () { setFlowView('flame'); });
+  flowChartBtn.addEventListener('click', function () { setFlowView('chart'); });
 
   chartOrientBtn.addEventListener('click', function () {
     chartVertical = !chartVertical;
@@ -7502,8 +7813,6 @@ Press Enter to apply, Esc to cancel.">
     if (chartPlayIdx >= chartPath.length - 1) {
       chartPlayIdx = 0;
       chartProgress = 0;
-      resetChartVisits();
-      markChartVisit(0);
     }
     chartPlaying = true;
     chartLastTick = 0;
@@ -7515,8 +7824,6 @@ Press Enter to apply, Esc to cancel.">
     stopChartAnim();
     chartPlayIdx = 0;
     chartProgress = 0;
-    resetChartVisits();
-    markChartVisit(0);
     paintFlow();
   });
 
@@ -7545,17 +7852,6 @@ Press Enter to apply, Esc to cancel.">
       if (flowBuilt) { computeFlowFilter(); hideFlowTip(); drawFlow(); }
     });
   }
-  if (flowColorSel) {
-    flowColorSel.addEventListener('change', function () {
-      flowColorMode = flowColorSel.value;
-      // A new scheme, or a switch between class and package identity, has to re-deal the
-      // slots from the top: keeping the old assignment would colour the first package with
-      // whatever the first class happened to be given.
-      resetFlameSlots();
-      if (flowBuilt) { hideFlowTip(); drawFlow(); }
-    });
-  }
-
   var flowMinWSel = byId('flowMinWSel');
   if (flowMinWSel) {
     flowMinWSel.addEventListener('change', function () {
@@ -7571,17 +7867,47 @@ Press Enter to apply, Esc to cancel.">
     });
   }
 
-  function zoomBy(factor) {
-    // Zoom and fit are two answers to the same question, so asking for one drops the
-    // other rather than compounding into a scale nobody chose.
+  /** Applies an absolute zoom percentage. Zoom and fit are two answers to the same
+   *  question, so setting one drops the other rather than compounding into a scale
+   *  nobody chose. */
+  function setZoomPct(pct) {
     flowFit = false;
     flowFitBtn.classList.remove('on');
-    flowZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, flowZoom * factor));
+    flowZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pct / 100));
     hideFlowTip();
     drawFlow();
   }
-  flowOutBtn.addEventListener('click', function () { zoomBy(1 / ZOOM_STEP); });
-  flowInBtn.addEventListener('click', function () { zoomBy(ZOOM_STEP); });
+
+  /** Keeps the slider and the typed box reading whatever the diagram is actually drawn
+   *  at, including when Fit width or the Flame layout are the ones choosing the scale
+   *  rather than a value either control set. Skips the text box while it has focus, so
+   *  a redraw mid-edit (e.g. from a live slider drag) can't clobber what's being typed.
+   *
+   *  <p>Flame is the exception: its canvas transform stays pinned at 1 always (that's
+   *  what keeps its labels legible while zoomed out), so reading {@link flowScale} there
+   *  would show "100" no matter what zoom was actually applied. Flame's real zoom lives
+   *  in {@code flowZoom} instead, spent on the time axis rather than the canvas. */
+  function syncZoomControls() {
+    var pct = flowFlame ? (flowFit ? 100 : Math.round(flowZoom * 100))
+      : Math.round(flowScale * 100);
+    flowZoomSlider.value = Math.max(40, Math.min(300, pct));
+    if (document.activeElement !== flowZoomValue) flowZoomValue.value = pct;
+  }
+
+  flowZoomSlider.addEventListener('input', function () {
+    setZoomPct(parseFloat(flowZoomSlider.value));
+  });
+
+  function applyZoomValueInput() {
+    var v = parseFloat(flowZoomValue.value);
+    if (isFinite(v) && v > 0) setZoomPct(v);
+    else syncZoomControls();
+  }
+  flowZoomValue.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { applyZoomValueInput(); flowZoomValue.blur(); }
+    else if (e.key === 'Escape') { syncZoomControls(); flowZoomValue.blur(); }
+  });
+  flowZoomValue.addEventListener('blur', applyZoomValueInput);
 
   /**
    * Largest canvas edge worth attempting for an export.
