@@ -47,7 +47,7 @@ __STYLES__
   <div class="seg" id="tabSeg" role="tablist">
     <!--tab:trace--><button class="segbtn on" id="tabTrace" type="button" role="tab" aria-selected="true" title="Line coverage and the call tree">Call Tree</button><!--/tab:trace-->
     <!--tab:graph--><button class="segbtn" id="tabGraph" type="button" role="tab" aria-selected="false" title="Where the time went, per file">Breakdown</button><!--/tab:graph-->
-    <!--tab:flow--><button class="segbtn" id="tabFlow" type="button" role="tab" aria-selected="false" title="The call flow from start to end">Flame Graph</button><!--/tab:flow-->
+    <!--tab:flow--><button class="segbtn" id="tabFlow" type="button" role="tab" aria-selected="false" title="The call flow from start to end: as steps, a flame graph, or a flowchart">Flow</button><!--/tab:flow-->
     <!--tab:timeline--><button class="segbtn" id="tabTimeline" type="button" role="tab" aria-selected="false" title="Where the wall clock actually went">Timeline</button><!--/tab:timeline-->
     <!--tab:findings--><button class="segbtn" id="tabFindings" type="button" role="tab" aria-selected="false" title="Things in this run worth a look">Findings <span class="tabbadge" id="findingsBadge" hidden></span></button><!--/tab:findings-->
   </div>
@@ -170,6 +170,14 @@ Press Enter to apply, Esc to cancel.">
   </span><!--/tab:findings-->
 
 <!--tab:flow-->  <span class="ctlgroup" id="flowControls" hidden>
+    <div class="seg" id="flowViewSeg" role="tablist">
+      <button class="segbtn on" id="flowChartBtn" type="button" role="tab" aria-selected="true"
+              title="A flowchart of distinct steps, coloured by line coverage, with an animated marker that walks the run in execution order">Flow Chart</button>
+      <button class="segbtn" id="flowFlameBtn" type="button" role="tab" aria-selected="false"
+              title="Lay the diagram out by time instead of by nesting: box width is duration">Flame Graph</button>
+      <button class="segbtn" id="flowStepsBtn" type="button" role="tab" aria-selected="false"
+              title="Every call in execution order, nested by depth">Steps</button>
+    </div>
     <select class="sort" id="flowScopeSel"
             title="Which steps the filter box keeps. A match always keeps its callers, so the chain back to the entry point stays whole; this only decides whether what it called is kept too.">
       <option value="sub">Match, with callers &amp; callees</option>
@@ -181,19 +189,15 @@ Press Enter to apply, Esc to cancel.">
             title="Fold a run of identical sibling calls into one box marked with its count">Group repeats</button>
     <button class="toggle excl" id="flowExcludedBtn" type="button" hidden
             title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
-    <button class="toggle" id="flowHotBtn" type="button"
+    <button class="toggle" id="flowHotBtn" type="button" hidden
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
-    <button class="toggle" id="flowFlameBtn" type="button"
-            title="Lay the diagram out by time instead of by nesting: box width is duration">Flame</button>
-    <button class="toggle" id="flowChartBtn" type="button"
-            title="A flowchart of distinct steps, coloured by line coverage, with an animated marker that walks the run in execution order">API Flow</button>
-    <button class="toggle" id="chartOrientBtn" type="button" hidden
-            title="Switch the flowchart between a left-to-right layout and a top-to-bottom one with Start/End">Top &rarr; bottom</button>
-    <span class="zoomseg" id="chartPlaySeg" hidden>
+    <button class="toggle on" id="chartOrientBtn" type="button"
+            title="Switch back to the left-to-right layout">Left &rarr; right</button>
+    <span class="zoomseg" id="chartPlaySeg">
       <button class="toggle zoombtn" id="chartPlayBtn" type="button" title="Play the run through the flowchart">&#9654;</button>
       <button class="toggle zoombtn" id="chartResetBtn" type="button" title="Back to the start">&#8634;</button>
     </span>
-    <select class="sort" id="chartSpeedSel" hidden title="Playback speed">
+    <select class="sort" id="chartSpeedSel" title="Playback speed">
       <option value="0.5">0.5&times;</option>
       <option value="1" selected>1&times;</option>
       <option value="2">2&times;</option>
@@ -205,20 +209,18 @@ Press Enter to apply, Esc to cancel.">
            min="0.05" max="8" step="0.05" value="0.5"
            title="Drag for a slower or faster walk-through than the presets allow, down to a twentieth of normal speed">
     <span class="chartspeed-val" id="chartSpeedVal" hidden>0.50&times;</span>
-    <select class="sort" id="flowColorSel" title="What a frame's colour means in the flame layout">
-      <option value="glowroot">Glowroot</option>
-      <option value="deju">Deju</option>
-      <option value="pkg">By package</option>
-    </select>
-    <select class="sort" id="flowMinWSel" title="Narrowest a frame may be drawn in the flame layout. Above 1px the diagram stops being a true time axis, and every frame becomes visible instead.">
+    <select class="sort" id="flowMinWSel" hidden title="Narrowest a frame may be drawn in the flame layout. Above 1px the diagram stops being a true time axis, and every frame becomes visible instead.">
       <option value="1">Every frame 1px</option>
       <option value="3">Every frame 3px</option>
       <option value="12">Every frame 12px</option>
       <option value="34">Every frame labelled</option>
     </select>
     <span class="zoomseg">
-      <button class="toggle zoombtn" id="flowOutBtn" type="button" title="Zoom out">&minus;</button>
-      <button class="toggle zoombtn" id="flowInBtn" type="button" title="Zoom in">&plus;</button>
+      <input class="zoom-slider" id="flowZoomSlider" type="range" min="40" max="300" step="5" value="100"
+             title="Drag to zoom the diagram">
+      <input class="search zoom-value" id="flowZoomValue" type="text" inputmode="numeric" size="3" value="100" maxlength="3"
+             title="Type a zoom percentage. Press Enter to apply, Esc to cancel.">
+      <span class="zoom-pct">%</span>
     </span>
     <button class="toggle on" id="flowFitBtn" type="button" title="Scale the diagram to fit the window width">Fit width</button>
     <button class="toggle" id="flowPngBtn" type="button" title="Save the diagram as a PNG image">Save PNG</button>
@@ -260,7 +262,15 @@ Press Enter to apply, Esc to cancel.">
 </section><!--/tab:graph-->
 
 <!--tab:flow--><section id="flowPanel" role="tabpanel" hidden>
-  <p class="panelnote" id="flowNote"></p>
+  <div class="flownoterow">
+    <p class="panelnote" id="flowNote"></p>
+    <div class="graphlegend" id="chartLegend">
+      <span><i class="sw sw-full"></i>Fully executed</span>
+      <span><i class="sw sw-partial"></i>Only some branches taken</span>
+      <span><i class="sw sw-none"></i>Entered method, line not executed</span>
+      <span><i class="sw sw-sql"></i>SQL query</span>
+    </div>
+  </div>
   <div class="flowcrumb" id="flowCrumb" hidden></div>
   <div class="flowwrap" id="flowWrap"></div>
   <div class="flowtip" id="flowTip" hidden></div>
