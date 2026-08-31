@@ -30,7 +30,7 @@ exports the whole thing as a self-contained HTML report.
 | `plugin/` | the IntelliJ IDEA plugin: tool window, editor painter, HTML report |
 | `tools/` | a throwaway CLI that speaks the socket protocol, development only |
 | `scripts/` | build helpers, the API audit and the demo-report generator |
-| `docs/` | the demo report |
+| `docs/` | the [user guide](docs/user-guide.md), [how it works](docs/architecture.md), and the demo report |
 | `assets/` | logo source |
 
 The agent is bundled inside the plugin, so plugin and agent are always the same build.
@@ -56,6 +56,8 @@ The agent listens on loopback only by default. Reaching it from a container or a
 machine takes an explicit `bind=`. The token is the fixed string `dejutoken`, published
 here and in the plugin source, so it is not a secret: the loopback binding is what keeps
 the control socket private. Open it wider only on a machine and network you trust.
+
+**Step-by-step setup — including Docker — and troubleshooting: [docs/user-guide.md](docs/user-guide.md).**
 
 ## Build
 
