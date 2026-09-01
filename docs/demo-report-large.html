@@ -1,3 +1,1168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deju Trace Report</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<style>
+/*
+ * Deju HTML report styles. Inlined verbatim into a <style> element by
+ * HtmlReportGenerator, so the exported file stays self-contained (no external
+ * resources, no network). Theme-aware: follows the viewer's light/dark
+ * preference, and the in-page toggle stamps data-theme on <html> to override.
+ */
+
+:root{
+  color-scheme: light dark;
+  --bg:#fff; --fg:#1f2328; --muted:#656d76; --panel:#f6f8fa; --border:#d0d7de;
+  --ln:#8c959f; --accent:#4a90d9;
+  --full-bg:rgba(46,164,79,.14); --partial-bg:rgba(209,167,44,.20); --none-bg:rgba(207,74,74,.16);
+  --full:#2da44e; --partial:#bf8700; --none:#cf4a4a;
+  --heat:rgba(74,144,217,.18);
+  --sql-ink:#ff9933; --flow-cls:#2e9e4f; --flow-mth:#2f6fd0;
+  /* Syntax colours, tuned after Xcode's palettes so the report reads like a Mac editor.
+     They sit on top of the green/amber/red coverage tints, which are low-alpha washes,
+     so contrast survives on every row state. */
+  --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
+  --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
+  /* macOS surface tokens: hairline separators, soft elevation, translucent chrome. */
+  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22); --land-border:#e2a300;
+  --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
+  --elev-sm:0 1px 2px rgba(0,0,0,.06);
+  --glass:rgba(255,255,255,.72);
+  --control:#fff; --control-hover:#f2f3f5;
+  --radius:10px; --radius-sm:7px;
+  /* Step badges carry the product's orange on white ink: the step number is the one thing
+     in a frame that says where you are in the run, so it is deliberately loud. Each theme
+     gets its own strength, #e67f18 on white and a dimmer #a0652a on the dark pages, since
+     one orange cannot both hold its own against white and avoid glaring off near-black in
+     a column of thirty badges. Same hue throughout, so it still reads as the same mark. */
+  --badge-bg:#e67f18; --badge-ink:#fff;
+  /* Measured at runtime so sticky file headers park directly under the toolbar, and the
+     toolbar itself parks directly under the meta row now that both stick in turn. */
+  --toolbarH:0px; --metaH:0px;
+}
+@media (prefers-color-scheme: dark){ :root{
+  --bg:#1e1f22; --fg:#dfe1e5; --muted:#9aa0a6; --panel:#2b2d30; --border:#3a3d42; --ln:#6f737a;
+  --full-bg:rgba(80,180,80,.18); --partial-bg:rgba(210,180,60,.20); --none-bg:rgba(210,80,80,.20);
+  --full:#6abf6a; --partial:#d6b656; --none:#e06c6c;
+  --heat:rgba(120,170,230,.20);
+  --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
+  --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
+  --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
+  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34); --land-border:#ffd23f;
+  --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
+  --elev-sm:0 1px 2px rgba(0,0,0,.35);
+  --glass:rgba(38,40,44,.72);
+  --control:#33363b; --control-hover:#3c4045;
+  --badge-bg:#a0652a;
+}}
+:root[data-theme="dark"]{
+  --bg:#1e1f22; --fg:#dfe1e5; --muted:#9aa0a6; --panel:#2b2d30; --border:#3a3d42; --ln:#6f737a;
+  --full-bg:rgba(80,180,80,.18); --partial-bg:rgba(210,180,60,.20); --none-bg:rgba(210,80,80,.20);
+  --full:#6abf6a; --partial:#d6b656; --none:#e06c6c;
+  --heat:rgba(120,170,230,.20);
+  --sql-ink:#ff9933; --flow-cls:#7fd08a; --flow-mth:#61afef;
+  --k-kw:#fc5fa3; --k-str:#fc6a5d; --k-chr:#fc6a5d; --k-cmt:#7f8c98;
+  --k-ann:#d0a760; --k-num:#a167e6; --k-typ:#5dd8ff;
+  --hairline:rgba(255,255,255,.10); --land:rgba(74,144,217,.34); --land-border:#ffd23f;
+  --elev:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
+  --elev-sm:0 1px 2px rgba(0,0,0,.35);
+  --glass:rgba(38,40,44,.72);
+  --control:#33363b; --control-hover:#3c4045;
+  --badge-bg:#a0652a;
+}
+:root[data-theme="light"]{
+  --bg:#fff; --fg:#1f2328; --muted:#656d76; --panel:#f6f8fa; --border:#d0d7de; --ln:#8c959f;
+  --full-bg:rgba(46,164,79,.14); --partial-bg:rgba(209,167,44,.20); --none-bg:rgba(207,74,74,.16);
+  --full:#2da44e; --partial:#bf8700; --none:#cf4a4a;
+  --heat:rgba(74,144,217,.18);
+  --sql-ink:#ff9933; --flow-cls:#2e9e4f; --flow-mth:#2f6fd0;
+  --k-kw:#9b2393; --k-str:#c41a16; --k-chr:#c41a16; --k-cmt:#5d6c79;
+  --k-ann:#8a5a1a; --k-num:#1c00cf; --k-typ:#0b4f79;
+  --hairline:rgba(0,0,0,.10); --land:rgba(74,144,217,.22); --land-border:#e2a300;
+  --elev:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08);
+  --elev-sm:0 1px 2px rgba(0,0,0,.06);
+  --glass:rgba(255,255,255,.72);
+  --control:#fff; --control-hover:#f2f3f5;
+  --badge-bg:#e67f18;
+}
+
+*{box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,sans-serif;
+  margin:0;padding:1.25rem;background:var(--bg);color:var(--fg);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+header{display:flex;align-items:center;gap:.9rem;flex-wrap:wrap;
+  padding-bottom:.5rem;border-bottom:1px solid var(--hairline);}
+.brand{display:flex;align-items:center;gap:.6rem;flex:0 0 auto;}
+.brand .logo{width:28px;height:28px;border-radius:6px;flex:0 0 auto;}
+h1{font-size:1.05rem;margin:0;}
+/* "Code Traces" as a chip beside the product name, in the same yellow-fill/green-ink
+   pairing as the step badges, so the report's two branded marks read as one family.
+   Its own class, not the legend's .chip, which is a clickable filter control. */
+.brand .brandchip{font-size:.72rem;font-weight:700;letter-spacing:.02em;line-height:1;
+  padding:.22rem .6rem;border-radius:99px;white-space:nowrap;
+  background:var(--badge-bg);color:var(--badge-ink);box-shadow:var(--elev-sm);}
+/* Theme switch, parked in the header's top-right corner. An icon rather than a labelled
+   toggle because it is the one control on the page that changes nothing about the trace,
+   and header is already justify-content:space-between, so it needs no positioning. */
+.headtools{display:flex;align-items:center;gap:.4rem;flex:0 0 auto;}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  font:inherit;font-size:.9rem;font-weight:700;line-height:1;
+  width:2rem;height:2rem;padding:0;border-radius:50%;cursor:pointer;
+  border:1px solid var(--hairline);background:var(--control);color:var(--muted);
+  box-shadow:var(--elev-sm);transition:background .12s ease,color .12s ease,border-color .12s ease;}
+.iconbtn:hover{background:var(--control-hover);color:var(--fg);border-color:var(--border);}
+.iconbtn:active{transform:translateY(.5px);}
+.iconbtn svg{display:block;}
+.meta{position:sticky;top:0;z-index:7;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  color:var(--muted);font-size:.82rem;padding:.55rem .75rem;margin:0 -.75rem;
+  background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--hairline);}
+/* Pushed right so the trace point keeps the left edge. The count follows it and gets no
+   free space of its own, which keeps the two together at the end of the row. */
+.meta .search{margin-left:auto;flex:0 1 20rem;min-width:10rem;font-size:.8rem;
+  padding:.3rem .85rem;background:var(--panel);}
+/* The trace point takes whatever is left and truncates rather than pushing the count onto
+   a second line: this row exists to be one line, which is the whole point of folding the
+   stats into the title above it. The full text stays on the element's title. */
+.meta #metaText{flex:1 1 14rem;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;}
+.meta .count{flex:0 0 auto;}
+.meta .search[hidden]{display:none;}
+
+.legend{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.78rem;}
+.legend .chip{padding:.15rem .6rem;border-radius:99px;border:1px solid var(--hairline);
+  cursor:pointer;user-select:none;box-shadow:var(--elev-sm);}
+.chip.full{background:var(--full-bg);} .chip.partial{background:var(--partial-bg);} .chip.none{background:var(--none-bg);}
+.legend .chip.off{opacity:.4;text-decoration:line-through;}
+
+.toggle{font:inherit;font-size:.8rem;cursor:pointer;padding:.32rem .75rem;border-radius:var(--radius-sm);
+  border:1px solid var(--hairline);background:var(--control);color:var(--fg);
+  box-shadow:var(--elev-sm);transition:background .12s ease,border-color .12s ease;}
+.toggle:hover{background:var(--control-hover);border-color:var(--border);}
+.toggle:active{transform:translateY(.5px);}
+.toggle.on{border-color:var(--accent);background:var(--heat);}
+/* Present but inert: the control still belongs on the toolbar, there is just nothing for
+   it to act on right now. Muted rather than removed, so it does not read as a glitch. */
+.toggle:disabled{opacity:.45;cursor:default;}
+.toggle:disabled:hover{background:var(--control);border-color:var(--hairline);}
+
+/* ------------------------------------------------------------------ files --- */
+/* No overflow on .file: an overflow value here would make it the nearest scroll
+   container and the sticky h2 would never stick. The radius is clipped by
+   .scroll instead. */
+.file{margin:0 0 1rem;border:1px solid var(--hairline);border-radius:var(--radius);
+  box-shadow:var(--elev-sm);background:var(--bg);}
+.file h2{
+  position:sticky;top:calc(var(--metaH) + var(--toolbarH));z-index:3;
+  display:flex;align-items:center;gap:.5rem;
+  font-size:.85rem;font-weight:600;margin:0;padding:.55rem .8rem;
+  background:var(--panel);border-bottom:1px solid var(--hairline);
+  border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;
+}
+.file h2 .src{color:var(--muted);font-weight:400;}
+.file h2 .caret{color:var(--muted);font-weight:400;display:inline-block;width:.85rem;flex:0 0 auto;}
+.file h2 .fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.file h2 .stats{margin-left:auto;display:flex;align-items:center;gap:.45rem;font-weight:400;font-size:.74rem;color:var(--muted);white-space:nowrap;}
+.file h2 .stats .pill{padding:.05rem .4rem;border-radius:99px;border:1px solid var(--border);background:var(--bg);}
+.file h2 .stats .pill.red{color:var(--none);border-color:var(--none);}
+.file h2 .stats .pill.amber{color:var(--partial);border-color:var(--partial);}
+.file h2 .act{flex:0 0 auto;font:inherit;font-size:.72rem;cursor:pointer;padding:.1rem .4rem;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);}
+.file h2 .act:hover{border-color:var(--accent);color:var(--fg);}
+.file.collapsed h2{border-bottom:none;border-radius:var(--radius);}
+.file.collapsed .scroll{display:none;}
+.scroll{overflow-x:auto;border-radius:0 0 var(--radius) var(--radius);}
+
+/* ------------------------------------------------------------------- rows --- */
+table{border-collapse:collapse;width:100%;
+  font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:.8rem;}
+td{padding:.08rem .5rem;white-space:pre;vertical-align:top;}
+td.time{text-align:right;color:var(--muted);white-space:nowrap;width:5rem;border-right:1px solid var(--border);font-variant-numeric:tabular-nums;}
+td.ln{text-align:right;color:var(--ln);user-select:none;width:3.2rem;border-right:1px solid var(--border);}
+td.ln a{color:inherit;text-decoration:none;}
+td.ln a:hover{color:var(--accent);text-decoration:underline;}
+td.code{width:100%;}
+
+/* --------------------------------------------------------------- syntax --- */
+/* Presentational only. paintCode() writes every fragment with textContent, so a
+   colour class can never be a route to executing traced source. */
+.k-kw{color:var(--k-kw);}
+.k-str{color:var(--k-str);}
+.k-chr{color:var(--k-chr);}
+.k-cmt{color:var(--k-cmt);font-style:italic;}
+.k-ann{color:var(--k-ann);}
+.k-num{color:var(--k-num);}
+.k-typ{color:var(--k-typ);}
+tr.FULL{background:var(--full-bg);} tr.FULL td.code{box-shadow:inset 3px 0 0 var(--full);}
+tr.PARTIAL{background:var(--partial-bg);} tr.PARTIAL td.code{box-shadow:inset 3px 0 0 var(--partial);}
+tr.NONE{background:var(--none-bg);} tr.NONE td.code{box-shadow:inset 3px 0 0 var(--none);}
+tr.cursor td{background:var(--heat);}
+tr.cursor td.code{box-shadow:inset 3px 0 0 var(--accent);}
+.br{color:var(--muted);font-size:.72rem;}
+
+/* ----------------------------------------------------- method sections --- */
+tr.mrow td{
+  padding:.3rem .5rem .22rem;background:var(--bg);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  white-space:normal;cursor:pointer;
+}
+tr.mrow:first-child td{border-top:none;}
+.mhead{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+.mhead .mcaret{color:var(--muted);width:.8rem;flex:0 0 auto;}
+.mhead .mname{font-weight:600;font-size:.82rem;}
+.mhead .mkind{color:var(--muted);font-weight:400;font-style:italic;}
+.mhead .mmeta{color:var(--muted);font-size:.72rem;margin-left:auto;font-variant-numeric:tabular-nums;}
+
+/* -------------------------------------------------------------- tree view --- */
+/* One table for the whole tree so the time and line columns stay aligned at every
+   depth; nesting is expressed by indenting the code cell, not by nested tables. */
+.treewrap{border:1px solid var(--border);border-radius:8px;}
+#treeTable{width:100%;}
+.fidelity{font-size:.74rem;color:var(--muted);margin:0 0 .5rem;}
+
+tr.frame td{
+  padding:.26rem .5rem;background:var(--panel);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  white-space:normal;cursor:pointer;
+}
+tr.frame:first-child td{border-top:none;}
+tr.frame.hot td{background:var(--heat);}
+.fhead{display:flex;align-items:baseline;gap:.45rem;font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+/* The step badge: the logo's yellow-to-green sweep, numeral in near-black. A pill rather
+   than a strict circle, because step numbers reach three and four digits on a real trace
+   and a fixed circle would either clip them or force every badge as wide as the longest.
+   Single digits still come out round. The fill is theme-independent, so the mark stays
+   recognisable as the same badge in light and dark. */
+.fhead .step{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  box-sizing:border-box;min-width:1.5rem;height:1.5rem;padding:0 .38rem;
+  border-radius:999px;
+  background:var(--badge-bg);
+  color:var(--badge-ink);font-size:.68rem;font-weight:700;line-height:1;
+  font-variant-numeric:tabular-nums;
+  box-shadow:var(--elev-sm);}
+.fhead .fcaret{color:var(--muted);width:.8rem;flex:0 0 auto;}
+.fhead .ffile{font-weight:600;font-size:.82rem;}
+.fhead .fsep{color:var(--muted);}
+.fhead .fmethod{font-weight:600;font-size:.82rem;}
+.fhead .fkind{color:var(--muted);font-weight:400;font-style:italic;font-size:.76rem;}
+.fhead .fsite{color:var(--muted);font-size:.72rem;}
+.fhead .fsite a{color:inherit;text-decoration:none;}
+.fhead .fsite a:hover{color:var(--accent);text-decoration:underline;}
+.fhead .ftime{margin-left:auto;color:var(--muted);font-size:.74rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+tr.frame.hot .ftime{color:var(--fg);font-weight:600;}
+
+/* A run of identical sibling calls, folded so an N+1 loop cannot flood the page. */
+tr.fold td{padding:.22rem .5rem;background:var(--bg);border-bottom:1px solid var(--border);white-space:normal;cursor:pointer;}
+.foldhead{display:flex;align-items:baseline;gap:.45rem;font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:.78rem;color:var(--muted);}
+.foldhead .fcount{font-weight:600;color:var(--fg);}
+.foldhead:hover{color:var(--fg);}
+/* An executed query. Distinct from a call frame because there is no source to step into, and
+   the statement text is the content. */
+tr.sqlrow td{padding:.22rem .5rem;background:var(--bg);border-bottom:1px solid var(--border);white-space:normal;}
+.fhead .sqltag{font-size:.66rem;font-weight:700;letter-spacing:.04em;padding:.05rem .3rem;
+  border:1px solid var(--border);border-radius:3px;color:var(--muted);flex:0 0 auto;}
+/* A formatted statement, so newlines and indentation are significant. pre-wrap keeps them
+   while still wrapping a forty-column select instead of scrolling the page sideways. */
+.sqltext{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.76rem;
+  line-height:1.5;white-space:pre-wrap;word-break:break-word;color:var(--fg);
+  margin:.15rem 0 .1rem;padding:.3rem .5rem;
+  background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius-sm);
+  border-left:2px solid var(--border);
+  position:relative;}
+/* Three rendered lines, counted visually rather than by newline: a single SELECT clause
+   over forty columns wraps to five lines and is exactly the case worth collapsing. */
+.sqltext.clamped{max-height:calc(3 * 1.5em + .6rem);overflow:hidden;}
+/* Fades the cut edge so it reads as "there is more" instead of a hard crop. */
+.sqltext.clamped::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.4em;
+  background:linear-gradient(to bottom,transparent,var(--panel));pointer-events:none;}
+.sqlmore{font:inherit;font-size:.72rem;cursor:pointer;padding:.1rem .45rem;margin:0 0 .2rem;
+  border:1px solid var(--hairline);border-radius:99px;
+  background:var(--control);color:var(--muted);}
+.sqlmore:hover{background:var(--control-hover);color:var(--fg);}
+.sqlmore[hidden]{display:none;}
+/* Roll-ups of excluded types read as an aside, not as executed code: dashed rule and no
+   solid bottom border, so the eye slides past them while following the real call flow. */
+tr.rollup td{border-bottom:1px dashed var(--border);opacity:.85;}
+tr.rollup:hover td{opacity:1;}
+
+/* Nesting depth is expressed as leading pad on the cell; --depth is set per row.
+   These selectors must out-specify `tr.frame td` / `tr.fold td` / `td` above, which set
+   the `padding` shorthand and would otherwise reset padding-left back to .5rem. */
+tr td.tcode,
+tr.frame td.tframe,
+tr.sqlrow td.tframe,
+tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
+
+.seg{display:inline-flex;border:1px solid var(--hairline);border-radius:var(--radius-sm);
+  background:var(--panel);padding:2px;gap:2px;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);}
+.segbtn{font:inherit;font-size:.8rem;cursor:pointer;padding:.26rem .75rem;border:0;
+  border-radius:calc(var(--radius-sm) - 2px);background:transparent;color:var(--muted);
+  transition:background .12s ease,color .12s ease;}
+.segbtn + .segbtn{border-left:0;}
+.segbtn.on{background:var(--control);color:var(--fg);font-weight:600;box-shadow:var(--elev-sm);}
+.segbtn:hover:not(.on){color:var(--fg);}
+.segbtn:disabled{opacity:.4;cursor:not-allowed;}
+[hidden]{display:none !important;}
+
+/* ---------------------------------------------------------------- chrome --- */
+.toolbar{position:sticky;top:var(--metaH);z-index:6;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+  padding:.55rem .75rem;margin:0 -.75rem .75rem;background:var(--glass);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--hairline);}
+.dropdown{position:relative;}
+/* Opaque, deliberately. This popover sits over dense code, and it is nested inside the
+   toolbar, which already has a backdrop-filter: an ancestor filter establishes a backdrop
+   root, so a child's blur has nothing behind it to sample and a translucent background just
+   lets the call tree show through unblurred. A list you have to read is not a place for
+   glass. */
+.menu{position:absolute;top:112%;left:0;width:min(30rem,88vw);background:var(--bg);
+  border:1px solid var(--hairline);border-radius:var(--radius);padding:.4rem;
+  box-shadow:var(--elev);z-index:10;}
+.menu[hidden]{display:none;}
+.menu-search{width:100%;font:inherit;font-size:.78rem;padding:.3rem .45rem;margin-bottom:.35rem;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--fg);}
+.menu-search:focus{outline:none;border-color:var(--accent);}
+.menu-actions{display:flex;gap:.35rem;margin-bottom:.35rem;}
+.menu-actions button{flex:1;font:inherit;font-size:.75rem;cursor:pointer;padding:.22rem;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--fg);}
+.menu-actions button:hover{border-color:var(--accent);}
+.menu-list{max-height:50vh;overflow:auto;overscroll-behavior:contain;}
+.menu label{display:flex;align-items:center;gap:.45rem;padding:.24rem .35rem;font-size:.78rem;
+  border-radius:var(--radius-sm);cursor:pointer;width:max-content;min-width:100%;}
+.menu label[hidden]{display:none;}
+.menu label:hover{background:var(--panel);}
+/* No ellipsis: a truncated fully-qualified name is exactly the part you need to tell
+   two same-named classes apart. The list scrolls sideways instead. */
+.menu label .mtxt{white-space:nowrap;}
+.menu label .gen{color:var(--muted);font-size:.72rem;flex:0 0 auto;}
+.menu .none{color:var(--muted);font-size:.76rem;padding:.3rem;}
+.search{font:inherit;font-size:.85rem;padding:.42rem .75rem;border-radius:99px;
+  border:1px solid var(--hairline);background:var(--panel);color:var(--fg);
+  flex:1 1 18rem;min-width:12rem;max-width:40rem;box-shadow:inset 0 1px 2px rgba(0,0,0,.04);}
+.search:focus{outline:none;border-color:var(--accent);}
+.sort{font:inherit;font-size:.8rem;padding:.3rem .5rem;border-radius:var(--radius-sm);
+  border:1px solid var(--hairline);background:var(--control);color:var(--fg);cursor:pointer;
+  box-shadow:var(--elev-sm);}
+.sort:focus{outline:none;border-color:var(--accent);}
+/* The hand-entered threshold. Narrow on purpose: it holds "750us", not a sentence, and it
+   sits between two controls in a toolbar that already wraps. */
+.mintime-custom{flex:0 0 auto;min-width:0;width:7.5rem;max-width:7.5rem;text-align:center;}
+.mintime-custom.bad{border-color:var(--none-bg);background:var(--none-bg);}
+.mintime-and{flex:0 0 auto;color:var(--muted);font-size:.78rem;}
+.mintime-and[hidden]{display:none;}
+.genToggle{display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--muted);cursor:pointer;white-space:nowrap;}
+.genToggle[hidden]{display:none;}
+.count{color:var(--muted);font-size:.78rem;margin-left:auto;white-space:nowrap;}
+/* The share of the run, riding inside the time it qualifies. Dimmer and smaller than the
+   duration: the number is the measurement, the percentage is the context for it, and a
+   reader scanning a column of frames should still be scanning durations. */
+.fpct{margin-left:.4rem;font-size:.72em;font-weight:400;color:var(--muted);
+  font-variant-numeric:tabular-nums;}
+.ftime .fpct,.tltime .fpct{opacity:.85;}
+/* A share-of-run bar behind the badge, the way Glowroot's own aggregate view reads at a
+   glance instead of asking the reader to parse a number. Only meaningful against a track
+   of fixed width, which is why it is a min-width badge rather than however wide the digits
+   happen to be — two rows' bars are only comparable when their tracks are the same size. */
+.fpct.bar{display:inline-block;min-width:2.5rem;text-align:right;
+  padding:0 .3rem;border-radius:3px;
+  background-image:linear-gradient(to right,
+    color-mix(in srgb, var(--accent) 50%, transparent),
+    color-mix(in srgb, var(--accent) 50%, transparent));
+  background-repeat:no-repeat;background-size:var(--fpct-fill,0%) 100%;}
+
+/* The run's headline numbers, inline in the title row. Value and caption sit on one line
+   divided by hairlines, so five stats cost the height of the heading beside them rather
+   than a banded row of their own above the toolbar. */
+.summary{display:flex;align-items:center;flex-wrap:wrap;gap:.15rem .1rem;
+  flex:1 1 auto;min-width:0;margin:0;}
+.summary .stat{display:flex;align-items:baseline;gap:.35rem;line-height:1.2;
+  padding:.1rem .8rem;border-left:1px solid var(--hairline);white-space:nowrap;}
+.summary .stat:first-child{border-left:0;}
+.summary .stat b{font-size:.92rem;font-weight:600;font-variant-numeric:tabular-nums;}
+/* The seconds/minutes reading beside a millisecond total: present, but clearly secondary
+   to the figure it restates. */
+.summary .stat b .statalt{font-size:.75rem;font-weight:400;color:var(--muted);
+  text-transform:none;letter-spacing:0;}
+.summary .stat span{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+/* A stat the reader must not take at face value: something was capped or dropped. */
+.summary .stat.warn b{color:var(--sql-ink);}
+.summary .stat.warn{cursor:help;}
+.empty{color:var(--muted);font-size:.85rem;padding:1rem;border:1px dashed var(--border);border-radius:8px;text-align:center;}
+.notice{color:var(--muted);font-size:.76rem;margin:0 0 .75rem;}
+
+/* ------------------------------------------------------------------ help --- */
+.help{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);padding:1rem;}
+.help[hidden]{display:none;}
+.help .card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;max-width:32rem;width:100%;max-height:80vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+.help h3{margin:0 0 .6rem;font-size:.95rem;}
+.help dl{display:grid;grid-template-columns:auto 1fr;gap:.3rem .8rem;margin:0 0 .8rem;font-size:.8rem;align-items:baseline;}
+.help dt{margin:0;}
+.help dd{margin:0;color:var(--muted);}
+.help kbd{font-family:SFMono-Regular,Consolas,monospace;font-size:.74rem;padding:.08rem .35rem;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;background:var(--panel);}
+.help p{font-size:.76rem;color:var(--muted);margin:.5rem 0 0;}
+.help .close{margin-top:.8rem;}
+
+/* ------------------------------------------------- graph / flow panels --- */
+
+/* Groups of toolbar controls that appear and disappear as a unit. display:contents keeps
+   the buttons themselves as flex children of .toolbar, so wrapping behaves exactly as it
+   did when they were written inline; [hidden] is !important, so it still wins. */
+.ctlgroup{display:contents;}
+
+.panelnote{color:var(--muted);font-size:.76rem;margin:0 0 .75rem;}
+
+.flownoterow{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+  flex-wrap:wrap;}
+.flownoterow .panelnote{margin:0 0 .75rem;}
+.flownoterow .graphlegend{margin:0 0 .75rem;}
+
+.graphlegend{display:flex;gap:1rem;align-items:center;font-size:.74rem;color:var(--muted);
+  margin:0 0 .6rem;}
+.graphlegend span{display:inline-flex;align-items:center;gap:.35rem;}
+.sw{width:.7rem;height:.7rem;border-radius:3px;display:inline-block;}
+.sw-self{background:var(--accent);}
+.sw-sql{background:var(--sql-ink);}
+.sw-full{background:var(--full);}
+.sw-partial{background:var(--partial);}
+.sw-none{background:var(--none);}
+
+.zoomseg{display:inline-flex;gap:.4rem;align-items:center;}
+.zoombtn{min-width:2rem;text-align:center;font-weight:600;padding:.32rem .5rem;}
+.zoom-slider{width:6rem;accent-color:var(--accent);cursor:pointer;}
+.zoom-value{min-width:5rem;padding:.42rem .3rem;text-align:center;}
+.zoom-pct{font-size:.8rem;color:var(--muted);}
+
+/* The fine-grained playback speed, shown only once "Custom…" is picked in the select
+   beside it: a preset list tops out at 0.5x, and a first watch of an unfamiliar run often
+   wants slower than that. */
+.chartspeed-custom{width:7rem;accent-color:var(--accent);cursor:pointer;}
+.chartspeed-val{font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums;
+  min-width:3.4em;}
+
+.graphrow{display:grid;grid-template-columns:minmax(7rem,var(--graph-name-w,15rem)) 1fr auto auto;
+  gap:.6rem;align-items:center;padding:.22rem 0;font-size:.8rem;}
+.graphmeta{display:flex;align-items:center;gap:.35rem;white-space:nowrap;
+  font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;}
+/* A repeat count earns a warning colour: the same statement issued N times is the one
+   thing on this page a reader should stop and look at. */
+.graphmeta .nplus1{font-weight:700;color:var(--none);border:1px solid var(--none);
+  border-radius:99px;padding:.02rem .35rem;cursor:help;}
+.graphrow + .graphrow{border-top:1px solid var(--hairline);}
+/* The list sits in a positioning context of its own so the resize handle — a sibling of
+   graphBody, not a child — survives every renderGraph() wiping the rows out from under it. */
+.graphlist{position:relative;}
+.graphname{display:flex;align-items:flex-start;gap:.1rem;font-weight:600;}
+.graphname .graphlabel{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;}
+.graphname .sub{display:block;font-weight:400;font-size:.68rem;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;}
+.graphname .rowcopy{flex:none;align-self:flex-start;}
+/* A thin drag handle pinned to the boundary the name column currently ends at, recomputed
+   from the rendered row rather than assumed, since minmax()'s floor can still win on a
+   narrow window. Widened past its visible line so the grab target isn't a single pixel. */
+.graphresizer{position:absolute;top:0;bottom:0;width:10px;margin-left:-5px;
+  cursor:col-resize;z-index:2;touch-action:none;}
+.graphresizer::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;
+  background:var(--hairline);transform:translateX(-50%);}
+.graphresizer:hover::after,.graphresizer.active::after,.graphresizer:focus-visible::after{
+  background:var(--accent);width:2px;}
+.graphbar{display:flex;height:.85rem;border-radius:4px;background:var(--panel);
+  overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);}
+.graphbar i{display:block;height:100%;}
+.graphbar .b-self{background:var(--accent);}
+.graphbar .b-sql{background:var(--partial);}
+.graphtime{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;
+  font-size:.76rem;}
+.graphtime b{color:var(--fg);font-weight:600;}
+/* Inclusive time, in method mode only: how much of this method's own time it spent on
+   code it called rather than its own — the gap between this and the bar above it. */
+.graphtime .gtotal{display:block;font-size:.68rem;opacity:.8;}
+
+/* Zoom trail for the flame view. Only shown once you are inside a frame, so the diagram
+   never carries chrome it does not need. */
+.flowcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.15rem;
+  margin:0 0 .5rem;font-size:.76rem;color:var(--muted);}
+.flowcrumb button{font:inherit;font-size:.76rem;cursor:pointer;padding:.1rem .4rem;
+  border:0;border-radius:5px;background:transparent;color:var(--accent);}
+.flowcrumb button:hover{background:var(--heat);}
+.flowcrumb button:disabled{color:var(--fg);cursor:default;font-weight:600;}
+.flowcrumb .sep{opacity:.6;}
+
+.flowwrap{position:relative;overflow:auto;max-height:78vh;border:1px solid var(--hairline);
+  border-radius:var(--radius);background:var(--panel);}
+/* The spacer carries the full diagram's size so the scrollbar is honest, while the canvas
+   itself is only ever as big as the visible area and is re-pinned to it on every scroll.
+   A canvas the height of the whole trace stops being drawable past 65535px. */
+#flowSpacer{position:relative;}
+#flowCanvas{display:block;position:absolute;top:0;left:0;}
+.flowtip{position:fixed;z-index:20;pointer-events:none;max-width:32rem;
+  background:var(--control);color:var(--fg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);box-shadow:var(--elev);padding:.45rem .6rem;
+  font-size:.74rem;line-height:1.45;}
+.flowtip .t-sig{font-weight:600;}
+.flowtip .t-sub{color:var(--muted);}
+/* The run-wide figures sit between the signature and the step line: brighter than the
+   muted footnote because they are usually the reason the frame was hovered, but not the
+   heading. */
+.flowtip .t-stat{color:var(--fg);opacity:.85;margin-top:.15rem;}
+.flowtip .t-sql{font-family:SFMono-Regular,Consolas,monospace;font-size:.7rem;
+  white-space:pre-wrap;word-break:break-word;margin-top:.2rem;}
+
+@media (max-width:640px){
+  body{padding:.75rem;}
+  .file h2 .stats{display:none;}
+  .count{margin-left:0;}
+  .graphrow{grid-template-columns:minmax(5rem,9rem) 1fr auto;}
+}
+
+/* ------------------------------------------------------------------ findings --- */
+
+.tabbadge{display:inline-block;min-width:1.1em;margin-left:.35em;padding:0 .32em;
+  border-radius:999px;background:var(--badge-bg);color:var(--badge-ink);
+  font-size:.66rem;font-weight:700;line-height:1.5;text-align:center;vertical-align:baseline;}
+.segbtn.hasfindings .tabbadge{background:var(--none);}
+
+.findgroup{margin:0 0 1.1rem;}
+.findgroup-head{display:flex;align-items:center;gap:.4rem;width:100%;margin:0 0 .5rem;
+  padding:.15rem 0;font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--muted);background:none;border:none;
+  cursor:pointer;text-align:left;}
+.findgroup-head:hover{color:var(--fg);}
+.findgroup-chevron{flex:0 0 auto;width:1em;color:var(--muted);}
+.findgroup-label{flex:0 0 auto;}
+.findgroup-count{flex:0 0 auto;min-width:1.3em;padding:.05rem .4rem;border-radius:999px;
+  background:var(--control);color:var(--muted);font-size:.7rem;text-align:center;}
+.findgroup.high .findgroup-label,.findgroup.high .findgroup-count{color:var(--none);}
+.findgroup.med .findgroup-label,.findgroup.med .findgroup-count{color:var(--partial);}
+.findgroup.high .findgroup-count{background:color-mix(in srgb,var(--none) 16%,var(--control));}
+.findgroup.med .findgroup-count{background:color-mix(in srgb,var(--partial) 16%,var(--control));}
+.findgroup-body[hidden]{display:none;}
+
+.finding{border:1px solid var(--border);border-left:3px solid var(--muted);
+  border-radius:var(--radius);background:var(--panel);padding:.65rem .85rem;margin:0 0 .55rem;
+  transition:border-color .12s ease,box-shadow .12s ease;}
+.finding:hover{border-color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.finding:last-child{margin-bottom:0;}
+.finding.high{border-left-color:var(--none);}
+.finding.med{border-left-color:var(--partial);}
+.finding.info{border-left-color:var(--accent);}
+.finding .fsev{display:inline-block;font-size:.62rem;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted);background:var(--control);
+  padding:.1rem .45rem;border-radius:999px;}
+.finding.high .fsev{color:var(--none);background:color-mix(in srgb,var(--none) 14%,var(--control));}
+.finding.med .fsev{color:var(--partial);background:color-mix(in srgb,var(--partial) 14%,var(--control));}
+.finding h4{margin:.4rem 0 .3rem;font-size:.92rem;font-weight:650;}
+.finding p{margin:0;color:var(--muted);font-size:.8rem;line-height:1.5;
+  white-space:normal;overflow-wrap:anywhere;}
+.finding .sqltext{margin:.5rem 0 0;}
+.finding .act{margin-top:.5rem;}
+
+/* ------------------------------------------------------------------ timeline --- */
+
+.tlruler{position:relative;height:1.1rem;
+  /* Inset to exactly the bar track below it, so a tick sits over the time it names. Margin
+     rather than padding: the ticks are absolutely positioned, and both their 0% and their
+     100% resolve against this element's PADDING box — which includes any padding it has, so
+     padding here moved the label text and left every tick exactly where it was. The ruler
+     read a whole column to the left of the bars it was meant to be a scale for. Left margin
+     now covers the actions column too, since it moved from the row's right edge to sit
+     beside the name. */
+  margin:0 9.2rem .25rem 32rem;}
+.tltick{position:absolute;top:0;transform:translateX(-50%);font-size:.66rem;color:var(--muted);
+  white-space:nowrap;}
+.tltick:first-child{transform:none;}
+.tltick:last-child{transform:translateX(-100%);}
+
+.tlrow{display:grid;grid-template-columns:1rem 21rem 8.5rem 1fr 8.5rem;gap:.4rem;
+  align-items:center;padding:.14rem .3rem;border-radius:var(--radius-sm);}
+/* Only rows that actually have steps underneath them get a caret; the column is kept on
+   the others so a leaf and a parent still line their names up. */
+.tlcaret{font-size:.82rem;line-height:1;color:var(--fg);opacity:.5;text-align:center;
+  user-select:none;cursor:pointer;border-radius:3px;}
+.tlcaret.leaf{visibility:hidden;cursor:default;}
+.tlcaret:hover{background:var(--control-hover);opacity:1;}
+/* Hidden until the row is hovered, the same rule .rowcopy follows in the tree: a column
+   of two hundred rows should not be a column of six hundred buttons. */
+.tlacts{display:flex;gap:.15rem;justify-content:flex-start;opacity:0;transition:opacity .12s;}
+.tlrow:hover .tlacts,.tlacts:focus-within{opacity:1;}
+.tlacts button,.tlacts a{font:inherit;font-size:.66rem;line-height:1;padding:.2rem .35rem;
+  border:1px solid var(--hairline);border-radius:var(--radius-sm);background:var(--control);
+  color:var(--muted);cursor:pointer;text-decoration:none;}
+.tlacts button:hover,.tlacts a:hover{color:var(--fg);background:var(--control-hover);}
+/* The full text behind a row: the formatted statement for a query, or the fully-qualified
+   signature the name column truncates for everything else. Opened in place rather than in a
+   tooltip that cannot be copied out of. Spans the whole grid so a long line is not squeezed
+   into one column. */
+.tlfull{grid-column:1/-1;margin:.15rem 0 .4rem 1.4rem;padding:.45rem .6rem;
+  background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius-sm);
+  font-family:SFMono-Regular,Consolas,monospace;font-size:.7rem;white-space:pre-wrap;
+  overflow-x:auto;}
+.tlrow:hover{background:var(--control-hover);}
+.tlname{cursor:pointer;padding-left:calc(var(--depth,0) * .55rem);font-size:.76rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tlrow.sql .tlname{color:var(--sql-ink);font-family:SFMono-Regular,Consolas,monospace;
+  font-size:.7rem;}
+.tltrack{position:relative;height:.85rem;background:var(--panel);border-radius:3px;
+  overflow:hidden;}
+.tlbar{position:absolute;top:0;bottom:0;min-width:1px;border-radius:3px;
+  background:color-mix(in srgb, var(--accent) 26%, transparent);}
+.tlown{position:absolute;top:0;bottom:0;left:0;border-radius:3px;background:var(--accent);}
+.tlrow.sql .tlbar{background:color-mix(in srgb, var(--sql-ink) 26%, transparent);}
+.tlrow.sql .tlown{background:var(--sql-ink);}
+.tltime{text-align:right;font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;
+  white-space:nowrap;}
+.tltime b{color:var(--fg);}
+
+/* --------------------------------------------------------------- row copying --- */
+
+/* Hidden until the row is hovered or the button itself is focused, so a column of forty
+   frames is not a column of forty icons. Kept in the layout either way, so revealing it
+   never nudges the timing next to it. */
+.rowcopy{margin-left:.4rem;padding:0 .25rem;border:0;background:none;cursor:pointer;
+  color:var(--muted);font-size:.75rem;line-height:1;opacity:0;transition:opacity .12s;}
+tr:hover .rowcopy,.graphrow:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
+.rowcopy:hover{color:var(--fg);}
+
+.fold.grouped .fcount{color:var(--accent);}
+
+@media (max-width:900px){
+  .tlrow{grid-template-columns:1rem 10rem 8.5rem 1fr 5.5rem;}
+  .tlruler{margin-left:21rem;margin-right:5.8rem;}
+}
+
+/* Printing. The tree is virtualised, so report.js swaps the full row list in on
+   beforeprint (up to a bounded size) and puts the window back afterwards; everything
+   here is about getting the chrome out of the way and not slicing rows in half. */
+@media print{
+  :root{--toolbarH:0px;--metaH:0px;}
+  body{padding:0;background:#fff;color:#000;}
+  header .headtools,.toolbar,#tabSeg,.legend,.search,#fileMenu,.help,.act,
+  .zoomseg,#flowPngBtn{display:none !important;}
+  .meta{position:static;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+    border-bottom:none;}
+  .meta,.summary{break-inside:avoid;}
+  .scroll,.treewrap,.flowwrap{overflow:visible !important;max-height:none !important;
+    border:none !important;}
+  tr,.file,.graphrow{break-inside:avoid;}
+  .file h2{break-after:avoid;}
+  a{text-decoration:none;color:inherit;}
+  /* A collapsed file prints as its header alone, which is what it looks like on screen. */
+  .file.collapsed .scroll{display:none;}
+}
+
+/* ------------------------------------------------------------ customize --- */
+
+/* Reuses the help overlay's card, so the two panels behave identically and only the
+   contents differ. */
+.help .cushint{margin:0 0 .8rem;}
+.curow{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem .9rem;margin:0 0 .55rem;}
+.curow-end{justify-content:flex-end;gap:.5rem;margin-top:.9rem;
+  border-top:1px solid var(--hairline);padding-top:.8rem;margin-bottom:0;}
+.cuhead{font-size:.72rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  color:var(--muted);margin:.9rem 0 .45rem;}
+.cuhead:first-child{margin-top:0;}
+/* A fixed basis rather than max-content: ragged checkbox columns read as a list of
+   unrelated switches, and these are meant to be scanned as a set. */
+.culabel{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;
+  flex:0 0 auto;min-width:8.5rem;cursor:pointer;}
+.culabel input{margin:0;cursor:pointer;}
+.culabel.wide{min-width:100%;}
+.cusel{font:inherit;font-size:.76rem;padding:.15rem .3rem;border:1px solid var(--border);
+  border-radius:5px;background:var(--panel);color:var(--fg);}
+.cunote{font-size:.72rem;color:var(--muted);margin:.15rem 0 0;flex:1 1 100%;}
+
+/* Columns the reader switched off. Every rule hides a whole column's worth of cells at
+   once, so a table never ends up with rows of differing widths. */
+body.no-time td.time,body.no-time .ftime,body.no-time .tltime b{display:none;}
+body.no-pct .fpct{display:none;}
+body.no-step .fhead .step{display:none;}
+body.no-line td.ln{display:none;}
+
+/* Compact: the same information at roughly four rows in the space of three. Only padding
+   and leading change, never a font size, so nothing reflows differently. */
+body.compact td{padding:0 .5rem;}
+body.compact td.code{line-height:1.32;}
+body.compact .tlrow{padding-top:.05rem;padding-bottom:.05rem;}
+body.compact .finding{padding:.5rem .7rem;}
+
+/* The row a Timeline or Findings link just landed on. The background wash fades in 1.6s, so
+   the eye is pulled to the right row without a mark that competes with the cursor highlight
+   afterwards; the yellow outline is not part of that animation and holds for a full minute
+   (cleared in JS), because the fade alone was gone before a reader who glanced away could
+   find the row again. */
+@keyframes deju-land{from{background:var(--land);}to{background:transparent;}}
+tr.landed td,.file.landed h2,.tlrow.landed{
+  animation:deju-land 1.6s ease-out;
+  outline:2px solid var(--land-border);outline-offset:-2px;}
+@media (prefers-reduced-motion:reduce){
+  tr.landed td,.file.landed h2,.tlrow.landed{animation:none;background:var(--land);}
+}
+
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><img class="logo" alt="" src="data:image/png;base64,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"><h1>Deju Trace Report</h1></div>
+  <!-- The run's headline numbers ride in the title row rather than in a band of their own:
+       the report opens on a laptop and every row above the toolbar is a row of trace nobody
+       can see. Script appends the stat chips here. -->
+  <div id="summary" class="summary"></div>
+  <div class="headtools">
+  <button class="iconbtn" id="customizeBtn" type="button"
+          title="Customize this report (g)" aria-label="Customize this report">
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M4 5h12a1 1 0 010 2H4a1 1 0 010-2zm0 4h8a1 1 0 010 2H4a1 1 0 010-2zm0 4h12a1 1 0 010 2H4a1 1 0 010-2z"/>
+      <circle cx="14" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </svg>
+  </button>
+  <button class="iconbtn" id="helpBtn" type="button"
+          title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+  <button class="iconbtn" id="themeToggle" type="button"
+          title="Toggle light / dark theme (t)" aria-label="Toggle light or dark theme">
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"
+            d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/>
+    </svg>
+  </button>
+  </div>
+</header>
+<!-- Tabs, trace point, filter and count in one row, so which run this is and how to switch
+     views both stay on screen together instead of separated by a row of buttons that read
+     as "part of the tabs" but were not. The filter rides here rather than in the toolbar
+     because this row survives a tab change, so one box can serve whichever tab is in front.
+
+     Each tab's button and its panel are bracketed by <!-\-tab:id-\-> markers. The export
+     dialog cuts the pairs for tabs it was told to leave out; the markers are literal
+     comments, matched exactly, because the panels nest and tag matching can be wrong. -->
+<div class="meta" id="meta">
+  <div class="seg" id="tabSeg" role="tablist">
+    <!--tab:trace--><button class="segbtn on" id="tabTrace" type="button" role="tab" aria-selected="true" title="Line coverage and the call tree">Call Tree</button><!--/tab:trace-->
+    <!--tab:graph--><button class="segbtn" id="tabGraph" type="button" role="tab" aria-selected="false" title="Where the time went, per file">Breakdown</button><!--/tab:graph-->
+    <!--tab:flow--><button class="segbtn" id="tabFlow" type="button" role="tab" aria-selected="false" title="The call flow from start to end: as steps, a flame graph, or a flowchart">Flow</button><!--/tab:flow-->
+    <!--tab:timeline--><button class="segbtn" id="tabTimeline" type="button" role="tab" aria-selected="false" title="Where the wall clock actually went">Timeline</button><!--/tab:timeline-->
+    <!--tab:findings--><button class="segbtn" id="tabFindings" type="button" role="tab" aria-selected="false" title="Things in this run worth a look">Findings <span class="tabbadge" id="findingsBadge" hidden></span></button><!--/tab:findings-->
+  </div>
+  <span id="metaText"></span>
+  <input class="search" id="search" type="search" placeholder="Filter code&hellip; (press /)" autocomplete="off"
+         title="Filters whatever tab is in front. Each tab remembers its own filter.">
+  <span class="count" id="count"></span>
+</div>
+<div class="toolbar" id="toolbar">
+  <!-- display:contents, so these stay direct flex children of the toolbar and the
+       existing wrapping is untouched; hiding the group hides the lot in one go. -->
+<!--tab:trace-->  <span class="ctlgroup" id="traceControls">
+  <div class="seg" id="viewSeg" role="tablist">
+    <button class="segbtn on" id="viewTree" type="button" role="tab" aria-selected="true">Tree</button>
+    <button class="segbtn" id="viewFiles" type="button" role="tab" aria-selected="false">Files</button>
+  </div>
+
+  <!-- Tree view only -->
+  <div class="seg t-only" id="detailSeg" data-owns-visibility role="tablist" hidden>
+    <button class="segbtn on" id="detailEssential" type="button" role="tab" aria-selected="true" title="Fold away calls into excluded types">Essential</button>
+    <button class="segbtn" id="detailFull" type="button" role="tab" aria-selected="false" title="Show every recorded call">Full</button>
+  </div>
+  <button class="toggle t-only" id="hotBtn" type="button" title="Highlight the slowest chain of calls from the trace point">Hot path</button>
+  <select class="sort t-only" id="minTime" title="Keep only calls whose own total time matches (structure is never reordered)">
+    <option value="0">All calls</option>
+    <optgroup label="At least">
+      <option value="ge:100">&ge; 100 &micro;s</option>
+      <option value="ge:500">&ge; 500 &micro;s</option>
+      <option value="ge:1000">&ge; 1 ms</option>
+      <option value="ge:10000">&ge; 10 ms</option>
+      <option value="ge:100000">&ge; 100 ms</option>
+      <option value="ge:1000000">&ge; 1 s</option>
+    </optgroup>
+    <optgroup label="Less than">
+      <option value="lt:100">&lt; 100 &micro;s</option>
+      <option value="lt:1000">&lt; 1 ms</option>
+      <option value="lt:10000">&lt; 10 ms</option>
+      <option value="lt:100000">&lt; 100 ms</option>
+    </optgroup>
+    <optgroup label="Between">
+      <option value="bt:100:1000">100 &micro;s to 1 ms</option>
+      <option value="bt:1000:10000">1 ms to 10 ms</option>
+      <option value="bt:10000:100000">10 ms to 100 ms</option>
+      <option value="bt:100000:1000000">100 ms to 1 s</option>
+    </optgroup>
+    <option value="custom">Custom&hellip;</option>
+  </select>
+  <select class="sort t-only" id="minTimeOp" data-owns-visibility hidden
+          title="How the value below is compared with each call's total time">
+    <option value="ge">at least</option>
+    <option value="lt">less than</option>
+    <option value="bt">between</option>
+  </select>
+  <input class="search mintime-custom t-only" id="minTimeCustom" data-owns-visibility type="text" hidden
+         size="9" autocomplete="off" placeholder="e.g. 750us"
+         title="A number with a unit: us, ms, s or m. A bare number is milliseconds.
+Press Enter to apply, Esc to cancel.">
+  <span class="mintime-and t-only" id="minTimeAnd" data-owns-visibility hidden>and</span>
+  <input class="search mintime-custom t-only" id="minTimeCustom2" data-owns-visibility type="text" hidden
+         size="9" autocomplete="off" placeholder="e.g. 50ms"
+         title="Upper bound, exclusive. Press Enter to apply, Esc to cancel.">
+  <button class="toggle t-only" id="minTimeCustomApply" data-owns-visibility type="button" hidden>Apply</button>
+  <button class="toggle t-only on" id="sqlBtn" type="button"
+          title="Show or hide every SQL statement in the tree">SQL</button>
+  <button class="toggle t-only" id="treeGroupBtn" type="button"
+          title="Fold every repeat of the same call under one parent into a single row at its first occurrence. Everything else keeps exact execution order.">Group repeats</button>
+  <button class="toggle t-only on" id="rollupBtn" data-owns-visibility type="button" hidden
+          title="Show or hide the &quot;N excluded calls&quot; summary rows">Excluded rows</button>
+
+  <!-- Both views: in Files it picks which files render, in Tree it hides those frames. -->
+  <div class="dropdown">
+    <button class="toggle" id="fileBtn" type="button" aria-haspopup="true"
+            title="Choose which files to show. In Tree view, unticking a file hides its calls and everything under them.">Files &#9662;</button>
+    <div class="menu" id="fileMenu" hidden>
+      <input class="menu-search" id="fileSearch" type="search" placeholder="Search files&hellip;" autocomplete="off">
+      <div class="menu-actions">
+        <button type="button" id="fileAll" title="Select every file matching the search">All</button>
+        <button type="button" id="fileNone" title="Deselect every file matching the search">None</button>
+      </div>
+      <div class="menu-list" id="fileList"></div>
+      <div class="none" id="fileNoMatch" hidden>No file matches.</div>
+    </div>
+  </div>
+  <select class="sort f-only" id="sort" title="Sort files">
+    <option value="api">API order (first entered)</option>
+    <option value="self">Slowest first (self time)</option>
+    <option value="total">Slowest first (total time)</option>
+    <option value="red">Most unexecuted</option>
+    <option value="name">Name</option>
+  </select>
+  <label class="genToggle f-only" id="genToggleWrap" hidden><input type="checkbox" id="genToggle"> Show generated <span id="genCount"></span></label>
+
+  <!-- Both views -->
+  <button class="toggle" id="foldBtn" type="button" title="Collapse or expand everything">Collapse all</button>
+  <button class="toggle" id="problemsBtn" type="button" title="Show only lines that did not fully execute">Problems only</button>
+  </span><!--/tab:trace-->
+
+
+<!--tab:graph-->  <span class="ctlgroup" id="graphControls" hidden>
+    <button class="toggle" id="graphMethodBtn" type="button"
+            title="Group the bars by method instead of by file, when a file's own time turns out to belong to just one of its methods">By method</button>
+    <button class="toggle on" id="graphSqlBtn" type="button"
+            title="Count each query against the method that issued it. Off leaves only time spent in your own code.">Include SQL</button>
+    <button class="toggle" id="graphAllBtn" type="button" hidden
+            title="Show every file rather than the slowest few">Show all files</button>
+  </span><!--/tab:graph-->
+
+<!--tab:timeline-->  <span class="ctlgroup" id="timelineControls" hidden>
+    <button class="toggle" id="timelineFoldBtn" type="button"
+            title="Collapse or expand every step that has steps underneath it">Collapse all</button>
+    <button class="toggle excl" id="timelineExcludedBtn" type="button" hidden
+            title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
+    <button class="toggle" id="timelineAllBtn" type="button"
+            title="Include steps too brief to matter as well as the ones that took the time">Show every step</button>
+    <button class="toggle" id="timelineCopyBtn" type="button" title="Copy this table as text">Copy</button>
+  </span><!--/tab:timeline-->
+
+<!--tab:findings-->  <span class="ctlgroup" id="findingsControls" hidden>
+    <button class="toggle" id="findingsCopyBtn" type="button" title="Copy every finding as text">Copy all</button>
+  </span><!--/tab:findings-->
+
+<!--tab:flow-->  <span class="ctlgroup" id="flowControls" hidden>
+    <div class="seg" id="flowViewSeg" role="tablist">
+      <button class="segbtn on" id="flowChartBtn" type="button" role="tab" aria-selected="true"
+              title="A flowchart of distinct steps, coloured by line coverage, with an animated marker that walks the run in execution order">Flow Chart</button>
+      <button class="segbtn" id="flowFlameBtn" type="button" role="tab" aria-selected="false"
+              title="Lay the diagram out by time instead of by nesting: box width is duration">Flame Graph</button>
+      <button class="segbtn" id="flowStepsBtn" type="button" role="tab" aria-selected="false"
+              title="Every call in execution order, nested by depth">Steps</button>
+    </div>
+    <select class="sort" id="flowScopeSel"
+            title="Which steps the filter box keeps. A match always keeps its callers, so the chain back to the entry point stays whole; this only decides whether what it called is kept too.">
+      <option value="sub">Match, with callers &amp; callees</option>
+      <option value="only">Match, callers only</option>
+      <option value="pkg">Match by package</option>
+    </select>
+    <button class="toggle on" id="flowSqlBtn" type="button" title="Show or hide SQL steps">SQL</button>
+    <button class="toggle on" id="flowGroupBtn" type="button"
+            title="Fold a run of identical sibling calls into one box marked with its count">Group repeats</button>
+    <button class="toggle excl" id="flowExcludedBtn" type="button" hidden
+            title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
+    <button class="toggle" id="flowHotBtn" type="button" hidden
+            title="Outline the slowest chain of calls from the trace point">Hot path</button>
+    <button class="toggle on" id="flameMergeBtn" type="button" hidden
+            title="Merge every call that arrived by the same route into one frame, as wide as the time all of them took. Off, each call gets its own box in the order it ran, which on a loop is thousands of them.">Merge repeats</button>
+    <button class="toggle on" id="chartOrientBtn" type="button"
+            title="Switch back to the left-to-right layout">Left &rarr; right</button>
+    <span class="zoomseg" id="chartPlaySeg">
+      <button class="toggle zoombtn" id="chartPlayBtn" type="button" title="Play the run through the flowchart">&#9654;</button>
+      <button class="toggle zoombtn" id="chartResetBtn" type="button" title="Back to the start">&#8634;</button>
+    </span>
+    <select class="sort" id="chartSpeedSel" title="Playback speed">
+      <option value="0.5">0.5&times;</option>
+      <option value="1" selected>1&times;</option>
+      <option value="2">2&times;</option>
+      <option value="4">4&times;</option>
+      <option value="8">8&times;</option>
+      <option value="custom">Custom&hellip;</option>
+    </select>
+    <input class="chartspeed-custom" id="chartSpeedCustom" type="range" hidden
+           min="0.05" max="8" step="0.05" value="0.5"
+           title="Drag for a slower or faster walk-through than the presets allow, down to a twentieth of normal speed">
+    <span class="chartspeed-val" id="chartSpeedVal" hidden>0.50&times;</span>
+    <select class="sort" id="flowMinWSel" hidden title="Narrowest a frame may be drawn in the flame layout. Above 1px the diagram stops being a true time axis, and every frame becomes visible instead.">
+      <option value="1">Every frame 1px</option>
+      <option value="3">Every frame 3px</option>
+      <option value="12">Every frame 12px</option>
+      <option value="34">Every frame labelled</option>
+    </select>
+    <span class="zoomseg">
+      <input class="zoom-slider" id="flowZoomSlider" type="range" min="40" max="300" step="5" value="100"
+             title="Drag to zoom the diagram">
+      <input class="search zoom-value" id="flowZoomValue" type="text" inputmode="numeric" size="3" value="100" maxlength="3"
+             title="Type a zoom percentage. Press Enter to apply, Esc to cancel.">
+      <span class="zoom-pct">%</span>
+    </span>
+    <button class="toggle on" id="flowFitBtn" type="button" title="Scale the diagram to fit the window width">Fit width</button>
+    <button class="toggle" id="flowPngBtn" type="button" title="Save the diagram as a PNG image">Save PNG</button>
+    <button class="toggle" id="flowSvgBtn" type="button" title="Save the diagram as an SVG image: vector, so it stays sharp at any zoom, and has no size limit">Save SVG</button>
+  </span><!--/tab:flow-->
+
+</div>
+<!--tab:trace--><div id="tracePanel" role="tabpanel">
+  <div id="legend" class="legend"></div>
+  <p class="notice" id="notice" hidden></p>
+
+  <!-- Tree view: every invocation in execution order -->
+  <section id="treeView">
+    <p class="fidelity" id="fidelity"></p>
+    <div class="scroll treewrap"><table id="treeTable"></table></div>
+    <div class="empty" id="treeEmpty" hidden>No calls match the current filters.</div>
+  </section>
+
+  <!-- Files view: per-file line coverage -->
+  <section id="filesView" hidden>
+    <div id="root"></div>
+    <div id="empty" class="empty" hidden>No lines match the current filters.</div>
+  </section>
+</div>
+<!--/tab:trace-->
+<!-- Graph and Flow are built on first open and never on load; both stay empty until then. -->
+<!--tab:graph--><section id="graphPanel" role="tabpanel" hidden>
+  <p class="panelnote" id="graphNote"></p>
+  <div class="graphlegend">
+    <span><i class="sw sw-self"></i>Own code</span>
+    <span><i class="sw sw-sql"></i>SQL</span>
+  </div>
+  <div class="graphlist" id="graphList">
+    <div id="graphBody"></div>
+    <div class="graphresizer" id="graphResizer" role="separator" aria-orientation="vertical"
+         aria-label="Resize the name column" tabindex="0" title="Drag to resize the name column"></div>
+  </div>
+  <div class="empty" id="graphEmpty" hidden>This run recorded no per-file timing.</div>
+</section><!--/tab:graph-->
+
+<!--tab:flow--><section id="flowPanel" role="tabpanel" hidden>
+  <div class="flownoterow">
+    <p class="panelnote" id="flowNote"></p>
+    <div class="graphlegend" id="chartLegend">
+      <span><i class="sw sw-full"></i>Fully executed</span>
+      <span><i class="sw sw-partial"></i>Only some branches taken</span>
+      <span><i class="sw sw-none"></i>Entered method, line not executed</span>
+      <span><i class="sw sw-sql"></i>SQL query</span>
+    </div>
+  </div>
+  <div class="flowcrumb" id="flowCrumb" hidden></div>
+  <div class="flowwrap" id="flowWrap"></div>
+  <div class="flowtip" id="flowTip" hidden></div>
+  <div class="empty" id="flowEmpty" hidden>This run recorded no call tree.</div>
+</section><!--/tab:flow-->
+
+<!--tab:timeline--><section id="timelinePanel" role="tabpanel" hidden>
+  <p class="panelnote" id="timelineNote"></p>
+  <div class="tlruler" id="timelineRuler"></div>
+  <div id="timelineBody"></div>
+  <div class="empty" id="timelineEmpty" hidden>This run recorded no call tree.</div>
+</section><!--/tab:timeline-->
+
+<!--tab:findings--><section id="findingsPanel" role="tabpanel" hidden>
+  <p class="panelnote" id="findingsNote"></p>
+  <div id="findingsBody"></div>
+  <div class="empty" id="findingsEmpty" hidden>Nothing stood out in this run.</div>
+</section><!--/tab:findings-->
+
+<div class="help" id="help" hidden>
+  <div class="card">
+    <h3>Keyboard shortcuts</h3>
+    <dl>
+      <dt><kbd>v</kbd></dt><dd>Switch between Tree and Files</dd>
+      <dt><kbd>/</kbd></dt><dd>Focus the filter. Every tab has one and each keeps its own</dd>
+      <dt><kbd>n</kbd> / <kbd>p</kbd></dt><dd>Next / previous problem line</dd>
+      <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous call frame (Tree) or file (Files)</dd>
+      <dt><kbd>e</kbd> / <kbd>c</kbd></dt><dd>Expand all / collapse all</dd>
+      <dt><kbd>h</kbd></dt><dd>Toggle the hot path (Tree)</dd>
+      <dt><kbd>f</kbd></dt><dd>Open the file picker</dd>
+      <dt><kbd>x</kbd></dt><dd>Toggle "Problems only"</dd>
+      <dt><kbd>o</kbd></dt><dd>Open the current line in the IDE</dd>
+      <dt><kbd>y</kbd></dt><dd>Copy the current file's path</dd>
+      <dt><kbd>Shift</kbd>+<kbd>C</kbd></dt><dd>Copy the current step as text</dd>
+      <dt><kbd>t</kbd></dt><dd>Toggle light / dark theme</dd>
+      <dt><kbd>g</kbd></dt><dd>Customize what this report shows</dd>
+      <dt><kbd>?</kbd></dt><dd>This help</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Close a panel, or clear the filter</dd>
+    </dl>
+    <h3>Customizing</h3>
+    <p>The slider button in the header opens <b>Customize</b>: which columns are shown, how
+    tightly the rows are packed, the theme, which tab the report opens on, and what starts
+    folded. Those choices are yours alone. They are kept in this browser and not written back
+    into the file, so the copy you forward still opens the way it was exported.</p>
+    <p>What a report opens with is set when it is exported, in the plugin's Export dialog,
+    along with which tabs are written into the file at all. A tab left out there is not in the
+    document and Customize cannot bring it back.</p>
+    <p>Filters, the time threshold and Essential/Full are deliberately not in that panel. They
+    change which calls you are looking at rather than how they look, so they stay in the
+    toolbar where they are visible.</p>
+
+    <h3>Filtering</h3>
+    <p>The box beside the trace point filters whichever tab is in front, and each tab keeps
+    its own query, so narrowing the tree down to one class does not also empty the Flame
+    Graph. What a match means differs by tab, and the box says which as you switch: source
+    text and SQL in <b>Call Tree</b>, a file or package name in <b>Breakdown</b>, a step label
+    in <b>Timeline</b>, a title or detail in <b>Findings</b>, and in <b>Flame Graph</b> a
+    regular expression over the step signature.</p>
+    <p>The Flame Graph's dropdown decides what a match brings with it. <b>Match, with
+    callers &amp; callees</b> keeps everything a matching step went on to call along with the
+    chain of callers above it, so the diagram still says how the code got there. <b>Match,
+    callers only</b> drops the callees, for when the shape of the calls <i>into</i> a layer
+    is the question. <b>Match by package</b> matches on package names rather than
+    signatures, which is the grouping a layered codebase is actually navigated by. A pattern
+    that will not compile is used as plain text rather than reported as an error.</p>
+    <h3>Findings</h3>
+    <p>A handful of rules run over this recording and name what stands out in it: the same
+    statement issued in a loop, one query that is most of the request, the frame that spent
+    the time in its own code rather than in what it called, a method invoked far more often
+    than the code suggests, and branches this request never took. Each card carries the
+    numbers it was derived from and links to the step it came from, so nothing has to be
+    taken on trust. The badge on the tab counts them.</p>
+    <h3>Timeline</h3>
+    <p>Where the wall clock went, in the order it went there. Each bar is one step: the
+    solid part is time in that step&rsquo;s <b>own</b> code, the faint part is time inside
+    the calls it made. That split is the one the other views cannot show you, and it is
+    what tells a slow method apart from a method that merely called something slow. Only
+    the steps that own a meaningful share are listed; <b>Show every step</b> lifts that.</p>
+    <p>The caret on a row folds away everything that step called, however far down the run
+    those calls are; <b>Collapse all</b> does it to the lot. Hovering a row reveals three
+    actions: <b>line</b> opens the calling line in the IDE, <b>sql</b> opens the statement
+    behind a query formatted and coloured in place, and <b>step</b> jumps to that frame in
+    the Call Tree.</p>
+    <p>One honest limit: the agent records how long each call took, not when it started, so
+    positions are derived by laying calls end to end in the order they ran. Durations and
+    ordering are exact; a gap where the request sat idle cannot be shown, because nothing in
+    the recording distinguishes it from work.</p>
+    <h3>Breakdown</h3>
+    <p>Time per file, slowest first. The bar has two parts: <b>own code</b> is the file's
+    self time, the work its own lines did, and <b>SQL</b> is the time its queries spent in
+    the database, charged to the method that issued them. Self time is the only additive
+    measure here, a method's <i>total</i> time contains everything it called, so summing
+    totals would count the same microseconds once per stack frame. Turning <b>Include
+    SQL</b> off leaves only your own code, which is what you want when the question is
+    which method to optimise rather than which query. This tab deliberately ignores the
+    Files picker and your excluded types: it is an accounting of where the milliseconds
+    went, and dropping a file would silently remove real time from the totals.</p>
+    <h3>Flame Graph</h3>
+    <p>The call tree drawn start to end, top to bottom in execution order, indented by
+    depth. Each box is one invocation; the bar inside it is that call's total time relative
+    to the whole run. Hover for the full signature and timing. It is the same data as the
+    Tree view, laid out so a long chain of calls is visible at a glance.</p>
+    <p><b>Flame</b> lays the same tree out by time instead: box width is duration, the entry
+    point holds the floor and the stack grows <i>upward</i>, so the tallest column is the
+    deepest chain and the widest box is the slowest call &mdash; the orientation Glowroot and
+    every other JVM flame graph uses. Each box carries its time and its share of what is on
+    screen. Clicking one makes it the new 100%; the trail above the diagram walks back out.</p>
+    <p>Colour carries identity, since most boxes are too narrow to label. <b>Glowroot
+    colours</b> is the familiar warm ramp, <b>Deju colours</b> is this report's own palette,
+    and <b>By package</b> gives up per-class identity for per-layer identity, which is the
+    only thing that still reads once a run touches two hundred classes. Queries keep a fill
+    of their own in every scheme, because telling a query from a method is the one
+    distinction here that has to survive.</p>
+    <p><b>Save PNG</b> and <b>Save SVG</b> both write whatever the diagram is showing right
+    now, filters and zoom included. The SVG is vector, so it stays sharp however far it is
+    zoomed, and it has no size ceiling &mdash; a diagram too wide for one image comes out
+    whole, where the PNG saves only the visible part and says so.</p>
+    <h3>Reading the tree</h3>
+    <p>The <b>numbered badge</b> on each frame is its step number: the order the methods
+    actually ran. A
+    nested frame is a call made from the line above it, and <b>called at :44</b> is the
+    caller line that made it. The time on a frame is that call's total (inclusive); the
+    time on a code line is that line's own (self) time.</p>
+    <p><b>Order fidelity.</b> Method calls are in exact execution order. Lines
+    <i>within</i> a method are shown in source order and merged across invocations, so a
+    loop body appears once rather than once per iteration, and a method called twice shows
+    the same lines under both frames.</p>
+    <p><b>Essential / Full.</b> <i>Essential</i> folds calls into your excluded types
+    (entities, DTOs, other data classes) into a single <b>&hellip; N excluded calls</b> row
+    at the call site, the count and total time stay visible, and clicking the row
+    expands it. A call is only folded when <i>everything underneath it</i> is also excluded,
+    so a getter that turns out to trigger a lazy load stays on screen along with the query it
+    caused. <b>Excluded rows</b> in the toolbar hides those summary rows altogether, once
+    you no longer need to be told what was folded away.
+    The <b>Flame Graph</b> and the <b>Timeline</b> fold the same types away by the same
+    rule, and both carry a <b>Show excluded</b> button to put them back.
+    <i>Full</i> shows every recorded call, repeats included: the
+    <b>&times;N more</b> folding that keeps an N+1 loop from flooding the default view is
+    lifted here too. Choose the types in the IDE under
+    <b>Settings &rarr; Tools &rarr; Deju Trace</b>, or with <b>Excluded types&hellip;</b>
+    in the Deju tool window; the recording itself is always complete, so nothing here is
+    ever lost. A nested class follows the class it lives in, so excluding a wrapper also
+    excludes the builder generated inside it. In the Files view, excluded types are
+    rendered like any other file but start folded shut.</p>
+    <p>Exclusions are applied when a report is <i>written</i>, so this file is a snapshot of
+    the rules at that moment, changing them later never alters an existing report.
+    Re-export the same run to apply new rules. Nothing about exclusions reaches the agent,
+    so there is never anything to restart.</p>
+    <p><b>SQL.</b> Executed queries appear at the line that issued them, formatted onto
+    clause lines with their bound values left as <code>?</code>, which is all that was ever
+    recorded. A long statement is trimmed to three lines with <b>Show full query</b> to open
+    it; the <b>SQL</b> button in the toolbar hides queries altogether when you want to read
+    control flow on its own.</p>
+    <p><b>Files.</b> The <b>Files</b> dropdown works in both views and means the same thing
+    in each: unticking a file removes it from the Files view and hides its calls, and
+    everything underneath them, from the Tree, so you can strip a trace down to the layer
+    you care about. The traced method's own frame always stays, since hiding the entry point
+    would empty the diagram. Data classes and generated code start ticked but folded shut,
+    so the page opens on the code worth reading without anything being filtered out behind
+    your back.</p>
+    <p><b>Open in IDE</b> uses <code>jetbrains://</code> links, which are handled by
+    JetBrains Toolbox. If nothing happens when you click a line number, Toolbox is not
+    installed, use <b>Copy path</b> in the Files view instead.</p>
+    <p><b>Sharing a spot.</b> The address bar follows what you are looking at, tab, view,
+    filter and the selected step, so the link in it opens this report where you are. The
+    copy button on a step (or <kbd>Shift</kbd>+<kbd>C</kbd>) puts that one frame on the
+    clipboard as plain text for a ticket or a chat.</p>
+    <p><b>Group repeats</b> folds every repeat of the same call under one parent into a
+    single row at its first occurrence. Unlike <b>&times;N more</b>, which only catches
+    repeats that happen to be adjacent, this catches a loop that alternates two calls and
+    issues each of them two hundred times. Everything that is not a repeat keeps its exact
+    position.</p>
+    <p>This report is a single self-contained file: no network calls, no remote
+    resources, and no captured variable values. A large one stores its data compressed and
+    unpacks it in the browser, which is why it opens a moment after it loads.</p>
+    <button class="toggle close" type="button" id="helpClose">Close</button>
+  </div>
+</div>
+
+<!-- Customize. The rows are built by script from what actually survived the export, so a
+     tab the exporter dropped is never offered here as something that could be switched on. -->
+<div class="help" id="custom" hidden>
+  <div class="card">
+    <h3>Customize this report</h3>
+    <p class="cushint">Yours only. Saved in this browser for this report, never in the file,
+      so what you change here is not what anyone else sees when they open their copy.</p>
+    <div id="customBody"></div>
+    <div class="curow curow-end">
+      <button class="toggle" type="button" id="customReset">Reset to the exported defaults</button>
+      <button class="toggle close" type="button" id="customClose">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- What the export dialog chose. Read once at load; absent in a report written by an older
+     plugin, in which case the script's own defaults apply and nothing changes. -->
+<script type="application/json" id="deju-prefs">{"openTab": "trace", "view": "tree", "density": "normal", "theme": "auto", "showTime": true, "showPercent": true, "showStep": true, "showLine": true, "sql": true, "groupRepeats": false, "collapseTree": false, "collapseSections": false}</script>
+<script type="application/json" id="deju-data">{"target": "com.example.order.OrderController#placeOrder", "startedAtIso": "2026-07-31T09:24:18.221Z", "durationMs": 1133, "cpuMicros": 1019859, "projectName": "example-api", "files": [{"fqClassName": "com.example.order.OrderController", "sourceFileName": "OrderController.java", "path": "src/main/java/com/example/order/OrderController.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderController.java", "lines": [{"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 70, "methodTotalMicros": 1133177, "methodSelfMicros": 13247, "methodName": "placeOrder", "methodStart": true, "code": "    @PostMapping"}, {"line": 22, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 969, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        if (request.items().isEmpty()) {"}, {"line": 23, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "            return ResponseEntity.badRequest().build();"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 1119929, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        OrderDto receipt = orders.place(request);"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 283, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        return ResponseEntity.ok(receipt);"}]}, {"fqClassName": "com.example.order.OrderService", "sourceFileName": "OrderService.java", "path": "src/main/java/com/example/order/OrderService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderService.java", "lines": [{"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 428, "methodTotalMicros": 1127540, "methodSelfMicros": 8336, "methodName": "place", "methodStart": true, "code": "        for (String name : request.items()) {"}, {"line": 22, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 214, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "            order.add(menu.findByName(name));   // one query per drink"}, {"line": 23, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 301296, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        }"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 15243, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        Money total = discounts.apply(subtotal, request.customerId());"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 94795, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        loyalty.award(request.customerId(), total);"}, {"line": 27, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 52637, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        orders.save(order, total);"}, {"line": 28, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 647847, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        return OrderDto.of(order, total);"}, {"line": 29, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 7383, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "    }"}]}, {"fqClassName": "com.example.menu.MenuRepository", "sourceFileName": "MenuRepository.java", "path": "src/main/java/com/example/menu/MenuRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/menu/MenuRepository.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 442446, "methodTotalMicros": 442447, "methodSelfMicros": 6645, "methodName": "findByName", "methodStart": true, "code": "        return jdbc.queryForObject("}]}, {"fqClassName": "com.example.pricing.PriceCalculator", "sourceFileName": "PriceCalculator.java", "path": "src/main/java/com/example/pricing/PriceCalculator.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/PriceCalculator.java", "lines": [{"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 791, "methodTotalMicros": 46029, "methodSelfMicros": 6472, "methodName": "total", "methodStart": true, "code": "        Money sum = Money.ZERO;"}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 1006, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 17, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 36823, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "            sum = sum.plus(priceOf(line.drink(), size));"}, {"line": 19, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 575, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        return sum;"}, {"line": 22, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 13369, "methodTotalMicros": 38029, "methodSelfMicros": 38029, "methodName": "priceOf", "methodStart": true, "code": "    Money priceOf(Drink drink, Size size) {"}, {"line": 23, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 8987, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        Money price = drink.basePrice();"}, {"line": 24, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 7130, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        if (size == Size.LARGE) {"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 8541, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        }"}]}, {"fqClassName": "com.example.pricing.DiscountPolicy", "sourceFileName": "DiscountPolicy.java", "path": "src/main/java/com/example/pricing/DiscountPolicy.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/DiscountPolicy.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 108, "methodTotalMicros": 47825, "methodSelfMicros": 841, "methodName": "apply", "methodStart": true, "code": "        Money total = subtotal;"}, {"line": 14, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 46983, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (loyalty.isMember(customerId)) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 264, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(10);"}, {"line": 17, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 324, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (total.isOver(Money.pounds(20))) {"}, {"line": 18, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(5);"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 144, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        return total;"}]}, {"fqClassName": "com.example.loyalty.LoyaltyService", "sourceFileName": "LoyaltyService.java", "path": "src/main/java/com/example/loyalty/LoyaltyService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/loyalty/LoyaltyService.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 46226, "methodTotalMicros": 46825, "methodSelfMicros": 598, "methodName": "isMember", "methodStart": true, "code": "                \"select count(*) from membership where customer_id = ?\","}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 167, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "isMember", "methodStart": false, "code": "    }"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 17, "methodTotalMicros": 2170, "methodSelfMicros": 58, "methodName": "award", "methodStart": true, "code": "        int points = total.wholePounds();"}, {"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 2111, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "award", "methodStart": false, "code": "        jdbc.update(\"update customer set points = points + ? where id = ?\","}]}, {"fqClassName": "com.example.order.OrderRepository", "sourceFileName": "OrderRepository.java", "path": "src/main/java/com/example/order/OrderRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderRepository.java", "lines": [{"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 64860, "methodTotalMicros": 569100, "methodSelfMicros": 4184, "methodName": "save", "methodStart": true, "code": "        jdbc.update(\"insert into customer_order (customer_id, total_pence) values (?, ?)\","}, {"line": 14, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 439, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 500054, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "            jdbc.update(\"insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)\","}]}, {"fqClassName": "com.example.order.OrderDto", "sourceFileName": "OrderDto.java", "path": "src/main/java/com/example/order/OrderDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderDto.java", "lines": [{"line": 9, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 648, "methodTotalMicros": 14360, "methodSelfMicros": 5558, "methodName": "of", "methodStart": true, "code": "        return new OrderDto("}, {"line": 10, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 416, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.id(),"}, {"line": 11, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 509, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.currency(),"}, {"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 370, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.pence(),"}, {"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 8801, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.lines().stream().map(OrderLineDto::of).toList());"}]}, {"fqClassName": "com.example.order.OrderLineDto", "sourceFileName": "OrderLineDto.java", "path": "src/main/java/com/example/order/OrderLineDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderLineDto.java", "lines": [{"line": 6, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 14289, "methodTotalMicros": 14289, "methodSelfMicros": 14289, "methodName": "of", "methodStart": true, "code": "        return new OrderLineDto(line.drink().name(), line.pricePence());"}]}], "calls": {"n": 2557, "classTable": ["com.example.order.OrderController", "com.example.order.OrderService", "com.example.menu.MenuRepository", "com.example.pricing.PriceCalculator", "com.example.pricing.DiscountPolicy", "com.example.loyalty.LoyaltyService", "com.example.order.OrderRepository", "com.example.order.OrderDto", "com.example.order.OrderLineDto"], "methodTable": ["placeOrder", "place", "findByName", "total", "priceOf", "apply", "isMember", "award", "save", "of"], "sqlTable": ["select id, name, base_price_pence from drink where name = ?", "select count(*) from membership where customer_id = ?", "update customer set points = points + ? where id = ?", "insert into customer_order (customer_id, total_pence) values (?, ?)", "insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)"], "parentSeq": [-1, 0, 1, 2, 1, 4, 1, 6, 7, 1, 9, 1, 11, 1, 13, 1, 15, 1, 17, 1, 19, 1, 21, 1, 23, 1, 25, 1, 27, 1, 29, 1, 31, 1, 33, 1, 35, 1, 37, 1, 39, 1, 41, 42, 1, 44, 1, 46, 1, 48, 1, 50, 1, 52, 1, 54, 1, 56, 1, 58, 1, 60, 1, 62, 1, 64, 1, 66, 1, 68, 1, 70, 1, 72, 1, 74, 1, 76, 77, 1, 79, 1, 81, 1, 83, 1, 85, 1, 87, 1, 89, 1, 91, 1, 93, 1, 95, 1, 97, 1, 99, 1, 101, 1, 103, 1, 105, 1, 107, 1, 109, 1, 111, 112, 1, 114, 1, 116, 1, 118, 1, 120, 1, 122, 1, 124, 1, 126, 1, 128, 1, 130, 1, 132, 1, 134, 1, 136, 1, 138, 1, 140, 1, 142, 1, 144, 1, 146, 147, 1, 149, 1, 151, 1, 153, 1, 155, 1, 157, 1, 159, 1, 161, 1, 163, 1, 165, 1, 167, 1, 169, 1, 171, 1, 173, 1, 175, 1, 177, 1, 179, 1, 181, 182, 1, 184, 1, 186, 1, 188, 1, 190, 1, 192, 1, 194, 1, 196, 1, 198, 1, 200, 1, 202, 1, 204, 1, 206, 1, 208, 1, 210, 1, 212, 1, 214, 1, 216, 217, 1, 219, 1, 221, 1, 223, 1, 225, 1, 227, 1, 229, 1, 231, 1, 233, 1, 235, 1, 237, 1, 239, 1, 241, 1, 243, 1, 245, 1, 247, 1, 249, 1, 251, 252, 1, 254, 1, 256, 1, 258, 1, 260, 1, 262, 1, 264, 1, 266, 1, 268, 1, 270, 1, 272, 1, 274, 1, 276, 1, 278, 1, 280, 1, 282, 1, 284, 1, 286, 287, 1, 289, 1, 291, 1, 293, 1, 295, 1, 297, 1, 299, 1, 301, 1, 303, 1, 305, 1, 307, 1, 309, 1, 311, 1, 313, 1, 315, 1, 317, 1, 319, 1, 321, 322, 1, 324, 1, 326, 1, 328, 1, 330, 1, 332, 1, 334, 1, 336, 1, 338, 1, 340, 1, 342, 1, 344, 1, 346, 1, 348, 1, 350, 1, 352, 1, 354, 1, 356, 357, 1, 359, 1, 361, 1, 363, 1, 365, 1, 367, 1, 369, 1, 371, 1, 373, 1, 375, 1, 377, 1, 379, 1, 381, 1, 383, 1, 385, 1, 387, 1, 389, 1, 391, 392, 1, 394, 1, 396, 1, 398, 1, 400, 1, 402, 1, 404, 1, 406, 1, 408, 1, 410, 1, 412, 1, 414, 1, 416, 1, 418, 1, 420, 1, 422, 1, 424, 1, 426, 427, 1, 429, 1, 431, 1, 433, 1, 435, 1, 437, 1, 439, 1, 441, 1, 443, 1, 445, 1, 447, 1, 449, 1, 451, 1, 453, 1, 455, 1, 457, 1, 459, 1, 461, 462, 1, 464, 1, 466, 1, 468, 1, 470, 1, 472, 1, 474, 1, 476, 1, 478, 1, 480, 1, 482, 1, 484, 1, 486, 1, 488, 1, 490, 1, 492, 1, 494, 1, 496, 497, 1, 499, 1, 501, 1, 503, 1, 505, 1, 507, 1, 509, 1, 511, 1, 513, 1, 515, 1, 517, 1, 519, 1, 521, 1, 523, 1, 525, 1, 527, 1, 529, 1, 531, 532, 1, 534, 1, 536, 1, 538, 1, 540, 1, 542, 1, 544, 1, 546, 1, 548, 1, 550, 1, 552, 1, 554, 1, 556, 1, 558, 1, 560, 1, 562, 1, 564, 1, 566, 567, 1, 569, 1, 571, 1, 573, 1, 575, 1, 577, 1, 579, 1, 581, 1, 583, 1, 585, 1, 587, 1, 589, 1, 591, 1, 593, 1, 595, 1, 597, 1, 599, 1, 601, 602, 1, 604, 1, 606, 1, 608, 1, 610, 1, 612, 1, 614, 1, 616, 1, 618, 1, 620, 1, 622, 1, 624, 1, 626, 1, 628, 1, 630, 1, 632, 1, 634, 1, 636, 637, 1, 639, 1, 641, 1, 643, 1, 645, 1, 647, 1, 649, 1, 651, 1, 653, 1, 655, 1, 657, 1, 659, 1, 661, 1, 663, 1, 665, 1, 667, 1, 669, 1, 671, 672, 1, 674, 1, 676, 1, 678, 1, 680, 1, 682, 1, 684, 1, 686, 1, 688, 1, 690, 1, 692, 1, 694, 1, 696, 1, 698, 1, 700, 1, 702, 1, 704, 1, 706, 707, 1, 709, 1, 711, 1, 713, 1, 715, 1, 717, 1, 719, 1, 721, 1, 723, 1, 725, 1, 727, 1, 729, 1, 731, 1, 733, 1, 735, 1, 737, 1, 739, 1, 741, 742, 1, 744, 1, 746, 1, 748, 1, 750, 1, 752, 1, 754, 1, 756, 1, 758, 1, 760, 1, 762, 1, 764, 1, 766, 1, 768, 1, 770, 1, 772, 1, 774, 1, 776, 777, 1, 779, 1, 781, 1, 783, 1, 785, 1, 787, 1, 789, 1, 791, 1, 793, 1, 795, 1, 797, 1, 799, 1, 801, 1, 803, 1, 805, 1, 807, 1, 809, 1, 811, 812, 1, 814, 1, 816, 1, 818, 1, 820, 1, 822, 1, 824, 1, 826, 1, 828, 1, 830, 1, 832, 1, 834, 1, 836, 1, 838, 1, 840, 1, 842, 1, 844, 1, 846, 847, 1, 849, 1, 851, 1, 853, 1, 855, 1, 857, 1, 859, 1, 861, 1, 863, 1, 865, 1, 867, 1, 869, 1, 871, 1, 873, 1, 875, 1, 877, 1, 879, 1, 881, 882, 1, 884, 1, 886, 1, 888, 1, 890, 1, 892, 1, 894, 1, 896, 1, 898, 1, 900, 1, 902, 1, 904, 1, 906, 1, 908, 1, 910, 1, 912, 1, 914, 1, 916, 917, 1, 919, 1, 921, 1, 923, 1, 925, 1, 927, 1, 929, 1, 931, 1, 933, 1, 935, 1, 937, 1, 939, 1, 941, 1, 943, 1, 945, 1, 947, 1, 949, 1, 951, 952, 1, 954, 1, 956, 1, 958, 1, 960, 1, 962, 1, 964, 1, 966, 1, 968, 1, 970, 1, 972, 1, 974, 1, 976, 1, 978, 1, 980, 1, 982, 1, 984, 1, 986, 987, 1, 989, 1, 991, 1, 993, 1, 995, 1, 997, 1, 999, 1, 1001, 1, 1003, 1, 1005, 1, 1007, 1, 1009, 1, 1011, 1, 1013, 1, 1015, 1, 1017, 1, 1019, 1, 1021, 1022, 1, 1024, 1, 1026, 1, 1028, 1, 1030, 1, 1032, 1, 1034, 1, 1036, 1, 1038, 1, 1040, 1, 1042, 1, 1044, 1, 1046, 1, 1048, 1, 1050, 1, 1052, 1, 1054, 1, 1056, 1057, 1, 1059, 1, 1061, 1, 1063, 1, 1065, 1, 1067, 1, 1069, 1, 1071, 1, 1073, 1, 1075, 1, 1077, 1, 1079, 1, 1081, 1, 1083, 1, 1085, 1, 1087, 1, 1089, 1, 1091, 1092, 1, 1094, 1, 1096, 1, 1098, 1, 1100, 1, 1102, 1, 1104, 1, 1106, 1, 1108, 1, 1110, 1, 1112, 1, 1114, 1, 1116, 1, 1118, 1, 1120, 1, 1122, 1, 1124, 1, 1126, 1127, 1, 1129, 1, 1131, 1, 1133, 1, 1135, 1, 1137, 1, 1139, 1, 1141, 1, 1143, 1, 1145, 1, 1147, 1, 1149, 1, 1151, 1, 1153, 1, 1155, 1, 1157, 1, 1159, 1, 1161, 1162, 1, 1164, 1, 1166, 1, 1168, 1, 1170, 1, 1172, 1, 1174, 1, 1176, 1, 1178, 1, 1180, 1, 1182, 1, 1184, 1, 1186, 1, 1188, 1, 1190, 1, 1192, 1, 1194, 1, 1196, 1197, 1, 1199, 1, 1201, 1, 1203, 1, 1205, 1, 1207, 1, 1209, 1, 1211, 1, 1213, 1, 1215, 1, 1217, 1, 1219, 1, 1221, 1, 1223, 1, 1225, 1, 1227, 1, 1229, 1, 1231, 1232, 1, 1234, 1, 1236, 1, 1238, 1, 1240, 1, 1242, 1, 1244, 1, 1246, 1, 1248, 1, 1250, 1, 1252, 1, 1254, 1, 1256, 1, 1258, 1, 1260, 1, 1262, 1, 1264, 1, 1266, 1267, 1, 1269, 1, 1271, 1, 1273, 1, 1275, 1, 1277, 1, 1279, 1, 1281, 1, 1283, 1, 1285, 1, 1287, 1, 1289, 1, 1291, 1, 1293, 1, 1295, 1, 1297, 1, 1299, 1, 1301, 1302, 1, 1304, 1, 1306, 1, 1308, 1, 1310, 1, 1312, 1, 1314, 1, 1316, 1, 1318, 1, 1320, 1, 1322, 1, 1324, 1, 1326, 1, 1328, 1, 1330, 1, 1332, 1, 1334, 1, 1336, 1337, 1, 1339, 1, 1341, 1, 1343, 1, 1345, 1, 1347, 1, 1349, 1, 1351, 1, 1353, 1, 1355, 1, 1357, 1, 1359, 1, 1361, 1, 1363, 1, 1365, 1, 1367, 1, 1369, 1, 1371, 1372, 1, 1374, 1, 1376, 1, 1378, 1, 1380, 1, 1382, 1, 1384, 1, 1386, 1, 1388, 1, 1390, 1, 1392, 1, 1394, 1, 1396, 1, 1398, 1, 1400, 1, 1402, 1, 1404, 1, 1406, 1407, 1, 1409, 1, 1411, 1, 1413, 1, 1415, 1, 1417, 1, 1419, 1, 1421, 1, 1423, 1, 1425, 1, 1427, 1, 1429, 1, 1431, 1, 1433, 1, 1435, 1, 1437, 1, 1439, 1, 1441, 1442, 1, 1444, 1, 1446, 1, 1448, 1, 1450, 1, 1452, 1, 1454, 1, 1456, 1, 1458, 1, 1460, 1, 1462, 1, 1464, 1, 1466, 1, 1468, 1, 1470, 1, 1472, 1, 1474, 1, 1476, 1477, 1, 1479, 1, 1481, 1, 1483, 1, 1485, 1, 1487, 1, 1489, 1, 1491, 1, 1493, 1, 1495, 1, 1497, 1, 1499, 1, 1501, 1, 1503, 1, 1505, 1, 1507, 1, 1509, 1, 1511, 1512, 1, 1514, 1, 1516, 1, 1518, 1, 1520, 1, 1522, 1, 1524, 1, 1526, 1, 1528, 1, 1530, 1, 1532, 1, 1534, 1, 1536, 1, 1538, 1, 1540, 1, 1542, 1, 1544, 1, 1546, 1547, 1, 1549, 1, 1551, 1, 1553, 1, 1555, 1, 1557, 1, 1559, 1, 1561, 1, 1563, 1, 1565, 1, 1567, 1, 1569, 1, 1571, 1, 1573, 1, 1575, 1, 1577, 1, 1579, 1, 1581, 1582, 1, 1584, 1, 1586, 1, 1588, 1, 1590, 1, 1592, 1, 1594, 1, 1596, 1, 1598, 1, 1600, 1, 1602, 1, 1604, 1, 1606, 1, 1608, 1, 1610, 1, 1612, 1, 1614, 1, 1616, 1617, 1, 1619, 1, 1621, 1, 1623, 1, 1625, 1, 1627, 1, 1629, 1, 1631, 1, 1633, 1, 1635, 1, 1637, 1, 1639, 1, 1641, 1, 1643, 1, 1645, 1, 1647, 1, 1649, 1, 1651, 1652, 1, 1654, 1, 1656, 1, 1658, 1, 1660, 1, 1662, 1, 1664, 1, 1666, 1, 1668, 1, 1670, 1, 1672, 1, 1674, 1, 1676, 1, 1678, 1, 1680, 1, 1682, 1, 1684, 1, 1686, 1687, 1, 1689, 1, 1691, 1, 1693, 1, 1695, 1, 1697, 1, 1699, 1, 1701, 1, 1703, 1, 1705, 1, 1707, 1, 1709, 1, 1711, 1, 1713, 1, 1715, 1, 1717, 1, 1719, 1, 1721, 1722, 1, 1724, 1, 1726, 1, 1728, 1, 1730, 1, 1732, 1, 1734, 1, 1736, 1, 1738, 1, 1740, 1, 1742, 1, 1744, 1, 1746, 1, 1748, 1, 1750, 1, 1752, 1, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1754, 1, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156, 2156], "className": [0, 1, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 4, 5, -1, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 2, -1, 3, 3, 5, -1, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8], "methodName": [0, 1, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 5, 6, -1, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 2, -1, 3, 4, 7, -1, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9], "sql": [-1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, -1, 1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 2, -1, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1], "callSiteLine": [null, 25, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 26, 14, 13, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 23, 13, 25, 17, 27, 21, 28, 12, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 29, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13], "totalMicros": [1133177, 1127540, 3630, 3510, 333, 313, 2990, 2970, 2838, 1200, 1080, 123, 103, 1108, 988, 115, 95, 1016, 896, 107, 87, 924, 804, 99, 79, 1217, 1097, 125, 105, 1125, 1005, 117, 97, 1033, 913, 109, 89, 941, 821, 101, 81, 790, 770, 735, 1234, 1114, 126, 106, 1142, 1022, 118, 98, 1050, 930, 110, 90, 958, 838, 102, 82, 1251, 1131, 128, 108, 1159, 1039, 120, 100, 1067, 947, 112, 92, 975, 855, 104, 84, 817, 797, 762, 1268, 1148, 129, 109, 1176, 1056, 121, 101, 1084, 964, 113, 93, 992, 872, 105, 85, 1285, 1165, 130, 110, 1193, 1073, 123, 103, 1101, 981, 115, 95, 1009, 889, 107, 87, 845, 825, 788, 917, 797, 99, 79, 1210, 1090, 124, 104, 1118, 998, 116, 96, 1026, 906, 108, 88, 934, 814, 100, 80, 1227, 1107, 125, 105, 1135, 1015, 118, 98, 1043, 923, 110, 90, 873, 853, 815, 951, 831, 102, 82, 1243, 1123, 127, 107, 1151, 1031, 119, 99, 1059, 939, 111, 91, 967, 847, 103, 83, 1260, 1140, 128, 108, 1168, 1048, 120, 100, 1076, 956, 113, 93, 901, 881, 841, 984, 864, 105, 85, 1277, 1157, 130, 110, 1185, 1065, 122, 102, 1093, 973, 114, 94, 1001, 881, 106, 86, 909, 789, 98, 78, 1202, 1082, 123, 103, 1110, 990, 115, 95, 928, 908, 868, 1018, 898, 107, 87, 926, 806, 100, 80, 1219, 1099, 125, 105, 1127, 1007, 117, 97, 1035, 915, 109, 89, 943, 823, 101, 81, 1236, 1116, 126, 106, 1144, 1024, 118, 98, 956, 936, 894, 1052, 932, 110, 90, 960, 840, 102, 82, 1253, 1133, 128, 108, 1161, 1041, 120, 100, 1069, 949, 112, 92, 977, 857, 104, 84, 1270, 1150, 129, 109, 1178, 1058, 121, 101, 984, 964, 921, 1086, 966, 113, 93, 994, 874, 105, 85, 1287, 1167, 131, 111, 1195, 1075, 123, 103, 1103, 983, 115, 95, 1011, 891, 107, 87, 919, 799, 99, 79, 1212, 1092, 124, 104, 1011, 991, 947, 1120, 1000, 116, 96, 1028, 908, 108, 88, 936, 816, 100, 80, 1229, 1109, 126, 106, 1137, 1017, 118, 98, 1045, 925, 110, 90, 953, 833, 102, 82, 1246, 1126, 127, 107, 1039, 1019, 974, 1154, 1034, 119, 99, 1062, 942, 111, 91, 970, 850, 103, 83, 1263, 1143, 129, 109, 1171, 1051, 121, 101, 1079, 959, 113, 93, 987, 867, 105, 85, 1280, 1160, 130, 110, 1067, 1047, 1000, 1188, 1068, 122, 102, 1096, 976, 114, 94, 1004, 884, 106, 86, 912, 792, 98, 78, 1205, 1085, 124, 104, 1113, 993, 116, 96, 1021, 901, 108, 88, 929, 809, 100, 80, 780, 760, 726, 1222, 1102, 125, 105, 1130, 1010, 117, 97, 1038, 918, 109, 89, 946, 826, 101, 81, 1238, 1118, 127, 107, 1146, 1026, 119, 99, 1054, 934, 111, 91, 962, 842, 103, 83, 807, 787, 752, 1255, 1135, 128, 108, 1163, 1043, 120, 100, 1071, 951, 112, 92, 979, 859, 104, 84, 1272, 1152, 129, 109, 1180, 1060, 121, 101, 1088, 968, 114, 94, 996, 876, 106, 86, 835, 815, 779, 1289, 1169, 131, 111, 1197, 1077, 123, 103, 1105, 985, 115, 95, 1013, 893, 107, 87, 921, 801, 99, 79, 1214, 1094, 124, 104, 1122, 1002, 116, 96, 1030, 910, 109, 89, 863, 843, 805, 938, 818, 101, 81, 1231, 1111, 126, 106, 1139, 1019, 118, 98, 1047, 927, 110, 90, 955, 835, 102, 82, 1248, 1128, 127, 107, 1156, 1036, 119, 99, 1064, 944, 111, 91, 891, 871, 832, 972, 852, 103, 83, 1265, 1145, 129, 109, 1173, 1053, 121, 101, 1081, 961, 113, 93, 989, 869, 105, 85, 1282, 1162, 130, 110, 1190, 1070, 122, 102, 1098, 978, 114, 94, 918, 898, 858, 1006, 886, 106, 86, 914, 794, 98, 78, 1207, 1087, 124, 104, 1115, 995, 116, 96, 1023, 903, 108, 88, 931, 811, 100, 80, 1224, 1104, 125, 105, 1132, 1012, 117, 97, 946, 926, 885, 1040, 920, 109, 89, 948, 828, 101, 81, 1241, 1121, 127, 107, 1149, 1029, 119, 99, 1057, 937, 111, 91, 965, 845, 103, 83, 1258, 1138, 128, 108, 1166, 1046, 120, 100, 974, 954, 911, 1074, 954, 112, 92, 982, 862, 104, 84, 1275, 1155, 130, 110, 1183, 1063, 122, 102, 1091, 971, 114, 94, 999, 879, 106, 86, 1292, 1172, 131, 111, 1200, 1080, 123, 103, 1001, 981, 938, 1108, 988, 115, 95, 1016, 896, 107, 87, 924, 804, 99, 79, 1217, 1097, 125, 105, 1125, 1005, 117, 97, 1033, 913, 109, 89, 940, 820, 101, 81, 1233, 1113, 126, 106, 1029, 1009, 964, 1141, 1021, 118, 98, 1049, 929, 110, 90, 957, 837, 102, 82, 1250, 1130, 128, 108, 1158, 1038, 120, 100, 1066, 946, 112, 92, 974, 854, 104, 84, 1267, 1147, 129, 109, 1057, 1037, 991, 1175, 1055, 121, 101, 1083, 963, 113, 93, 991, 871, 105, 85, 1284, 1164, 130, 110, 1192, 1072, 123, 103, 1100, 980, 115, 95, 1008, 888, 107, 87, 916, 796, 99, 79, 770, 750, 716, 1209, 1089, 124, 104, 1117, 997, 116, 96, 1025, 905, 108, 88, 933, 813, 100, 80, 1226, 1106, 125, 105, 1134, 1014, 117, 97, 1042, 922, 110, 90, 950, 830, 102, 82, 797, 777, 743, 1243, 1123, 127, 107, 1151, 1031, 119, 99, 1059, 939, 111, 91, 967, 847, 103, 83, 1260, 1140, 128, 108, 1168, 1048, 120, 100, 1076, 956, 112, 92, 984, 864, 105, 85, 825, 805, 769, 1277, 1157, 130, 110, 1185, 1065, 122, 102, 1093, 973, 114, 94, 1001, 881, 106, 86, 909, 789, 98, 78, 1202, 1082, 123, 103, 1110, 990, 115, 95, 1018, 898, 107, 87, 853, 833, 796, 926, 806, 100, 80, 1219, 1099, 125, 105, 1127, 1007, 117, 97, 1035, 915, 109, 89, 943, 823, 101, 81, 1236, 1116, 126, 106, 1144, 1024, 118, 98, 1052, 932, 110, 90, 880, 860, 822, 960, 840, 102, 82, 1253, 1133, 128, 108, 1161, 1041, 120, 100, 1069, 949, 112, 92, 977, 857, 104, 84, 1270, 1150, 129, 109, 1178, 1058, 121, 101, 1086, 966, 113, 93, 908, 888, 849, 994, 874, 105, 85, 1287, 1167, 131, 111, 1195, 1075, 123, 103, 1103, 983, 115, 95, 1011, 891, 107, 87, 919, 799, 99, 79, 1212, 1092, 124, 104, 1120, 1000, 116, 96, 936, 916, 875, 1028, 908, 108, 88, 935, 815, 100, 80, 1228, 1108, 126, 106, 1136, 1016, 118, 98, 1044, 924, 110, 90, 952, 832, 102, 82, 1245, 1125, 127, 107, 1153, 1033, 119, 99, 964, 944, 902, 1061, 941, 111, 91, 969, 849, 103, 83, 1262, 1142, 129, 109, 1170, 1050, 121, 101, 1078, 958, 113, 93, 986, 866, 105, 85, 1279, 1159, 130, 110, 1187, 1067, 122, 102, 991, 971, 928, 1095, 975, 114, 94, 1003, 883, 106, 86, 911, 791, 98, 78, 1204, 1084, 124, 104, 1112, 992, 116, 96, 1020, 900, 108, 88, 928, 808, 100, 80, 1221, 1101, 125, 105, 1019, 999, 955, 1129, 1009, 117, 97, 1037, 917, 109, 89, 945, 825, 101, 81, 1238, 1118, 126, 106, 1146, 1026, 119, 99, 1054, 934, 111, 91, 962, 842, 103, 83, 1255, 1135, 128, 108, 1047, 1027, 981, 1163, 1043, 120, 100, 1071, 951, 112, 92, 979, 859, 104, 84, 1272, 1152, 129, 109, 1180, 1060, 121, 101, 1088, 968, 114, 94, 996, 876, 106, 86, 1289, 1169, 131, 111, 1074, 1054, 1008, 1197, 1077, 123, 103, 1105, 985, 115, 95, 1013, 893, 107, 87, 921, 801, 99, 79, 1214, 1094, 124, 104, 1122, 1002, 116, 96, 1030, 910, 108, 88, 938, 818, 101, 81, 787, 767, 733, 1231, 1111, 126, 106, 1139, 1019, 118, 98, 1047, 927, 110, 90, 955, 835, 102, 82, 1248, 1128, 127, 107, 1156, 1036, 119, 99, 1064, 944, 111, 91, 972, 852, 103, 83, 815, 795, 760, 1265, 1145, 129, 109, 1173, 1053, 121, 101, 1081, 961, 113, 93, 989, 869, 105, 85, 1282, 1162, 130, 110, 1190, 1070, 122, 102, 1098, 978, 114, 94, 1006, 886, 106, 86, 843, 823, 786, 914, 794, 98, 78, 1207, 1087, 124, 104, 1115, 995, 116, 96, 1023, 903, 108, 88, 930, 810, 100, 80, 1223, 1103, 125, 105, 1131, 1011, 117, 97, 1039, 919, 109, 89, 870, 850, 813, 947, 827, 101, 81, 1240, 1120, 127, 107, 1148, 1028, 119, 99, 1056, 936, 111, 91, 964, 844, 103, 83, 1257, 1137, 128, 108, 1165, 1045, 120, 100, 1073, 953, 112, 92, 898, 878, 839, 981, 861, 104, 84, 1274, 1154, 130, 110, 1182, 1062, 122, 102, 1090, 970, 114, 94, 998, 878, 106, 86, 1291, 1171, 131, 111, 1199, 1079, 123, 103, 1107, 987, 115, 95, 926, 906, 866, 1015, 895, 107, 87, 923, 803, 99, 79, 1216, 1096, 125, 105, 1124, 1004, 117, 97, 1032, 912, 109, 89, 940, 820, 101, 81, 1233, 1113, 126, 106, 1141, 1021, 118, 98, 954, 934, 892, 1049, 929, 110, 90, 957, 837, 102, 82, 1250, 1130, 128, 108, 1158, 1038, 120, 100, 1066, 946, 112, 92, 974, 854, 104, 84, 1267, 1147, 129, 109, 1175, 1055, 121, 101, 981, 961, 918, 1083, 963, 113, 93, 991, 871, 105, 85, 1284, 1164, 130, 110, 1192, 1072, 122, 102, 1100, 980, 115, 95, 1008, 888, 107, 87, 916, 796, 99, 79, 1209, 1089, 124, 104, 1009, 989, 945, 1117, 997, 116, 96, 1025, 905, 108, 88, 933, 813, 100, 80, 1226, 1106, 125, 105, 1134, 1014, 117, 97, 1042, 922, 110, 90, 950, 830, 102, 82, 1243, 1123, 127, 107, 1037, 1017, 971, 1151, 1031, 119, 99, 1059, 939, 111, 91, 967, 847, 103, 83, 1260, 1140, 128, 108, 1168, 1048, 120, 100, 1076, 956, 112, 92, 984, 864, 104, 84, 1277, 1157, 130, 110, 1064, 1044, 998, 1185, 1065, 122, 102, 1093, 973, 114, 94, 1001, 881, 106, 86, 909, 789, 98, 78, 1202, 1082, 123, 103, 1110, 990, 115, 95, 1017, 897, 107, 87, 925, 805, 99, 79, 777, 757, 723, 1218, 1098, 125, 105, 1126, 1006, 117, 97, 1034, 914, 109, 89, 942, 822, 101, 81, 1235, 1115, 126, 106, 1143, 1023, 118, 98, 1051, 931, 110, 90, 959, 839, 102, 82, 805, 785, 750, 1252, 1132, 128, 108, 1160, 1040, 120, 100, 1068, 948, 112, 92, 976, 856, 104, 84, 1269, 1149, 129, 109, 1177, 1057, 121, 101, 1085, 965, 113, 93, 993, 873, 105, 85, 833, 813, 776, 1286, 1166, 131, 111, 1194, 1074, 123, 103, 1102, 982, 115, 95, 1010, 890, 107, 87, 918, 798, 99, 79, 1211, 1091, 124, 104, 1119, 999, 116, 96, 1027, 907, 108, 88, 860, 840, 803, 935, 815, 100, 80, 1228, 1108, 126, 106, 1136, 1016, 118, 98, 1044, 924, 110, 90, 952, 832, 102, 82, 1245, 1125, 127, 107, 1153, 1033, 119, 99, 2170, 2150, 569100, 3100, 4620, 1527, 1410, 1293, 1176, 1549, 1432, 1315, 1198, 1571, 1453, 1336, 1219, 1592, 1475, 1358, 1241, 1614, 1497, 1379, 1262, 1635, 1518, 1401, 1284, 1167, 1540, 1423, 1305, 1188, 1561, 1444, 1327, 1210, 1583, 1466, 1349, 1231, 1604, 1487, 1370, 1253, 1626, 1509, 1392, 1275, 1157, 1530, 1413, 1296, 1179, 1552, 1435, 1318, 1201, 1573, 1456, 1339, 1222, 1595, 1478, 1361, 1244, 1617, 1499, 1382, 1265, 1638, 1521, 1404, 1287, 1170, 1543, 1425, 1308, 1191, 1564, 1447, 1330, 1213, 1586, 1469, 1351, 1234, 1607, 1490, 1373, 1256, 1629, 1512, 1395, 1277, 1160, 1533, 1416, 1299, 1182, 1555, 1438, 1321, 1204, 1576, 1459, 1342, 1225, 1598, 1481, 1364, 1247, 1620, 1502, 1385, 1268, 1641, 1524, 1407, 1290, 1173, 1546, 1428, 1311, 1194, 1567, 1450, 1333, 1216, 1589, 1472, 1354, 1237, 1610, 1493, 1376, 1259, 1632, 1515, 1398, 1280, 1163, 1536, 1419, 1302, 1185, 1558, 1441, 1324, 1206, 1579, 1462, 1345, 1228, 1601, 1484, 1367, 1250, 1622, 1505, 1388, 1271, 1644, 1527, 1410, 1293, 1176, 1548, 1431, 1314, 1197, 1570, 1453, 1336, 1219, 1592, 1474, 1357, 1240, 1613, 1496, 1379, 1262, 1635, 1518, 1400, 1283, 1166, 1539, 1422, 1305, 1188, 1561, 1444, 1326, 1209, 1582, 1465, 1348, 1231, 1604, 1487, 1370, 1253, 1625, 1508, 1391, 1274, 1157, 1530, 1413, 1296, 1179, 1551, 1434, 1317, 1200, 1573, 1456, 1339, 1222, 1595, 1477, 1360, 1243, 1616, 1499, 1382, 1265, 1638, 1521, 1403, 1286, 1169, 1542, 1425, 1308, 1191, 1564, 1447, 1329, 1212, 1585, 1468, 1351, 1234, 1607, 1490, 1373, 1255, 1628, 1511, 1394, 1277, 1160, 1533, 1416, 1299, 1181, 1554, 1437, 1320, 1203, 1576, 1459, 1342, 1225, 1597, 1480, 1363, 1246, 1619, 1502, 1385, 1268, 1641, 1523, 1406, 1289, 1172, 1545, 1428, 1311, 1194, 1567, 1449, 1332, 1215, 1588, 1471, 1354, 1237, 1610, 1493, 1375, 1258, 1631, 1514, 1397, 1280, 1163, 1536, 1419, 1302, 1184, 1557, 1440, 1323, 1206, 1579, 1462, 1345, 1228, 1600, 1483, 1366, 1249, 1622, 1505, 1388, 1271, 1644, 1526, 1409, 1292, 1175, 1548, 1431, 1314, 1197, 1570, 1452, 1335, 1218, 1591, 1474, 1357, 1240, 1613, 1496, 1378, 1261, 1634, 1517, 1400, 1283, 1166, 1539, 1422, 1304, 1187, 1560, 1443, 1326, 1209, 1582, 1465, 1348, 1230, 1603, 1486, 1369, 1252, 1625, 1508, 1391, 1274, 1156, 1529, 1412, 1295, 1178, 1551, 1434, 1317, 1200, 1572, 1455, 1338, 1221, 1594, 1477, 1360, 1243, 1616, 1498, 1381, 1264, 1637, 1520, 1403, 1286, 1169, 1542, 1424, 1307, 1190, 1563, 1446, 1329, 1212, 1585, 1468, 14360, 118, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 29, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 41, 38, 35, 31, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 29, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 29, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 29, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 41, 38, 34, 31, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 29, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 29, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 42, 39, 36, 33, 29, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37, 34, 31, 41, 38, 35, 32, 41, 38, 35, 32, 29, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 41, 37, 34, 31, 41, 38, 35, 32, 42, 39, 36, 33, 30, 39, 36, 33, 30, 40, 37, 34, 31, 40, 37]}, "callsTruncated": false, "agentVersion": "2.1.0", "pluginVersion": "2.1.0", "excludedClasses": ["com.example.order.OrderDto", "com.example.order.OrderLineDto"], "excludedOmitted": false}</script>
+<script>
 /*
  * Deju HTML report behaviour. Inlined verbatim into a <script> element by
  * HtmlReportGenerator, so the exported file stays self-contained.
@@ -7492,3 +8657,7 @@
   urlStateReady = true;
   applyUrlState();
 })();
+
+</script>
+</body>
+</html>

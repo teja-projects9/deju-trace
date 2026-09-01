@@ -882,6 +882,8 @@ Press Enter to apply, Esc to cancel.">
             title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
     <button class="toggle" id="flowHotBtn" type="button" hidden
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
+    <button class="toggle on" id="flameMergeBtn" type="button" hidden
+            title="Merge every call that arrived by the same route into one frame, as wide as the time all of them took. Off, each call gets its own box in the order it ran, which on a loop is thousands of them.">Merge repeats</button>
     <button class="toggle on" id="chartOrientBtn" type="button"
             title="Switch back to the left-to-right layout">Left &rarr; right</button>
     <span class="zoomseg" id="chartPlaySeg">
@@ -5536,6 +5538,7 @@ Press Enter to apply, Esc to cancel.">
   var flowSqlBtn = byId('flowSqlBtn');
   var flowGroupBtn = byId('flowGroupBtn');
   var flowHotBtn = byId('flowHotBtn');
+  var flameMergeBtn = byId('flameMergeBtn');
   var flowStepsBtn = byId('flowStepsBtn');
   var flowFlameBtn = byId('flowFlameBtn');
   var flowChartBtn = byId('flowChartBtn');
@@ -5573,6 +5576,12 @@ Press Enter to apply, Esc to cancel.">
   var flowMatchSelf = null;    // index -> 1 when the pattern filter's own text matched this step
   var flowMatchTotal = 0;      // summed micros of every outermost matched subtree
   var flameRoot = null;        // seq the flame view is zoomed into, null for the whole run
+  /* Merged is what a flame graph normally means, so it is the default; the chronological
+     layout stays one click away for the times the question is "in what order", and the
+     two are otherwise the same view of the same run. */
+  var flameMerged = true;
+  var flameRootPath = null;    // call path the merged flame is zoomed into
+  var flameMergedTotal = 0;    // micros the widest row represents, for the tooltip's share
   var collapsedFlow = {};      // seq -> true, subtree folded away by a click
   var flowSql = true;
   var flowGroup = true;
@@ -5806,9 +5815,19 @@ Press Enter to apply, Esc to cancel.">
     var shown = flowVisible.length;
     // Deliberately not naming a cause: SQL, grouping, a fold and the file picker can each
     // take steps out, often at the same time, and guessing which would sometimes be wrong.
-    var bits = [shown === flowNodes.length
-      ? shown + ' steps in execution order'
-      : shown + ' of ' + flowNodes.length + ' steps shown'];
+    // Merged flame counts differently on purpose: nothing there is hidden, so "N of M
+    // shown" would be the wrong shape of sentence. What it did is fold, and by how much is
+    // the number worth printing.
+    var bits = [];
+    if (flowFlame && flameMerged) {
+      var frames = flowDrawn.length;
+      bits.push(flowNodes.length + ' calls merged into ' + frames
+        + (frames === 1 ? ' frame' : ' frames'));
+    } else {
+      bits.push(shown === flowNodes.length
+        ? shown + ' steps in execution order'
+        : shown + ' of ' + flowNodes.length + ' steps shown');
+    }
     if (!showExcluded && hasExclusions) {
       bits.push('excluded types are folded away');
     }
@@ -6135,6 +6154,136 @@ Press Enter to apply, Esc to cancel.">
       if (x + pw[i] > widest) widest = x + pw[i];
     }
     return widest;
+  }
+
+  // ------------------------------------------------------------ merged flame ---
+  //
+  // What a flame graph is, as against what the chronological layout above draws.
+  //
+  // The layout above gives every recorded call a box of its own and positions it on a
+  // time axis. On a loop that is thousands of boxes, nearly all of them narrower than a
+  // pixel, and the width floor that rescues them from invisibility is also what forces
+  // the note to admit the widths have stopped meaning anything.
+  //
+  // A flame graph merges instead: every call that arrived by the same route through the
+  // code becomes ONE frame, as wide as the time all of them took together. The count
+  // moves into the tooltip. A four-hundred-iteration loop is one readable box rather than
+  // four hundred slivers, which is the whole reason the format is read the way it is —
+  // and it is what Glowroot, async-profiler and Brendan Gregg's original all do. What is
+  // given up is when each call happened; the Timeline tab answers that question already.
+
+  /** Frames narrower than this are dropped with their subtree: too thin to see or hit. */
+  var FLAME_MIN_PX = 0.4;
+
+  /**
+   * Aggregates every recorded call into frames keyed by call path.
+   *
+   * <p>Walks {@link flowNodes} in pre-order applying the same filters the chronological
+   * view applies — the file picker, excluded types, the SQL toggle — but not its
+   * adjacent-run folding, which merging supersedes: adjacency can only fold a run of
+   * identical neighbours, and a loop body calling three different things in turn never
+   * produces one.
+   *
+   * <p>Skips are whole subtrees, so what survives is still a tree and a kept node's parent
+   * is always the nearest kept node one level up.
+   *
+   * @return {{roots: Array, total: number}}
+   */
+  function buildFlameMerged() {
+    var byDepth = [];        // depth -> the merged frame the next child belongs under
+    var roots = [];
+    var rootByKey = {};
+    var total = 0;
+    var searching = flowFilterText.trim() !== '' && flowMatchSelf;
+
+    for (var i = 0; i < flowNodes.length; i++) {
+      var n = flowNodes[i];
+      if (n.cname && !classSelected(n.cname)) { i += n.span - 1; continue; }
+      if (!showExcluded && foldableSeq[n.seq]) { i += n.span - 1; continue; }
+      if (!flowSql && n.isSql) { i += n.span - 1; continue; }
+
+      var parent = n.depth > 0 ? byDepth[n.depth - 1] : null;
+      var siblings = parent ? parent.kids : roots;
+      var map = parent ? parent.kidByKey : rootByKey;
+      var frame = map[n.key];
+      if (!frame) {
+        frame = map[n.key] = {
+          // Everything drawNode, the hit test and the tooltip read off an ordinary flame
+          // node, so a merged frame duck-types one and the whole draw path is reused.
+          seq: n.seq, cls: n.cls, mth: n.mth, sig: n.sig, isSql: n.isSql, sql: n.sql,
+          owner: n.owner, cname: n.cname, key: n.key, sqlLines: n.sqlLines,
+          depth: parent ? parent.depth + 1 : 0,
+          shown: 0, calls: 0, matched: false,
+          kids: [], kidByKey: {}, parent: parent,
+          path: (parent ? parent.path + '\u0001' : '') + n.key
+        };
+        siblings.push(frame);
+      }
+      frame.shown += n.total;
+      frame.calls++;
+      if (searching && flowMatchSelf[flowIdxBySeq[n.seq]]) frame.matched = true;
+      if (!parent) total += n.total;
+      byDepth[n.depth] = frame;
+    }
+    return { roots: roots, total: total };
+  }
+
+  /**
+   * Places merged frames: width is time, children packed inside their parent, widest first.
+   *
+   * <p>Widest first rather than in call order or alphabetically: the question this view is
+   * opened with is "what took the time", and putting the answer at the left edge of every
+   * row means reading down the left-hand column answers it without hunting.
+   *
+   * <p>A frame's children can only be as wide as the frame itself, so the parent's own
+   * uncovered remainder on the right is its self time — the same reading a sampled flame
+   * graph gives, arrived at from exact durations rather than from counting samples.
+   */
+  function layoutFlameMerged(roots, total, span) {
+    var drawn = [];
+    var maxDepth = 0;
+    var stack = [];
+
+    var pen = 0;
+    roots.sort(function (a, b) { return b.shown - a.shown; });
+    for (var r = 0; r < roots.length; r++) {
+      roots[r].x = FLOW_PAD + pen;
+      roots[r].w = total > 0 ? (roots[r].shown / total) * span : span;
+      pen += roots[r].w;
+      stack.push(roots[r]);
+    }
+
+    while (stack.length) {
+      var f = stack.pop();
+      if (f.depth > maxDepth) maxDepth = f.depth;
+      drawn.push(f);
+
+      f.kids.sort(function (a, b) { return b.shown - a.shown; });
+      var cx = f.x;
+      for (var k = 0; k < f.kids.length; k++) {
+        var kid = f.kids[k];
+        var kw = f.shown > 0 ? (kid.shown / f.shown) * f.w : 0;
+        if (kw < FLAME_MIN_PX) continue;   // too thin to see or hit; its subtree goes too
+        kid.x = cx;
+        kid.w = kw;
+        cx += kw;
+        stack.push(kid);
+      }
+    }
+    return { drawn: drawn, maxDepth: maxDepth };
+  }
+
+  /** The merged frame a path points at, or null once a filter has removed it. */
+  function findFlameFrame(roots, path) {
+    var stack = roots.slice();
+    while (stack.length) {
+      var f = stack.pop();
+      if (f.path === path) return f;
+      if (path.indexOf(f.path) === 0) {
+        for (var i = 0; i < f.kids.length; i++) stack.push(f.kids[i]);
+      }
+    }
+    return null;
   }
 
   function flowColors() {
@@ -6645,6 +6794,40 @@ Press Enter to apply, Esc to cancel.">
       flowDrawn = chartNodes;
       contentW = chartContentW;
       contentH = chartContentH;
+    } else if (flowFlame && flameMerged) {
+      var built = buildFlameMerged();
+      var mRoots = built.roots;
+      var mTotal = built.total;
+
+      // Zooming makes one frame the new 100%: the same rule as the chronological view,
+      // except the frame is found by its call path rather than by a recorded seq, since a
+      // merged frame is many calls and has no single one of its own.
+      if (flameRootPath) {
+        var focus = findFlameFrame(mRoots, flameRootPath);
+        if (!focus) {
+          flameRootPath = null;      // filtered out from under us
+        } else {
+          focus.parent = null;       // it is the root of the drawn tree now
+          mRoots = [focus];
+          mTotal = focus.shown || 1;
+        }
+      }
+
+      var mSpan = flowFit ? (avail - FLOW_PAD * 2)
+        : Math.max(FLOW_FLAME_W, avail - FLOW_PAD * 2) * flowZoom;
+      var laid = layoutFlameMerged(mRoots, mTotal, mSpan);
+      // Nothing is ever widened past its share here, so the note has no caveat to make.
+      flameWidened = false;
+      laid.drawn.forEach(function (n) {
+        var row = laid.maxDepth - n.depth;
+        n.y = FLOW_PAD + FLOW_RULER + row * FLAME_BOX;
+        n.h = FLAME_BOX;
+        (flowByDepth[row] || (flowByDepth[row] = [])).push(n);
+      });
+      flowDrawn = laid.drawn;
+      flameMergedTotal = mTotal;
+      contentW = FLOW_PAD * 2 + mSpan;
+      contentH = FLOW_PAD * 2 + FLOW_RULER + (laid.maxDepth + 1) * FLAME_BOX;
     } else if (flowFlame) {
       layoutFlame(flowVisible);
 
@@ -6751,8 +6934,13 @@ Press Enter to apply, Esc to cancel.">
       countEl.textContent = flowChart
         ? 'Showing ' + chartStepCount() + ' distinct step'
           + (chartStepCount() === 1 ? '' : 's') + ' in this flow'
-        : 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
-          + (flowNodes.length === 1 ? ' step' : ' steps');
+        // Merged frames are not steps and there is no "of" to give them: every call is on
+        // the diagram, just not in a box of its own.
+        : (flowFlame && flameMerged)
+          ? flowDrawn.length + (flowDrawn.length === 1 ? ' frame, ' : ' frames, ')
+            + flowNodes.length + ' calls'
+          : 'Showing ' + flowDrawn.length + ' of ' + flowNodes.length
+            + (flowNodes.length === 1 ? ' step' : ' steps');
     }
 
     paintFlow();
@@ -6834,15 +7022,25 @@ Press Enter to apply, Esc to cancel.">
       // The pale grey-to-yellow wash a classic CPU flame graph paints behind its stack.
       // Built against the diagram's own coordinates, not the viewport slice being painted,
       // so the wash stays put as the canvas scrolls instead of sliding under it.
-      var grad = ctx.createLinearGradient(0, 0, 0, flowContentH);
-      if (c.dark) {
-        grad.addColorStop(0, '#242322');
-        grad.addColorStop(1, '#2e2a1c');
+      //
+      // Flat when there is no gradient to be had: the SVG export runs this same renderer
+      // through a context shim that implements paths, fills and text and nothing else, so
+      // asking it for a gradient threw and took the whole export with it. One colour from
+      // the middle of the wash is a fair stand-in, and a saved file beats an exact one
+      // that never arrives.
+      if (ctx.createLinearGradient) {
+        var grad = ctx.createLinearGradient(0, 0, 0, flowContentH);
+        if (c.dark) {
+          grad.addColorStop(0, '#242322');
+          grad.addColorStop(1, '#2e2a1c');
+        } else {
+          grad.addColorStop(0, '#eeeeee');
+          grad.addColorStop(1, '#eeeeb0');
+        }
+        ctx.fillStyle = grad;
       } else {
-        grad.addColorStop(0, '#eeeeee');
-        grad.addColorStop(1, '#eeeeb0');
+        ctx.fillStyle = c.dark ? '#292724' : '#eeeed7';
       }
-      ctx.fillStyle = grad;
     } else {
       ctx.fillStyle = c.bg;
     }
@@ -6976,7 +7174,11 @@ Press Enter to apply, Esc to cancel.">
     var ink = null;
     if (flowFlame) {
       var searching = flowFilterText.trim() !== '' && flowMatchSelf;
-      var isMatch = searching && flowMatchSelf[flowIdxBySeq[n.seq]];
+      // A merged frame carries its own answer: it stands for many calls, and they all
+      // share the signature the pattern is tested against, so it was settled when the
+      // frame was built rather than looked up per repaint.
+      var isMatch = searching
+        && (n.matched !== undefined ? n.matched : flowMatchSelf[flowIdxBySeq[n.seq]]);
       var fill;
       if (isMatch) {
         fill = c.dark ? FLAME_MATCH_DARK : FLAME_MATCH_LIGHT;
@@ -7527,9 +7729,15 @@ Press Enter to apply, Esc to cancel.">
     }
     if (flowFlame) {
       // Clicking the frame you are already zoomed into steps back out to its parent.
-      flameRoot = (flameRoot === n.seq)
-        ? (flowBySeq[n.parentSeq] ? n.parentSeq : null)
-        : n.seq;
+      if (flameMerged) {
+        flameRootPath = (flameRootPath === n.path)
+          ? (n.parent ? n.parent.path : null)
+          : n.path;
+      } else {
+        flameRoot = (flameRoot === n.seq)
+          ? (flowBySeq[n.parentSeq] ? n.parentSeq : null)
+          : n.seq;
+      }
       hideFlowTip();
       drawFlow();
       return;
@@ -7544,35 +7752,48 @@ Press Enter to apply, Esc to cancel.">
   /** The trail back out of a flame zoom: every ancestor of the focused frame. */
   var crumbKey = '';
   function renderCrumb() {
-    var key = (flowFlame ? 'f' : 't') + ':' + flameRoot;
+    var focus = flameMerged ? flameRootPath : flameRoot;
+    var key = (flowFlame ? 'f' : 't') + ':' + (flameMerged ? 'm' : 'c') + ':' + focus;
     if (key === crumbKey) return;
     crumbKey = key;
-    if (!flowFlame || flameRoot == null) {
+    if (!flowFlame || focus == null) {
       flowCrumb.hidden = true;
       flowCrumb.textContent = '';
       return;
     }
+
+    // The chain is walked the same way in both layouts, just over different parents: a
+    // recorded call's parentSeq, or a merged frame's own parent link.
     var chain = [];
-    for (var n = flowBySeq[flameRoot]; n; n = flowBySeq[n.parentSeq]) chain.unshift(n);
+    var n;
+    if (flameMerged) {
+      for (n = findFlameFrame(buildFlameMerged().roots, flameRootPath); n; n = n.parent) {
+        chain.unshift(n);
+      }
+    } else {
+      for (n = flowBySeq[flameRoot]; n; n = flowBySeq[n.parentSeq]) chain.unshift(n);
+    }
 
     flowCrumb.textContent = '';
     flowCrumb.appendChild(crumbBtn('Whole run', null, false));
-    chain.forEach(function (n, i) {
+    chain.forEach(function (f, i) {
       flowCrumb.appendChild(el('span', 'sep', '▸'));
       flowCrumb.appendChild(crumbBtn(
-        n.isSql ? sqlLabel(n.sql) : (n.cls + n.mth), n.seq, i === chain.length - 1));
+        f.isSql ? sqlLabel(f.sql) : (f.cls + f.mth),
+        flameMerged ? f.path : f.seq, i === chain.length - 1));
     });
     flowCrumb.hidden = false;
   }
 
-  function crumbBtn(label, seq, current) {
+  function crumbBtn(label, target, current) {
     var b = el('button', null, label);
     b.type = 'button';
     b.disabled = current;          // you are already here
     if (!current) {
-      b.title = seq == null ? 'Back to the whole run' : 'Zoom out to ' + label;
+      b.title = target == null ? 'Back to the whole run' : 'Zoom out to ' + label;
       b.addEventListener('click', function () {
-        flameRoot = seq;
+        if (flameMerged) flameRootPath = target;
+        else flameRoot = target;
         hideFlowTip();
         drawFlow();
       });
@@ -7668,10 +7889,21 @@ Press Enter to apply, Esc to cancel.">
       }
       if (facts.length) flowTip.appendChild(el('div', 't-stat', facts.join(' · ')));
     }
-    var sub = 'step ' + (n.seq + 1) + ' · ' + fmtPct(n.shown);
-    if (n.reps > 1) sub += ' · ' + n.reps + ' identical calls combined';
-    if (n.site != null) sub += ' · called at line ' + n.site;
-    if (flowFlame) sub += (flameRoot === n.seq) ? ' · click to zoom out' : ' · click to zoom in';
+    // A merged frame is not a step: it stands for every call that arrived here by the same
+    // route, so it is described by how many of them there were and what they cost together,
+    // and a step number would be picking one of them arbitrarily.
+    var sub;
+    if (n.calls !== undefined) {
+      sub = (n.calls === 1 ? '1 call' : n.calls + ' calls merged') + ' · ' + fmtPct(n.shown);
+    } else {
+      sub = 'step ' + (n.seq + 1) + ' · ' + fmtPct(n.shown);
+      if (n.reps > 1) sub += ' · ' + n.reps + ' identical calls combined';
+      if (n.site != null) sub += ' · called at line ' + n.site;
+    }
+    if (flowFlame) {
+      var here = flameMerged ? (flameRootPath === n.path) : (flameRoot === n.seq);
+      sub += here ? ' · click to zoom out' : ' · click to zoom in';
+    }
     else if (n.hasKids && n.reps === 1) {
       sub += collapsedFlow[n.seq] ? ' · click to expand' : ' · click to fold';
     }
@@ -7713,8 +7945,27 @@ Press Enter to apply, Esc to cancel.">
    */
   function syncFlowSubViewControls() {
     flowHotBtn.hidden = flowChart;
-    if (flowMinWSel) flowMinWSel.hidden = !flowFlame;
+    flameMergeBtn.hidden = !flowFlame;
+    // The width floor exists to rescue sub-pixel frames from a per-call layout. Merging
+    // removes them at the source, so the control has nothing left to do and would only
+    // offer to make the widths dishonest again.
+    if (flowMinWSel) flowMinWSel.hidden = !flowFlame || flameMerged;
+    // Grouping a run of identical neighbours is what merging already does, and more of it.
+    flowGroupBtn.hidden = flowFlame && flameMerged;
   }
+
+  flameMergeBtn.addEventListener('click', function () {
+    flameMerged = !flameMerged;
+    flameMergeBtn.classList.toggle('on', flameMerged);
+    // The two layouts address frames differently — a call path, or one recorded call — so
+    // a zoom cannot be carried across and is dropped rather than silently pointed at the
+    // wrong frame.
+    flameRoot = null;
+    flameRootPath = null;
+    syncFlowSubViewControls();
+    hideFlowTip();
+    drawFlow();
+  });
 
   flowToggle(flowSqlBtn, function () { return flowSql; }, function (v) { flowSql = v; });
   flowToggle(flowGroupBtn, function () { return flowGroup; }, function (v) { flowGroup = v; });
@@ -7770,7 +8021,7 @@ Press Enter to apply, Esc to cancel.">
   function setFlowView(view) {
     flowFlame = view === 'flame';
     flowChart = view === 'chart';
-    if (!flowFlame) flameRoot = null;
+    if (!flowFlame) { flameRoot = null; flameRootPath = null; }
     Object.keys(FLOW_VIEW_BTNS).forEach(function (v) {
       var on = v === view;
       FLOW_VIEW_BTNS[v].classList.toggle('on', on);
