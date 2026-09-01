@@ -191,6 +191,8 @@ Press Enter to apply, Esc to cancel.">
             title="Include the types you excluded (entities, DTOs and other data classes)">Show excluded</button>
     <button class="toggle" id="flowHotBtn" type="button" hidden
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
+    <button class="toggle on" id="flameMergeBtn" type="button" hidden
+            title="Merge every call that arrived by the same route into one frame, as wide as the time all of them took. Off, each call gets its own box in the order it ran, which on a loop is thousands of them.">Merge repeats</button>
     <button class="toggle on" id="chartOrientBtn" type="button"
             title="Switch back to the left-to-right layout">Left &rarr; right</button>
     <span class="zoomseg" id="chartPlaySeg">
