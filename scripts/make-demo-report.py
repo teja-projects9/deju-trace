@@ -34,6 +34,11 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RES = ROOT / "plugin/src/main/resources"
 OUT = ROOT / "docs/demo-report.html"
+# The same report over a trace big enough to be a fair test of the diagrams. The small
+# demo is the Marketplace sample and stays readable at a glance; this one is what a real
+# request against a loop-heavy endpoint actually produces, and is where a view that only
+# works on thirty-six calls gives itself away. Written by `--large`.
+OUT_LARGE = ROOT / "docs/demo-report-large.html"
 
 PROJECT = "example-api"
 SRC_ROOT = "src/main/java"
@@ -376,9 +381,9 @@ SQL_ORDER = "insert into customer_order (customer_id, total_pence) values (?, ?)
 SQL_LINE = "insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)"
 
 
-def build_files():
+def build_files(coverage=None):
     files = []
-    for fqcn, methods in COVERAGE.items():
+    for fqcn, methods in (coverage or COVERAGE).items():
         source_name, source = SOURCES[fqcn]
         text = source.splitlines()
         lines = []
@@ -556,6 +561,119 @@ def build_calls():
     return t.calls
 
 
+# How many order lines the large trace's basket holds. Every per-line loop below runs
+# this many times, so it is the one number that sets the size of the whole thing.
+LARGE_LINES = 400
+# One in this many lines is a member, so the loyalty branch runs on a minority of them —
+# a level where every sibling is identical is the easy case, and not the interesting one.
+LARGE_MEMBER_EVERY = 8
+
+
+def build_large_calls():
+    """A basket of LARGE_LINES lines through the same code, which is what a real request
+    against a loop-heavy endpoint looks like.
+
+    Same nine classes as the small demo, so no new source or coverage is needed; what
+    changes is how many times each is called. Durations drift a little per iteration
+    (a cache warming up, a connection pool settling) rather than repeating exactly,
+    because a diagram that only works when every sibling is the same width is not one
+    that works.
+    """
+    t = Trace()
+
+    def drift(base, i, spread=0.35):
+        # Deterministic, so regenerating the demo does not churn the file: a cheap
+        # hash-like wobble around `base`, plus a first-call penalty for the cold path.
+        wobble = ((i * 2654435761) % 1000) / 1000.0 - 0.5
+        cold = 4.0 if i == 0 else 1.0
+        return max(1, int(base * cold * (1 + spread * wobble)))
+
+    root = t.call("com.example.order.OrderController", "placeOrder", -1, None, 0)
+    place = t.call("com.example.order.OrderService", "place", root, 25, 0)
+
+    # One pass over the basket, doing the whole per-line job each time round — which is how
+    # a loop body is actually written, and why the repeats end up interleaved rather than
+    # batched. It matters for the diagrams: a run of identical adjacent siblings folds
+    # away on its own, and three methods taking turns never does.
+    for i in range(LARGE_LINES):
+        micros = drift(1100, i)
+        find = t.call("com.example.menu.MenuRepository", "findByName", place, 23, micros)
+        t.sql(SQL_DRINK, find, 13, max(1, micros - 120))          # the N+1
+
+        total = t.call("com.example.pricing.PriceCalculator", "total", place, 25, 0)
+        t.call("com.example.pricing.PriceCalculator", "priceOf", total, 17, drift(95, i))
+
+        # A minority branch: only members reach the loyalty service and its query.
+        if i % LARGE_MEMBER_EVERY == 0:
+            apply_ = t.call("com.example.pricing.DiscountPolicy", "apply", place, 26, 0)
+            member = t.call("com.example.loyalty.LoyaltyService", "isMember", apply_, 14,
+                            drift(900, i))
+            t.sql(SQL_MEMBER, member, 13, drift(860, i))
+
+    award = t.call("com.example.loyalty.LoyaltyService", "award", place, 27, 0)
+    t.sql(SQL_POINTS, award, 21, 2150)
+
+    save = t.call("com.example.order.OrderRepository", "save", place, 28, 0)
+    t.sql(SQL_ORDER, save, 12, 3100)
+    for i in range(LARGE_LINES):
+        t.sql(SQL_LINE, save, 15, drift(1400, i))
+
+    dto = t.call("com.example.order.OrderDto", "of", place, 29, 0)
+    for i in range(LARGE_LINES):
+        t.call("com.example.order.OrderLineDto", "of", dto, 13, drift(36, i))
+
+    roll_up_totals(t.calls)
+    return t.calls
+
+
+def roll_up_totals(calls):
+    """Fills in every zero total with the sum of its children plus a little self time.
+
+    A parent's inclusive time has to contain its children's or the flame graph is drawing
+    a lie, and hand-writing those sums for a four-thousand-call trace is not something to
+    do by eye.
+    """
+    kids = {}
+    for c in calls:
+        kids.setdefault(c["parentSeq"], []).append(c)
+    for c in reversed(calls):          # children always come later in pre-order
+        if c["totalMicros"]:
+            continue
+        below = sum(k["totalMicros"] for k in kids.get(c["seq"], []))
+        c["totalMicros"] = below + max(20, below // 200)   # a sliver of its own on top
+
+
+def scaled_coverage(calls):
+    """COVERAGE with every method's totals rescaled to what `calls` actually spent in it.
+
+    The line-by-line coverage (which lines ran, which branches) is a property of the code
+    and does not change with basket size; the times attached to it do. Scaling keeps the
+    Call Tree and Breakdown numbers agreeing with the call list instead of quietly
+    contradicting it.
+    """
+    observed = {}
+    for c in calls:
+        if c["sql"] is None and c["className"]:
+            key = (c["className"], c["methodName"])
+            observed[key] = observed.get(key, 0) + c["totalMicros"]
+
+    out = {}
+    for fqcn, methods in COVERAGE.items():
+        scaled_methods = []
+        for method, total, self_micros, entries in methods:
+            new_total = observed.get((fqcn, method), total)
+            factor = (new_total / total) if total else 1.0
+            scaled_methods.append((
+                method,
+                new_total,
+                max(1, int(self_micros * factor)),
+                [(ln, st, bc, bt, (max(1, int(us * factor)) if us is not None else None))
+                 for ln, st, bc, bt, us in entries],
+            ))
+        out[fqcn] = scaled_methods
+    return out
+
+
 def data_uri(path):
     if not path.exists():
         return ""
@@ -563,14 +681,27 @@ def data_uri(path):
 
 
 def main():
+    large = "--large" in sys.argv[1:]
+    out_path = OUT_LARGE if large else OUT
+
+    if large:
+        calls = build_large_calls()
+        files = build_files(scaled_coverage(calls))
+        root_micros = calls[0]["totalMicros"]
+    else:
+        calls = build_calls()
+        files = build_files()
+        root_micros = 47900
+
     model = {
         "target": "com.example.order.OrderController#placeOrder",
         "startedAtIso": "2026-07-31T09:24:18.221Z",
-        "durationMs": 48,
-        "cpuMicros": 43100,  # mostly CPU-bound: a little wait on the DB pool, no real I/O stall
+        "durationMs": round(root_micros / 1000) if large else 48,
+        # Same split as the small demo: mostly CPU, a little waiting on the pool.
+        "cpuMicros": int(root_micros * 0.9) if large else 43100,
         "projectName": PROJECT,
-        "files": build_files(),
-        "calls": encode_calls(build_calls()),
+        "files": files,
+        "calls": encode_calls(calls),
         "callsTruncated": False,
         "agentVersion": "2.1.0",
         "pluginVersion": "2.1.0",
@@ -609,12 +740,12 @@ def main():
         sys.exit("placeholder(s) left unsubstituted, the template changed shape: "
                  + ", ".join(left))
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(html, encoding="utf-8")
-    calls = model["calls"]
-    print(f"wrote {OUT.relative_to(ROOT)}  ({len(html):,} bytes)")
-    print(f"  {len(model['files'])} files, {calls['n']} call nodes, "
-          f"{sum(1 for q in calls['sql'] if q >= 0)} queries, {len(EXCLUDED)} excluded types")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(html, encoding="utf-8")
+    encoded = model["calls"]
+    print(f"wrote {out_path.relative_to(ROOT)}  ({len(html):,} bytes)")
+    print(f"  {len(model['files'])} files, {encoded['n']} call nodes, "
+          f"{sum(1 for q in encoded['sql'] if q >= 0)} queries, {len(EXCLUDED)} excluded types")
     print(f"  tabs: {', '.join(DEMO_TABS)}  ·  opens on {DEMO_PREFS['openTab']}")
 
 
