@@ -100,6 +100,16 @@
           <li><b>Findings are grouped by severity</b> and collapsible, and a query inside
           one is now syntax-highlighted the same way it is everywhere else in the
           report.</li>
+          <li><b>New: Merge repeats in the Flame Graph.</b> Every call that arrived by the
+          same route through the code now becomes one frame, as wide as the time all of them
+          took together, with the count in its tooltip &mdash; a loop of thousands of calls
+          reads as a handful of frames instead of a wall of slivers. Turn it off when the
+          question is what order things happened in.</li>
+          <li><b>Fixed: Save SVG on the Flame Graph</b> threw and wrote nothing, broken by
+          this release's own background wash; the export now falls back to a flat colour.</li>
+          <li><b>New: a user guide.</b> <code>docs/user-guide.md</code> walks through setup
+          for a local JVM and for a container, with a troubleshooting table built from the
+          errors the plugin and agent actually print.</li>
         </ul>
         <p><b>2.3.0</b>: a flowchart with a start and an end</p>
         <ul>
