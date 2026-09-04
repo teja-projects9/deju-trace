@@ -171,7 +171,7 @@ h1{font-size:1.05rem;margin:0;}
 table{border-collapse:collapse;width:100%;
   font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:.8rem;}
 td{padding:.08rem .5rem;white-space:pre;vertical-align:top;}
-td.time{text-align:right;color:var(--muted);white-space:nowrap;width:5rem;border-right:1px solid var(--border);font-variant-numeric:tabular-nums;}
+td.time{text-align:right;color:var(--muted);white-space:nowrap;width:6.6rem;font-size:.72rem;border-right:1px solid var(--border);font-variant-numeric:tabular-nums;}
 td.ln{text-align:right;color:var(--ln);user-select:none;width:3.2rem;border-right:1px solid var(--border);}
 td.ln a{color:inherit;text-decoration:none;}
 td.ln a:hover{color:var(--accent);text-decoration:underline;}
@@ -242,8 +242,12 @@ tr.frame.hot td{background:var(--heat);}
 .fhead .fsite{color:var(--muted);font-size:.72rem;}
 .fhead .fsite a{color:inherit;text-decoration:none;}
 .fhead .fsite a:hover{color:var(--accent);text-decoration:underline;}
-.fhead .ftime{margin-left:auto;color:var(--muted);font-size:.74rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
-tr.frame.hot .ftime{color:var(--fg);font-weight:600;}
+/* Bold and full-strength ink, unlike the small muted number beside every source line: that
+   one is a line's own time; this is the call's total including everything it went on to do,
+   and the two look confusable side by side unless the total reads as the bigger number it
+   conceptually is. */
+.fhead .ftime{margin-left:auto;color:var(--fg);font-weight:600;font-size:.82rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+tr.frame.hot .ftime{color:var(--accent);}
 
 /* A run of identical sibling calls, folded so an N+1 loop cannot flood the page. */
 tr.fold td{padding:.22rem .5rem;background:var(--bg);border-bottom:1px solid var(--border);white-space:normal;cursor:pointer;}
@@ -285,7 +289,20 @@ tr.rollup:hover td{opacity:1;}
 tr td.tcode,
 tr.frame td.tframe,
 tr.sqlrow td.tframe,
-tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
+tr.fold td.tframe{
+  padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);
+  /* One faint vertical tick per ancestor level, the way a file tree or an IDE's structure
+     view marks indent depth, so a line ten levels deep can be traced back to which call it
+     belongs to without counting indent widths by eye. Drawn as a single repeating pattern
+     clipped to exactly `depth` widths — depth 0 gets none — rather than a real border per
+     level, since nothing here nests actual elements inside one another (see the note above
+     on why depth is a padding, not a DOM structure). */
+  background-image:repeating-linear-gradient(to right,
+    var(--border) 0, var(--border) 1px, transparent 1px, transparent 1.15rem);
+  background-position:.5rem 0;
+  background-size:calc(var(--depth, 0) * 1.15rem) 100%;
+  background-repeat:no-repeat;
+}
 
 .seg{display:inline-flex;border:1px solid var(--hairline);border-radius:var(--radius-sm);
   background:var(--panel);padding:2px;gap:2px;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);}
@@ -487,6 +504,11 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
    A canvas the height of the whole trace stops being drawable past 65535px. */
 #flowSpacer{position:relative;}
 #flowCanvas{display:block;position:absolute;top:0;left:0;}
+/* Re-pinned to a corner of the viewport on every scroll, same trick as #flowCanvas above;
+   hidden by default so a fresh report shows nothing here until paintMinimap() has sized
+   and positioned it at least once. */
+#flowMinimap{display:none;position:absolute;top:0;left:0;border-radius:6px;
+  box-shadow:var(--elev);cursor:crosshair;}
 .flowtip{position:fixed;z-index:20;pointer-events:none;max-width:32rem;
   background:var(--control);color:var(--fg);border:1px solid var(--border);
   border-radius:var(--radius-sm);box-shadow:var(--elev);padding:.45rem .6rem;

@@ -193,8 +193,14 @@ Press Enter to apply, Esc to cancel.">
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
     <button class="toggle on" id="flameMergeBtn" type="button" hidden
             title="Merge every call that arrived by the same route into one frame, as wide as the time all of them took. Off, each call gets its own box in the order it ran, which on a loop is thousands of them.">Merge repeats</button>
+    <button class="toggle" id="flameCallersBtn" type="button" hidden
+            title="Click a frame to see everything that calls it, merged by caller and stacked upward from it — a sandwich view, for &quot;what's calling this expensive thing everywhere&quot;.">Callers of&hellip;</button>
     <button class="toggle on" id="chartOrientBtn" type="button"
             title="Switch back to the left-to-right layout">Left &rarr; right</button>
+    <button class="toggle" id="chartLayerBtn" type="button"
+            title="Order each row by architectural layer — controller, service, repository/DAO, then SQL — guessed from the class name, instead of by call order">Sort: call order</button>
+    <button class="toggle" id="chartMinimapBtn" type="button"
+            title="Show a small overview of the whole diagram in the corner, with a box marking what's on screen; drag it to jump around a large diagram">Minimap</button>
     <span class="zoomseg" id="chartPlaySeg">
       <button class="toggle zoombtn" id="chartPlayBtn" type="button" title="Play the run through the flowchart">&#9654;</button>
       <button class="toggle zoombtn" id="chartResetBtn" type="button" title="Back to the start">&#8634;</button>

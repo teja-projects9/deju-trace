@@ -59,9 +59,21 @@ final class Session {
     // includes=) is naturally attributed to its call-site line, the plprofiler behaviour.
     /** lineProbeId -> accumulated self nanos. */
     final Map<Integer, Long> lineNanos = new HashMap<>();
-    /** methodGid -> inclusive (enter→exit) nanos, summed across invocations. */
+    /**
+     * methodGid -> inclusive (enter→exit) nanos, summed across invocations — but only ever
+     * the outermost invocation of a given method at any one time, never an invocation
+     * reached through the method recursing into itself. A recursive call's own enter→exit
+     * span sits entirely inside the span of whichever invocation called it, so adding both
+     * spans would count the overlapping time twice: three self-recursive levels each really
+     * costing 10ms of wall time would otherwise report as 30+20+10 = 60ms instead of the
+     * 30ms actually elapsed. {@link #activeDepth} is what tells an exiting frame whether it
+     * was the outermost one and so should bank its time here at all.
+     */
     final Map<Integer, Long> methodNanos = new HashMap<>();
-    /** Active call frames: each entry is {methodGid, enterNanos, callSeq}. */
+    /** How many frames of each method are currently on the stack, recursive re-entries
+     *  included — see {@link #methodNanos}. */
+    private final Map<Integer, Integer> activeDepth = new HashMap<>();
+    /** Active call frames: each entry is {methodGid, enterNanos, callSeq, outermost (0/1)}. */
     private final Deque<long[]> frames = new ArrayDeque<>();
     private int lastLineProbe = -1;
     private long lastLineNanos;
@@ -141,7 +153,10 @@ final class Session {
         int callSite = lastLineProbe;
         int parent = frames.isEmpty() ? -1 : (int) frames.peek()[2];
         closeCurrentLine(now);
-        frames.push(new long[] {methodGid, now, recordCall(methodGid, parent, callSite)});
+        // Zero before this push means no frame of this method is already open below it on
+        // the stack, i.e. this one is the outermost — see methodNanos.
+        boolean outermost = activeDepth.merge(methodGid, 1, Integer::sum) == 1;
+        frames.push(new long[] {methodGid, now, recordCall(methodGid, parent, callSite), outermost ? 1L : 0L});
     }
 
     /** A method returned: close its last line, pop the frame and bank its inclusive time. */
@@ -149,8 +164,14 @@ final class Session {
         closeCurrentLine(now);
         long[] frame = frames.poll();
         if (frame != null) {
+            int methodGid = (int) frame[0];
             long elapsed = now - frame[1];
-            methodNanos.merge((int) frame[0], elapsed, Long::sum);
+            if (activeDepth.merge(methodGid, -1, Integer::sum) <= 0) {
+                activeDepth.remove(methodGid); // tidy: this method is no longer on the stack at all
+            }
+            if (frame[3] == 1L) {
+                methodNanos.merge(methodGid, elapsed, Long::sum);
+            }
             int seq = (int) frame[2];
             if (seq >= 0) {
                 callNanos[seq] = elapsed;

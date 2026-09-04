@@ -21,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PaintPlanTest {
 
     private static final Predicate<String> NOTHING_EXCLUDED = c -> false;
+    /** A cap high enough to never bind in a test that isn't about the cap itself — zero
+     *  now means "open none", not "unlimited" (see {@link #zeroOpensNoneButPaintsEverything}). */
+    private static final int NO_CAP = 100;
 
     @Test
     void opensFilesInTheOrderTheCallTreeReachesThem() {
@@ -28,7 +31,7 @@ class PaintPlanTest {
                 files("com.example.Repo", "com.example.Controller", "com.example.Service"),
                 calls("com.example.Controller", "com.example.Service", "com.example.Repo"));
         assertEquals(List.of("com.example.Controller", "com.example.Service", "com.example.Repo"),
-                names(PaintPlan.of(payload, NOTHING_EXCLUDED, 0)),
+                names(PaintPlan.of(payload, NOTHING_EXCLUDED, NO_CAP)),
                 "the traced method's own file comes first, whatever order the payload listed files in");
     }
 
@@ -39,7 +42,7 @@ class PaintPlanTest {
                 calls("com.example.Controller", "com.example.Service", "com.example.Repo",
                         "com.example.Service", "com.example.Repo"));
         assertEquals(List.of("com.example.Controller", "com.example.Service", "com.example.Repo"),
-                names(PaintPlan.of(payload, NOTHING_EXCLUDED, 0)));
+                names(PaintPlan.of(payload, NOTHING_EXCLUDED, NO_CAP)));
     }
 
     @Test
@@ -69,11 +72,13 @@ class PaintPlanTest {
     }
 
     @Test
-    void zeroMeansNoLimit() {
+    void zeroOpensNoneButPaintsEverything() {
         DejuPayload payload = payload(files("a.A", "b.B", "c.C"), calls("a.A", "b.B", "c.C"));
         PaintPlan plan = PaintPlan.of(payload, NOTHING_EXCLUDED, 0);
-        assertEquals(3, plan.open.size());
-        assertFalse(plan.isTrimmed(), "nothing was left out, so nothing should be reported");
+        assertTrue(plan.open.isEmpty(), "zero opens no tabs at all — paint only");
+        assertEquals(List.of("a.A", "b.B", "c.C"), plan.overLimit);
+        assertEquals(3, plan.recorded(), "every file is still painted; only the tabs are withheld");
+        assertTrue(plan.isTrimmed());
     }
 
     @Test
@@ -90,14 +95,14 @@ class PaintPlanTest {
         DejuPayload payload = payload(
                 files("a.Unvisited", "a.Controller"),
                 calls("a.Controller"));
-        assertEquals(List.of("a.Controller", "a.Unvisited"), names(PaintPlan.of(payload, NOTHING_EXCLUDED, 0)));
+        assertEquals(List.of("a.Controller", "a.Unvisited"), names(PaintPlan.of(payload, NOTHING_EXCLUDED, NO_CAP)));
     }
 
     @Test
     void aPayloadWithNoCallTreeFallsBackToPayloadOrder() {
         // Recorded by an agent older than the call tree; the files are all we have.
         DejuPayload payload = payload(files("a.A", "b.B"), null);
-        assertEquals(List.of("a.A", "b.B"), names(PaintPlan.of(payload, NOTHING_EXCLUDED, 0)));
+        assertEquals(List.of("a.A", "b.B"), names(PaintPlan.of(payload, NOTHING_EXCLUDED, NO_CAP)));
     }
 
     @Test
@@ -105,13 +110,13 @@ class PaintPlanTest {
         // SQL nodes carry no class name; they must not upset the ordering.
         DejuPayload payload = payload(files("a.Controller", "a.Repo"),
                 calls("a.Controller", null, "a.Repo"));
-        assertEquals(List.of("a.Controller", "a.Repo"), names(PaintPlan.of(payload, NOTHING_EXCLUDED, 0)));
+        assertEquals(List.of("a.Controller", "a.Repo"), names(PaintPlan.of(payload, NOTHING_EXCLUDED, NO_CAP)));
     }
 
     @Test
     void aCalledClassWithNoRecordedFileIsSkipped() {
         DejuPayload payload = payload(files("a.Controller"), calls("a.Controller", "a.NoSourceHere"));
-        assertEquals(List.of("a.Controller"), names(PaintPlan.of(payload, NOTHING_EXCLUDED, 0)));
+        assertEquals(List.of("a.Controller"), names(PaintPlan.of(payload, NOTHING_EXCLUDED, NO_CAP)));
     }
 
     @Test
@@ -154,7 +159,7 @@ class PaintPlanTest {
                 files("com.example.Repo", "com.example.Controller", "com.example.Service"),
                 calls("com.example.Controller", "com.example.Service", "com.example.Repo"));
 
-        assertEquals(names(PaintPlan.of(payload, NOTHING_EXCLUDED, 0)),
+        assertEquals(names(PaintPlan.of(payload, NOTHING_EXCLUDED, NO_CAP)),
                 PaintPlan.classNamesInExecutionOrder(payload),
                 "the numbered order and the tab order are the same order");
     }

@@ -70,7 +70,9 @@ public final class PaintPlan {
      * Builds the plan for one payload.
      *
      * @param isExcluded the project's exclusion rule, applied to fully-qualified class names
-     * @param maxFiles   how many files may be opened; zero or less means no limit
+     * @param maxFiles   how many files may be opened; zero opens none — coverage is still
+     *                   painted into every file's document either way, so zero is "just
+     *                   colour, no tabs" rather than "nothing happens"
      */
     public static PaintPlan of(DejuPayload payload, Predicate<String> isExcluded, int maxFiles) {
         List<FileCoverage> ordered = inExecutionOrder(payload);
@@ -91,8 +93,13 @@ public final class PaintPlan {
             excluded.clear();
         }
 
+        // maxFiles is never negative (the settings page rejects that), so this also covers
+        // zero correctly: keep.subList(0, 0) is the empty list, every survivor lands in
+        // overLimit, and nothing opens — exactly "paint, don't open" rather than the old
+        // "zero means unlimited" reading, which made the one deliberately low-friction
+        // setting silently open everything instead.
         List<String> overLimit = new ArrayList<>();
-        if (maxFiles > 0 && keep.size() > maxFiles) {
+        if (keep.size() > maxFiles) {
             for (FileCoverage fc : keep.subList(maxFiles, keep.size())) {
                 overLimit.add(fc.getFqClassName());
             }

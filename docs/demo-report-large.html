@@ -179,7 +179,7 @@ h1{font-size:1.05rem;margin:0;}
 table{border-collapse:collapse;width:100%;
   font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:.8rem;}
 td{padding:.08rem .5rem;white-space:pre;vertical-align:top;}
-td.time{text-align:right;color:var(--muted);white-space:nowrap;width:5rem;border-right:1px solid var(--border);font-variant-numeric:tabular-nums;}
+td.time{text-align:right;color:var(--muted);white-space:nowrap;width:6.6rem;font-size:.72rem;border-right:1px solid var(--border);font-variant-numeric:tabular-nums;}
 td.ln{text-align:right;color:var(--ln);user-select:none;width:3.2rem;border-right:1px solid var(--border);}
 td.ln a{color:inherit;text-decoration:none;}
 td.ln a:hover{color:var(--accent);text-decoration:underline;}
@@ -250,8 +250,12 @@ tr.frame.hot td{background:var(--heat);}
 .fhead .fsite{color:var(--muted);font-size:.72rem;}
 .fhead .fsite a{color:inherit;text-decoration:none;}
 .fhead .fsite a:hover{color:var(--accent);text-decoration:underline;}
-.fhead .ftime{margin-left:auto;color:var(--muted);font-size:.74rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
-tr.frame.hot .ftime{color:var(--fg);font-weight:600;}
+/* Bold and full-strength ink, unlike the small muted number beside every source line: that
+   one is a line's own time; this is the call's total including everything it went on to do,
+   and the two look confusable side by side unless the total reads as the bigger number it
+   conceptually is. */
+.fhead .ftime{margin-left:auto;color:var(--fg);font-weight:600;font-size:.82rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+tr.frame.hot .ftime{color:var(--accent);}
 
 /* A run of identical sibling calls, folded so an N+1 loop cannot flood the page. */
 tr.fold td{padding:.22rem .5rem;background:var(--bg);border-bottom:1px solid var(--border);white-space:normal;cursor:pointer;}
@@ -293,7 +297,20 @@ tr.rollup:hover td{opacity:1;}
 tr td.tcode,
 tr.frame td.tframe,
 tr.sqlrow td.tframe,
-tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
+tr.fold td.tframe{
+  padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);
+  /* One faint vertical tick per ancestor level, the way a file tree or an IDE's structure
+     view marks indent depth, so a line ten levels deep can be traced back to which call it
+     belongs to without counting indent widths by eye. Drawn as a single repeating pattern
+     clipped to exactly `depth` widths — depth 0 gets none — rather than a real border per
+     level, since nothing here nests actual elements inside one another (see the note above
+     on why depth is a padding, not a DOM structure). */
+  background-image:repeating-linear-gradient(to right,
+    var(--border) 0, var(--border) 1px, transparent 1px, transparent 1.15rem);
+  background-position:.5rem 0;
+  background-size:calc(var(--depth, 0) * 1.15rem) 100%;
+  background-repeat:no-repeat;
+}
 
 .seg{display:inline-flex;border:1px solid var(--hairline);border-radius:var(--radius-sm);
   background:var(--panel);padding:2px;gap:2px;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);}
@@ -495,6 +512,11 @@ tr.fold td.tframe{padding-left:calc(.5rem + var(--depth, 0) * 1.15rem);}
    A canvas the height of the whole trace stops being drawable past 65535px. */
 #flowSpacer{position:relative;}
 #flowCanvas{display:block;position:absolute;top:0;left:0;}
+/* Re-pinned to a corner of the viewport on every scroll, same trick as #flowCanvas above;
+   hidden by default so a fresh report shows nothing here until paintMinimap() has sized
+   and positioned it at least once. */
+#flowMinimap{display:none;position:absolute;top:0;left:0;border-radius:6px;
+  box-shadow:var(--elev);cursor:crosshair;}
 .flowtip{position:fixed;z-index:20;pointer-events:none;max-width:32rem;
   background:var(--control);color:var(--fg);border:1px solid var(--border);
   border-radius:var(--radius-sm);box-shadow:var(--elev);padding:.45rem .6rem;
@@ -884,8 +906,14 @@ Press Enter to apply, Esc to cancel.">
             title="Outline the slowest chain of calls from the trace point">Hot path</button>
     <button class="toggle on" id="flameMergeBtn" type="button" hidden
             title="Merge every call that arrived by the same route into one frame, as wide as the time all of them took. Off, each call gets its own box in the order it ran, which on a loop is thousands of them.">Merge repeats</button>
+    <button class="toggle" id="flameCallersBtn" type="button" hidden
+            title="Click a frame to see everything that calls it, merged by caller and stacked upward from it — a sandwich view, for &quot;what's calling this expensive thing everywhere&quot;.">Callers of&hellip;</button>
     <button class="toggle on" id="chartOrientBtn" type="button"
             title="Switch back to the left-to-right layout">Left &rarr; right</button>
+    <button class="toggle" id="chartLayerBtn" type="button"
+            title="Order each row by architectural layer — controller, service, repository/DAO, then SQL — guessed from the class name, instead of by call order">Sort: call order</button>
+    <button class="toggle" id="chartMinimapBtn" type="button"
+            title="Show a small overview of the whole diagram in the corner, with a box marking what's on screen; drag it to jump around a large diagram">Minimap</button>
     <span class="zoomseg" id="chartPlaySeg">
       <button class="toggle zoombtn" id="chartPlayBtn" type="button" title="Play the run through the flowchart">&#9654;</button>
       <button class="toggle zoombtn" id="chartResetBtn" type="button" title="Back to the start">&#8634;</button>
@@ -1468,6 +1496,18 @@ Press Enter to apply, Esc to cancel.">
   function fmtPct(micros) {
     var p = pct(micros);
     return p ? fmt(micros) + '  ' + p : fmt(micros);
+  }
+
+  /**
+   * The Tree and Files per-line time cell: percent leads, since it is the figure that is
+   * comparable line to line, with the duration bracketed alongside it — "12% [8.4ms]".
+   * Square brackets rather than round: parentheses already carry a softer "aside" meaning
+   * elsewhere in this UI (the branch-coverage count beside a line), and this is not an
+   * aside. Falls back to the bare duration when there is no run length to divide by.
+   */
+  function fmtLineTime(micros) {
+    var p = pct(micros);
+    return p ? p + ' [' + fmt(micros) + ']' : fmt(micros);
   }
 
   /**
@@ -2116,12 +2156,13 @@ Press Enter to apply, Esc to cancel.">
     var tm = el('td', 'time');
     var micros = (l.methodTotalMicros != null) ? l.methodTotalMicros : l.timeMicros;
     if (micros != null) {
-      tm.textContent = (l.methodTotalMicros != null ? '▸ ' : '') + fmt(micros);
+      tm.textContent = (l.methodTotalMicros != null ? '▸ ' : '') + fmtLineTime(micros);
       // The share goes on the title rather than into the cell: this column is one narrow
       // gutter beside every line of source, and doubling its width to carry a second
       // number would take the width off the code it exists to annotate.
       var lp = pct(micros);
-      tm.title = (l.methodTotalMicros != null ? 'method total' : 'line self time')
+      tm.title = (l.methodTotalMicros != null ? 'method total, summed across every call in the run'
+          : 'line self time, summed across every call to this method in the run')
         + (lp ? ' · ' + lp + ' of the run' : '');
     }
     var code = el('td', 'code');
@@ -2396,6 +2437,26 @@ Press Enter to apply, Esc to cancel.">
     more.addEventListener('click', function () {
       var clamped = code.classList.toggle('clamped');
       more.textContent = clamped ? 'Show full query' : 'Show less';
+      // The window scrolling next is what moves this row: paintTreeWindow() clears and
+      // rebuilds the table to shift which rows are mounted, and doing that while this
+      // button still has focus is what threw the page to wherever the row ended up —
+      // the browser's own focus handling, not anything this script asked for. Nothing
+      // about the click needs focus to stay here once it has been handled.
+      more.blur();
+      // This row's height just changed outside the virtual scroller's own measurement
+      // pass, which only runs on a scroll or resize. Left stale, the cached offset below
+      // this row is wrong until the next scroll event corrects it mid-scroll, which on
+      // its own was a second way for the page to jump under a reader's feet.
+      var hh = tr.offsetHeight;
+      if (hh && r.vi != null && rowHeights[r.vi] !== hh) {
+        rowHeights[r.vi] = hh;
+        rebuildOffsets();
+        if (padTop && renderedFrom >= 0) {
+          padTop.firstChild.style.height = rowOffsets[renderedFrom] + 'px';
+          padBot.firstChild.style.height =
+            Math.max(0, rowOffsets[visRows.length] - rowOffsets[renderedTo]) + 'px';
+        }
+      }
     });
     td.appendChild(more);
     tr.appendChild(td);
@@ -2449,7 +2510,12 @@ Press Enter to apply, Esc to cancel.">
     }
 
     var time = el('span', 'ftime', node.totalMicros != null ? fmt(node.totalMicros) : '');
-    time.title = 'total (inclusive) time of this call';
+    // The source lines shown under this frame are not scoped to this one call — see the
+    // note on their own timing cell — so this total needs to say the same thing about
+    // itself: it is only this call's own inclusive time, and the lines below may add up to
+    // a bigger number if this method was called more than once elsewhere in the run.
+    time.title = "total (inclusive) time of this one call. The lines below total every call "
+      + 'to this method in the run, which can be larger.';
     // The share rides inside the time element rather than beside it, so the two never wrap
     // apart and the number keeps its own meaning: "48 ms, which is a third of the request".
     var fp = pctBadge(node.totalMicros);
@@ -2485,14 +2551,20 @@ Press Enter to apply, Esc to cancel.">
     var tr = el('tr', st);
     var tm = el('td', 'time');
     if (lineModel.timeMicros != null) {
-      tm.textContent = fmt(lineModel.timeMicros);
+      tm.textContent = fmtLineTime(lineModel.timeMicros);
       // The share on the title, the way the Files view already does it: the column is one
       // narrow gutter beside every line of source, and a second number in it would take
       // the width off the code it exists to annotate. The Tree used to say nothing at all
       // here, so the same line answered "what share of the run is this?" in one view and
       // not the other.
       var lp = pct(lineModel.timeMicros);
-      tm.title = 'line self time' + (lp ? ' · ' + lp + ' of the run' : '');
+      // Summed across every call to this method anywhere in the run, not just the one
+      // step this row happens to be nested under — the source model has no per-invocation
+      // breakdown to draw on, only one running total per line. Left unsaid, a line under a
+      // frame that reads "3.6 ms" but shows "442 ms" of its own looks like a bug rather
+      // than what it is: 400 calls' worth of time landing on the one line all of them share.
+      tm.title = 'line self time, summed across every call to this method in the run'
+        + (lp ? ' · ' + lp + ' of the run' : '');
     }
     var code = el('td', 'code tcode');
     code.style.setProperty('--depth', depth);
@@ -4332,7 +4404,10 @@ Press Enter to apply, Esc to cancel.">
 
   byId('fidelity').textContent = treeAvailable
     ? 'Steps are in exact execution order. Lines within a method are in source order and '
-      + 'merged across invocations, so a loop body appears once rather than once per iteration.'
+      + 'merged across invocations, so a loop body appears once rather than once per iteration '
+      + '— which also means a line\'s own time total is summed across every call to that '
+      + 'method, not just the one step it happens to be shown under, and can run higher than '
+      + "that step's own total if the method was called more than once."
     : '';
 
   // Files view starts collapsed when long, with the slowest few open, so it opens as an
@@ -5507,6 +5582,11 @@ Press Enter to apply, Esc to cancel.">
   var FLOW_ROW = 26;           // vertical pitch of one call
   var FLOW_BOX = 20;           // box height inside that pitch, in the Tree layout
   var FLAME_BOX = 25;          // row height in the Flame layout
+  // Narrowest a flame frame may be before it also carries time + share text, on top of its
+  // name. Below this, width already says how long the call took the way a classic flame
+  // graph reads; above it, there is room enough that leaving the numbers to the tooltip
+  // only would make a reader hover every box just to compare two of them.
+  var FLAME_METRICS_MIN_W = 90;
   var FLOW_INDENT = 22;        // horizontal step per depth level
   var FLOW_PAD = 14;
   var FLOW_MINW = 150;
@@ -5539,10 +5619,13 @@ Press Enter to apply, Esc to cancel.">
   var flowGroupBtn = byId('flowGroupBtn');
   var flowHotBtn = byId('flowHotBtn');
   var flameMergeBtn = byId('flameMergeBtn');
+  var flameCallersBtn = byId('flameCallersBtn');
   var flowStepsBtn = byId('flowStepsBtn');
   var flowFlameBtn = byId('flowFlameBtn');
   var flowChartBtn = byId('flowChartBtn');
   var chartOrientBtn = byId('chartOrientBtn');
+  var chartLayerBtn = byId('chartLayerBtn');
+  var chartMinimapBtn = byId('chartMinimapBtn');
   var chartLegend = byId('chartLegend');
   var chartPlaySeg = byId('chartPlaySeg');
   var chartPlayBtn = byId('chartPlayBtn');
@@ -5559,6 +5642,8 @@ Press Enter to apply, Esc to cancel.">
   var flowScopeSel = byId('flowScopeSel');
 
   var flowSpacer = null;       // sized to the whole diagram; the canvas is not
+  var flowMinimap = null;      // small overview inset, pinned over a corner of the viewport
+  var minimapDragging = false;
   var flowContentW = 0;        // diagram size in its own coordinates, pre-scale
   var flowContentH = 0;
   var drawnBySeq = {};         // seq -> drawn node, for connectors to reach an off-screen parent
@@ -5582,6 +5667,8 @@ Press Enter to apply, Esc to cancel.">
   var flameMerged = true;
   var flameRootPath = null;    // call path the merged flame is zoomed into
   var flameMergedTotal = 0;    // micros the widest row represents, for the tooltip's share
+  var flameCallersArm = false; // true between clicking "Callers of…" and picking a frame
+  var flameCallersTarget = null; // method/SQL key the flame is showing merged callers of, or null
   var collapsedFlow = {};      // seq -> true, subtree folded away by a click
   var flowSql = true;
   var flowGroup = true;
@@ -5634,6 +5721,7 @@ Press Enter to apply, Esc to cancel.">
   var chartByKey = {};
   var chartEdges = [];      // {from, to, x1,y1,x2,y2}
   var chartEdgeByKey = {};  // "fromKey>toKey" -> edge, so the marker can walk the same line it draws
+  var chartGroups = [];     // {label, hue, x0,y0,x1,y1, pill} — adjacent same-package siblings
   var chartPath = [];       // {node, reps} per distinct visit, in execution order (sampled if huge);
                              // a call site hit several times in a row (a tight loop) collapses into
                              // one entry so Play doesn't idle through every repeat
@@ -5652,7 +5740,10 @@ Press Enter to apply, Esc to cancel.">
   var CHART_MAX_PATH = 4000; // playback is sampled down past this so it finishes in a sane time
   var CHART_PAD = 24;
   var CHART_NODE_W = 200;
-  var CHART_NODE_H = 34;
+  // Tall enough for three stacked lines (class, method, time/share/count) instead of the one
+  // line the box used to hold — a call site's identity no longer has to fight its own metrics
+  // for the same 34px of width.
+  var CHART_NODE_H = 58;
   // Named for the two roles a gap plays, not for an axis, since the two orientations
   // swap which axis each one falls on. LEVEL_GAP separates one call depth from the next —
   // it carries the elbow an edge bends through, so it stays generous. SIB_GAP separates
@@ -5666,6 +5757,38 @@ Press Enter to apply, Esc to cancel.">
   // actual visible edge leaves a gap wherever the two don't line up.
   var CHART_TERM_W = 108;
   var chartVertical = true;  // false: depth -> columns (left to right). true: depth -> rows (top to bottom).
+  var chartSortByLayer = false;  // false: siblings in call order. true: grouped by guessed architectural layer.
+  var chartMinimapOn = false;  // an overview corner inset, for finding your place in a large chart
+
+  /**
+   * Which architectural layer a class name suggests, from its own name alone — the report
+   * has no build-time knowledge of a project's actual layering, so this is a guess from the
+   * naming convention most Java (and similar) codebases already follow, not a real
+   * classification. Ranked in the order a request typically flows through them, so sorting
+   * siblings by this number reads top-to-bottom (or left-to-right) the way an architecture
+   * diagram would group them, rather than the order the trace happened to call them in.
+   * Unrecognised names sit between service and repository — the middle of the pipeline is a
+   * safer default than either end for a class this guess has nothing to go on.
+   */
+  function chartLayerRank(n) {
+    if (n.isSql) return 2;
+    var cls = n.cls || '';
+    if (/(controller|resource|endpoint|handler)$/i.test(cls)) return 0;
+    if (/(service|manager|usecase|facade)$/i.test(cls)) return 1;
+    if (/(repository|dao|mapper|store)$/i.test(cls)) return 2;
+    if (/client$/i.test(cls)) return 3;
+    return 1.5;
+  }
+
+  /** Call order normally; grouped by {@link chartLayerRank} when that sort is switched on,
+   *  with call order still breaking ties within the same layer so the grouping is stable. */
+  function chartSiblingCompare(a, b) {
+    if (chartSortByLayer) {
+      var d = chartLayerRank(a) - chartLayerRank(b);
+      if (d) return d;
+    }
+    return a.order - b.order;
+  }
 
   /**
    * Narrowest a flame frame may be drawn, in pixels.
@@ -5794,6 +5917,12 @@ Press Enter to apply, Esc to cancel.">
     flowCanvas = document.createElement('canvas');
     flowCanvas.id = 'flowCanvas';
     flowSpacer.appendChild(flowCanvas);
+    // Also a child of the spacer, not the wrap, so it shares the canvas's own trick of
+    // being manually re-pinned over the scrolled viewport on every scroll event (see
+    // paintFlow) rather than actually scrolling away with the diagram underneath it.
+    flowMinimap = document.createElement('canvas');
+    flowMinimap.id = 'flowMinimap';
+    flowSpacer.appendChild(flowMinimap);
     flowWrap.appendChild(flowSpacer);
     flowWrap.addEventListener('scroll', paintFlow);
 
@@ -5801,6 +5930,16 @@ Press Enter to apply, Esc to cancel.">
     flowCanvas.addEventListener('mouseleave', hideFlowTip);
     flowCanvas.addEventListener('click', onFlowClick);
     flowWrap.addEventListener('scroll', hideFlowTip);
+
+    flowMinimap.addEventListener('mousedown', function (e) {
+      minimapDragging = true;
+      jumpToMinimapPoint(e);
+      e.preventDefault();   // otherwise a drag also selects the canvas as text
+    });
+    window.addEventListener('mousemove', function (e) {
+      if (minimapDragging) jumpToMinimapPoint(e);
+    });
+    window.addEventListener('mouseup', function () { minimapDragging = false; });
   }
 
   /**
@@ -5819,7 +5958,7 @@ Press Enter to apply, Esc to cancel.">
     // shown" would be the wrong shape of sentence. What it did is fold, and by how much is
     // the number worth printing.
     var bits = [];
-    if (flowFlame && flameMerged) {
+    if (flowFlame && (flameMerged || flameCallersTarget)) {
       var frames = flowDrawn.length;
       bits.push(flowNodes.length + ' calls merged into ' + frames
         + (frames === 1 ? ' frame' : ' frames'));
@@ -5859,7 +5998,10 @@ Press Enter to apply, Esc to cancel.">
         + ' time — read the percentages, not the boxes');
     }
     flowNote.textContent = bits.join(' · ') + '. '
-      + (flowFlame ? 'Click a step to zoom into it; callers are at the bottom.'
+      + (flowFlame && flameCallersTarget
+        ? 'Showing every caller of the frame at the bottom, merged by identity. Click a'
+          + ' caller to re-centre on it, or Callers of… in the toolbar to leave.'
+        : flowFlame ? 'Click a step to zoom into it; callers are at the bottom.'
         : 'Click a step to fold its calls away.');
   }
 
@@ -6286,6 +6428,74 @@ Press Enter to apply, Esc to cancel.">
     return null;
   }
 
+  /**
+   * The "callers of" sandwich view: every occurrence of one method or query anywhere in the
+   * run, merged into a single frame at the base, with its callers merged by identity and
+   * stacked above it one ring per step up the call stack &mdash; the mirror image of {@link
+   * buildFlameMerged}, walking each match's {@code parentSeq} chain outward instead of
+   * walking the whole run's children inward.
+   *
+   * <p>A frame built here duck-types the same shape {@link buildFlameMerged} produces
+   * ({@code kids}/{@code parent}/{@code path}/{@code shown}/{@code calls}), so {@link
+   * layoutFlameMerged} and {@code drawNode} need no changes to lay this out and paint it: as
+   * far as either is concerned this is just another merged flame with one root.
+   *
+   * @return {{roots: Array, total: number}}, {@code roots} empty once nothing in the run
+   *   still matches {@code targetKey} (a file or SQL filter can remove every instance).
+   */
+  function buildFlameCallers(targetKey) {
+    var searching = flowFilterText.trim() !== '' && flowMatchSelf;
+    var root = null;
+    var total = 0;
+
+    for (var i = 0; i < flowNodes.length; i++) {
+      var n = flowNodes[i];
+      if (n.key !== targetKey) continue;
+      if (n.cname && !classSelected(n.cname)) continue;
+      if (!showExcluded && foldableSeq[n.seq]) continue;
+      if (!flowSql && n.isSql) continue;
+
+      if (!root) {
+        root = flameCallersFrame(n, 0, null, n.key);
+      }
+      root.shown += n.total;
+      root.calls++;
+      if (searching && flowMatchSelf[flowIdxBySeq[n.seq]]) root.matched = true;
+      total += n.total;
+
+      // One ring per caller out from the target, merging whichever callers share an
+      // identity at that ring — same rule buildFlameMerged applies going the other way.
+      var frame = root;
+      var path = root.path;
+      for (var cur = flowBySeq[n.parentSeq]; cur; cur = flowBySeq[cur.parentSeq]) {
+        path += '' + cur.key;
+        var child = frame.kidByKey[cur.key];
+        if (!child) {
+          child = flameCallersFrame(cur, frame.depth + 1, frame, path);
+          frame.kids.push(child);
+          frame.kidByKey[cur.key] = child;
+        }
+        // Every ring out from the target carries that SAME occurrence's own time: this is
+        // "how much of the target's time arrived via this lineage of callers", not the
+        // caller's own total elsewhere in the run (which may include calls that never
+        // reach the target at all).
+        child.shown += n.total;
+        child.calls++;
+        frame = child;
+      }
+    }
+    return { roots: root ? [root] : [], total: total };
+  }
+
+  function flameCallersFrame(n, depth, parent, path) {
+    return {
+      seq: n.seq, cls: n.cls, mth: n.mth, sig: n.sig, isSql: n.isSql, sql: n.sql,
+      owner: n.owner, cname: n.cname, key: n.key, sqlLines: n.sqlLines,
+      depth: depth, shown: 0, calls: 0, matched: false,
+      kids: [], kidByKey: {}, parent: parent, path: path
+    };
+  }
+
   function flowColors() {
     // Read from the stylesheet rather than hardcoded, so one theme toggle repaints the
     // canvas in the new palette with no second source of truth for the colours.
@@ -6413,7 +6623,7 @@ Press Enter to apply, Esc to cancel.">
         var raw = nodeBySeq[n.seq] || {};
         cn = chartByKey[n.key] = {
           key: n.key, isSql: n.isSql, sql: n.sql, cls: n.cls, mth: n.mth,
-          className: n.cname, methodName: raw.methodName,
+          className: n.cname, methodName: raw.methodName, owner: n.owner,
           status: n.isSql ? null : rollupStatus(n.cname, raw.methodName),
           depth: n.depth, order: order, num: order + 1, firstSeq: n.seq,
           n: 0, total: 0, recursive: false
@@ -6492,6 +6702,123 @@ Press Enter to apply, Esc to cancel.">
   function layoutChart(avail) {
     if (chartVertical) layoutChartVertical(avail);
     else layoutChartHorizontal();
+    computeChartGroups();
+  }
+
+  /** The dot-separated portion of a fully qualified class name before its own, or null for
+   *  a class with no package (or no name at all — a SQL node with no identifiable owner). */
+  function chartPackageOf(full) {
+    if (!full) return null;
+    var i = full.lastIndexOf('.');
+    return i > 0 ? full.slice(0, i) : null;
+  }
+
+  /** The package a node belongs to, charged to the issuing class for a SQL node the same
+   *  way its colour already is — a query has no package of its own to group by. */
+  function chartGroupInfo(n) {
+    var pkg = chartPackageOf(n.isSql ? n.owner : n.className);
+    if (!pkg) return null;
+    return { key: pkg, label: pkg.slice(pkg.lastIndexOf('.') + 1) };
+  }
+
+  /** A stable hue from a string, so the same package lands on the same colour on every
+   *  repaint rather than reshuffling each time the groups are recomputed. */
+  function chartGroupHue(key) {
+    var h = 0;
+    for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+    return Math.abs(h) % 360;
+  }
+
+  /**
+   * Buckets sibling steps that share a package into one visually clustered group, the way
+   * the reference diagram bands its output heads by business area — a call flow has no
+   * business-area equivalent, so package is the nearest thing that is both meaningful (it
+   * usually tracks an architectural layer: repository, service, controller) and already on
+   * every node for free.
+   *
+   * <p>Bucketed by each node's own drawn coordinate rather than by depth: a wide band in
+   * vertical mode can wrap onto several visual rows, and two nodes at the same depth but a
+   * different wrapped row are not actually siblings on screen, whatever the call tree says.
+   * Grouping by depth there would silently merge two unrelated rows into one run.
+   *
+   * <p>Only a run of two or more gets a group — a lone box with nothing beside it to share
+   * the package would just repeat the name already printed inside it. And only a run sitting
+   * on the first visual row of its band gets the header pill above it: a wrapped later row,
+   * like every column in horizontal mode, has only the tight sibling gap above it, not the
+   * full gap between depths, and there is nowhere for the pill to go without overlapping the
+   * row it would sit on top of. Those runs still get the softer backdrop panel, just not the
+   * label.
+   */
+  function computeChartGroups() {
+    chartGroups = [];
+    var byBand = {};
+    chartNodes.forEach(function (n) {
+      if (n.term) return;
+      var k = chartVertical ? Math.round(n.y) : Math.round(n.x);
+      (byBand[k] || (byBand[k] = [])).push(n);
+    });
+    var bandMinY = {};
+    if (chartVertical) {
+      chartNodes.forEach(function (n) {
+        if (n.term) return;
+        if (bandMinY[n.depth] == null || n.y < bandMinY[n.depth]) bandMinY[n.depth] = n.y;
+      });
+    }
+    Object.keys(byBand).forEach(function (k) {
+      var list = byBand[k].slice().sort(function (a, b) {
+        return chartVertical ? a.x - b.x : a.y - b.y;
+      });
+      var i = 0;
+      while (i < list.length) {
+        var info = chartGroupInfo(list[i]);
+        var j = i + 1;
+        if (info) {
+          while (j < list.length) {
+            var infoJ = chartGroupInfo(list[j]);
+            if (!infoJ || infoJ.key !== info.key) break;
+            j++;
+          }
+        }
+        if (info && j - i >= 2) {
+          var run = list.slice(i, j);
+          var xs = run.map(function (n) { return n.x; });
+          var x2s = run.map(function (n) { return n.x + n.w; });
+          var ys = run.map(function (n) { return n.y; });
+          var y2s = run.map(function (n) { return n.y + n.h; });
+          var y0 = Math.min.apply(null, ys);
+          chartGroups.push({
+            label: info.label, hue: chartGroupHue(info.key),
+            x0: Math.min.apply(null, xs), x1: Math.max.apply(null, x2s),
+            y0: y0, y1: Math.max.apply(null, y2s),
+            pill: chartVertical && y0 === bandMinY[run[0].depth]
+          });
+        }
+        i = j;
+      }
+    });
+  }
+
+  /** A soft package-tinted panel behind a run of grouped boxes, with a small pill label
+   *  above it when there is room — see {@link computeChartGroups} for when there isn't. */
+  function drawChartGroup(ctx, c, g) {
+    var pad = 8;
+    var bx = g.x0 - pad, by = g.y0 - pad;
+    var bw = (g.x1 - g.x0) + pad * 2, bh = (g.y1 - g.y0) + pad * 2;
+    roundRect(ctx, bx, by, bw, bh, 14);
+    ctx.fillStyle = 'hsl(' + g.hue + ',50%,' + (c.dark ? '17%' : '95%') + ')';
+    ctx.fill();
+    if (!g.pill) return;
+    ctx.font = 'bold 9px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    var label = g.label.toUpperCase();
+    var lw = ctx.measureText(label).width;
+    var pillW = lw + 18, pillH = 17;
+    var pillX = bx + bw / 2 - pillW / 2, pillY = by - pillH - 7;
+    roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+    ctx.fillStyle = 'hsl(' + g.hue + ',55%,' + (c.dark ? '25%' : '89%') + ')';
+    ctx.fill();
+    ctx.fillStyle = 'hsl(' + g.hue + ',60%,' + (c.dark ? '74%' : '36%') + ')';
+    ctx.fillText(label, pillX + 9, pillY + pillH / 2 + 1);
+    ctx.font = FLOW_FONT;
   }
 
   /**
@@ -6515,7 +6842,7 @@ Press Enter to apply, Esc to cancel.">
     var maxBottom = 0;
     var x = CHART_PAD;
     colDepths.forEach(function (depth) {
-      var list = cols[depth].sort(function (a, b) { return a.order - b.order; });
+      var list = cols[depth].sort(chartSiblingCompare);
       var y = CHART_PAD;
       list.forEach(function (n) {
         n.x = x; n.y = y; n.w = CHART_NODE_W; n.h = CHART_NODE_H;
@@ -6547,6 +6874,7 @@ Press Enter to apply, Esc to cancel.">
         e.x2 = b.x; e.y2 = b.y + b.h / 2;
       }
     });
+    spreadChartEdgeAnchors();
     layoutChartEdgeBends(true);
   }
 
@@ -6575,7 +6903,7 @@ Press Enter to apply, Esc to cancel.">
     var plan = [];
     var maxRowW = CHART_NODE_W;
     depths.forEach(function (depth) {
-      var list = bands[depth].sort(function (a, b) { return a.order - b.order; });
+      var list = bands[depth].sort(chartSiblingCompare);
       var rowCount = Math.ceil(list.length / perRow);
       for (var r = 0; r < rowCount; r++) {
         var count = Math.min(perRow, list.length - r * perRow);
@@ -6623,7 +6951,57 @@ Press Enter to apply, Esc to cancel.">
         e.x2 = b.x + b.w / 2; e.y2 = b.y;
       }
     });
+    spreadChartEdgeAnchors();
     layoutChartEdgeBends(false);
+  }
+
+  /**
+   * Ports along a box's own edge, one per outgoing (or incoming) connector, instead of
+   * every edge from — or to — the same box leaving from its exact centre. A fan-out of five
+   * curves that all start at one point bunches into an unreadable knot right at the box
+   * before it has any room to spread; starting them already spread, in the same order
+   * they'll arrive in, means no two of them have to cross just to get clear of the box they
+   * share.
+   *
+   * <p>Runs after every edge's endpoints are set but before {@link layoutChartEdgeBends},
+   * which fans the *middle* of edges crossing the same gap — a separate, complementary pass
+   * that still matters once endpoints are spread, since two edges can still meet mid-span
+   * on their way between two different pairs of ports.
+   */
+  function spreadChartEdgeAnchors() {
+    // A terminator's drawn pill is narrower than the grid cell it's centred in (see
+    // drawChartTerminator); ports have to sit on the pill's own visible edge; the cell's
+    // edge would start every line in mid-air beside it.
+    function box(n) {
+      if (!n.term) return { x: n.x, y: n.y, w: n.w, h: n.h };
+      var w = CHART_TERM_W, h = 34;
+      return { x: n.x + n.w / 2 - w / 2, y: n.y + n.h / 2 - h / 2, w: w, h: h };
+    }
+    function spread(list, key, sortKey) {
+      if (list.length < 2) return;
+      // Ordered by where each edge's other end sits, on the cross axis, so the ports come
+      // out in the same top-to-bottom (or left-to-right) order the lines will end up in —
+      // otherwise spreading them out could just as easily add crossings as remove them.
+      list.sort(function (p, q) { return p[sortKey] - q[sortKey]; });
+      var b = box(chartByKey[list[0][key === 'x1' || key === 'y1' ? 'from' : 'to']]);
+      if (!b) return;
+      var size = chartVertical ? b.w : b.h;
+      var span = Math.max(0, size - 10);
+      var start = (chartVertical ? b.x : b.y) + (size - span) / 2;
+      list.forEach(function (e, i) {
+        e[key] = start + span * (i + 0.5) / list.length;
+      });
+    }
+    var axis1 = chartVertical ? 'x1' : 'y1';
+    var axis2 = chartVertical ? 'x2' : 'y2';
+    var byFrom = {}, byTo = {};
+    chartEdges.forEach(function (e) {
+      if (e.x1 == null || e.rail) return;
+      (byFrom[e.from] || (byFrom[e.from] = [])).push(e);
+      (byTo[e.to] || (byTo[e.to] = [])).push(e);
+    });
+    Object.keys(byFrom).forEach(function (k) { spread(byFrom[k], axis1, axis2); });
+    Object.keys(byTo).forEach(function (k) { spread(byTo[k], axis2, axis1); });
   }
 
   /**
@@ -6794,6 +7172,32 @@ Press Enter to apply, Esc to cancel.">
       flowDrawn = chartNodes;
       contentW = chartContentW;
       contentH = chartContentH;
+    } else if (flowFlame && flameCallersTarget) {
+      var builtC = buildFlameCallers(flameCallersTarget);
+      if (builtC.roots.length === 0) {
+        // The targeted method or query was filtered out from under us (the file picker, the
+        // SQL toggle) and no longer matches anything; there is nothing left to show callers
+        // of, so fall back the same way a zoom does when its own frame disappears.
+        flameCallersTarget = null;
+        flameCallersArm = false;
+        syncFlowSubViewControls();
+        drawFlow();
+        return;
+      }
+      var cSpan = flowFit ? (avail - FLOW_PAD * 2)
+        : Math.max(FLOW_FLAME_W, avail - FLOW_PAD * 2) * flowZoom;
+      var laidC = layoutFlameMerged(builtC.roots, builtC.total || 1, cSpan);
+      flameWidened = false;
+      laidC.drawn.forEach(function (n) {
+        var row = laidC.maxDepth - n.depth;
+        n.y = FLOW_PAD + FLOW_RULER + row * FLAME_BOX;
+        n.h = FLAME_BOX;
+        (flowByDepth[row] || (flowByDepth[row] = [])).push(n);
+      });
+      flowDrawn = laidC.drawn;
+      flameMergedTotal = builtC.total;
+      contentW = FLOW_PAD * 2 + cSpan;
+      contentH = FLOW_PAD * 2 + FLOW_RULER + (laidC.maxDepth + 1) * FLAME_BOX;
     } else if (flowFlame && flameMerged) {
       var built = buildFlameMerged();
       var mRoots = built.roots;
@@ -7006,6 +7410,92 @@ Press Enter to apply, Esc to cancel.">
                      -sx * dpr, -sy * dpr);
     renderFlow(ctx, sx / flowScale, sy / flowScale,
                (sx + viewW) / flowScale, (sy + viewH) / flowScale);
+    paintMinimap(sx, sy, viewW, viewH);
+  }
+
+  var MINIMAP_W = 190, MINIMAP_H = 130, MINIMAP_PAD = 10, MINIMAP_MARGIN = 3;
+
+  /**
+   * A small overview of the whole Flow Chart in the corner, with a rectangle marking what's
+   * currently on screen &mdash; orientation for a diagram too large to see all of at once,
+   * the way an image editor's navigator panel works.
+   *
+   * <p>Reads only what {@link paintFlow} and {@link drawFlow} already computed
+   * ({@link chartNodes}, {@link flowContentW}/{@link flowContentH}, {@link flowScale}) and
+   * draws to its own canvas; nothing about the chart's own layout, edges or paint path
+   * changes because this exists.
+   *
+   * <p>Pinned over a corner of the viewport the same way {@link flowCanvas} is: it is a
+   * child of the scrolling spacer, not the wrap, so its {@code left}/{@code top} are
+   * recomputed here on every scroll rather than left to CSS, which has no "stay in the
+   * corner of this scrolled box" position of its own.
+   */
+  function paintMinimap(sx, sy, viewW, viewH) {
+    if (!flowMinimap) return;
+    if (!chartMinimapOn || !flowChart || flowContentW === 0) {
+      flowMinimap.style.display = 'none';
+      return;
+    }
+    flowMinimap.style.display = 'block';
+    flowMinimap.style.left = (sx + viewW - MINIMAP_W - MINIMAP_PAD) + 'px';
+    flowMinimap.style.top = (sy + viewH - MINIMAP_H - MINIMAP_PAD) + 'px';
+
+    var dpr = flowDpr();
+    var needW = Math.ceil(MINIMAP_W * dpr);
+    var needH = Math.ceil(MINIMAP_H * dpr);
+    if (flowMinimap.width !== needW || flowMinimap.height !== needH) {
+      flowMinimap.width = needW;
+      flowMinimap.height = needH;
+      flowMinimap.style.width = MINIMAP_W + 'px';
+      flowMinimap.style.height = MINIMAP_H + 'px';
+    }
+    var ctx = flowMinimap.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, MINIMAP_W, MINIMAP_H);
+
+    var c = flowColors();
+    ctx.fillStyle = c.box;
+    ctx.fillRect(0, 0, MINIMAP_W, MINIMAP_H);
+
+    var scale = minimapScale();
+    var ox = MINIMAP_MARGIN, oy = MINIMAP_MARGIN;
+    chartNodes.forEach(function (n) {
+      if (n.w == null) return;
+      ctx.globalAlpha = n.term ? 0.55 : 0.8;
+      ctx.fillStyle = n.term ? c.muted : (n.isSql ? c.sql : c.accent);
+      ctx.fillRect(ox + n.x * scale, oy + n.y * scale,
+        Math.max(1, n.w * scale), Math.max(1, n.h * scale));
+    });
+    ctx.globalAlpha = 1;
+
+    // The part of the diagram actually on screen right now, in the same content-space
+    // rectangle paintFlow just handed renderFlow.
+    ctx.strokeStyle = c.fg;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(
+      ox + (sx / flowScale) * scale, oy + (sy / flowScale) * scale,
+      (viewW / flowScale) * scale, (viewH / flowScale) * scale);
+
+    ctx.strokeStyle = c.line;
+    ctx.strokeRect(0.5, 0.5, MINIMAP_W - 1, MINIMAP_H - 1);
+  }
+
+  function minimapScale() {
+    return Math.min((MINIMAP_W - MINIMAP_MARGIN * 2) / flowContentW,
+                     (MINIMAP_H - MINIMAP_MARGIN * 2) / flowContentH);
+  }
+
+  /** Scrolls the main diagram to center on wherever the minimap was clicked or dragged. */
+  function jumpToMinimapPoint(e) {
+    if (!flowMinimap || flowContentW === 0) return;
+    var r = flowMinimap.getBoundingClientRect();
+    var scale = minimapScale();
+    var cx = (e.clientX - r.left - MINIMAP_MARGIN) / scale;
+    var cy = (e.clientY - r.top - MINIMAP_MARGIN) / scale;
+    var viewW = flowWrap.clientWidth || 1;
+    var viewH = flowWrap.clientHeight || 1;
+    flowWrap.scrollLeft = Math.max(0, cx * flowScale - viewW / 2);
+    flowWrap.scrollTop = Math.max(0, cy * flowScale - viewH / 2);
   }
 
   /**
@@ -7226,16 +7716,27 @@ Press Enter to apply, Esc to cancel.">
     var mid = n.y + h / 2;
     var right = n.x + n.w - 7;
 
-    // Flame frames carry only a name, the way a classic flame graph reads: width already
-    // says how long the call took, and the exact number, the share, the repeat count are
-    // all one hover away in the tooltip. Printing them on every box too is the clutter the
-    // reference deliberately leaves out.
-    if (!flowFlame) {
+    // A narrow flame frame carries only a name, the way a classic flame graph reads: width
+    // already says how long the call took, and there isn't room for numbers besides. Once a
+    // frame is wide enough to spare it, it gets its time and share too — otherwise that pair
+    // is one hover away in the tooltip and nowhere else, which meant comparing two boxes
+    // without a mouse was never possible.
+    if (!flowFlame || n.w >= FLAME_METRICS_MIN_W) {
       var time = fmt(n.shown);
       var timeW = ctx.measureText(time).width;
       ctx.fillStyle = ink || c.muted;
       ctx.fillText(time, right - timeW, mid);
       right -= timeW + 6;
+
+      if (flowFlame) {
+        var pctTxt = pct(n.shown);
+        if (pctTxt) {
+          var pctW = ctx.measureText(pctTxt).width;
+          ctx.fillStyle = ink || c.muted;
+          ctx.fillText(pctTxt, right - pctW, mid);
+          right -= pctW + 6;
+        }
+      }
 
       if (n.reps > 1) {
         var rep = '×' + n.reps;
@@ -7342,6 +7843,15 @@ Press Enter to apply, Esc to cancel.">
   }
 
   function renderChartFrame(ctx, c, x0, y0, x1, y1) {
+    // Group backdrops sit behind everything else — connectors, boxes, marker — so they
+    // read as a panel the steps are clustered on top of rather than a layer painted over
+    // them.
+    for (var g = 0; g < chartGroups.length; g++) {
+      var grp = chartGroups[g];
+      if (grp.x1 < x0 || grp.x0 > x1 || grp.y1 < y0 || grp.y0 > y1) continue;
+      drawChartGroup(ctx, c, grp);
+    }
+    ctx.font = FLOW_FONT;
     // Connectors get the stronger --muted grey rather than the very pale --border one
     // everything else uses for hairlines: a directional path someone has to trace by eye
     // needs more contrast than a table rule does.
@@ -7367,27 +7877,74 @@ Press Enter to apply, Esc to cancel.">
   }
 
   /**
-   * A caller-to-callee connector, elbowed through the gap between one depth and the next.
-   * Horizontal mode bends the elbow vertically (right, down-or-up, right) since depth runs
-   * left to right there; vertical mode bends it horizontally (down, across, down) since
-   * depth runs top to bottom instead — the arrowhead always ends up pointing into whichever
-   * side of the callee's box actually faces its caller.
+   * A caller-to-callee connector, curved smoothly through the gap between one depth and the
+   * next rather than elbowed at a sharp right angle — the flowing S-curve a real diagramming
+   * tool draws between two boxes, not a circuit-board trace. Horizontal mode bows the curve
+   * vertically (bulging up or down) since depth runs left to right there; vertical mode bows
+   * it horizontally instead, since depth runs top to bottom. Either way the curve leaves and
+   * arrives perpendicular to the box faces it connects, so the arrowhead always ends up
+   * pointing straight into whichever side of the callee's box actually faces its caller.
    */
-  var CHART_ELBOW_R = 7;
+  var CHART_CURVE_SAMPLES = 16;
 
   /**
-   * A multi-point path with each interior corner rounded via arcTo, instead of the sharp
-   * right angles a series of lineTo calls would give — square corners on several closely
-   * stacked connectors read as a jumble of jagged segments; rounded ones read as one
-   * deliberate path, the way a drawn flowchart or a real diagramming tool would render it.
+   * How far each control point leans toward the *other* endpoint's position on the free
+   * axis, instead of sitting exactly on its own endpoint's. At 0 every edge leaving the same
+   * box starts out moving in exactly the same direction — flat along the bend axis — no
+   * matter how far apart the ports it left from are, so a fan-out reads as one bundle of
+   * lines that only pulls apart once it's most of the way across the gap. Leaning the control
+   * points toward each other's endpoint instead means the curve is already peeling off toward
+   * its own target from the moment it leaves the box, which is what actually keeps a bundle
+   * of five readable as five lines rather than one for most of their length.
    */
-  function elbowPath(ctx, pts) {
+  var CHART_CURVE_LEAN = 0.4;
+
+  /**
+   * Points along a cubic Bezier from {@code e}'s start to its end, control points pulled out
+   * to the edge's bend axis so the curve reads as one flowing line rather than a straight
+   * shortcut through whatever sits between the two boxes. Sampled into a fine polyline —
+   * not drawn with a real bezierCurveTo — because the SVG export runs every draw call
+   * through a context shim (see {@link svgContext}) that implements straight and arc
+   * segments and nothing else; a sampled curve degrades to an very-close polyline there
+   * instead of throwing away the export entirely.
+   *
+   * <p>Which axis the control points sit on flips for a rail edge (the detour a leaf branch
+   * takes around a busy row to reach the synthetic End node): an ordinary edge in vertical
+   * mode bows sideways (fixed x, bend is a y), while a rail edge in that same mode bows
+   * up/down instead (fixed y, bend is an x) because it is routing around a row rather than
+   * through the normal gap between two depths. Horizontal mode is the mirror image of both.
+   */
+  function chartEdgePoints(e) {
+    var x1 = e.x1, y1 = e.y1, x2 = e.x2, y2 = e.y2;
+    var yBend = chartVertical !== !!e.rail;
+    var bend = e.rail ? (yBend ? e.railY : e.railX)
+      : (e.bend != null ? e.bend : (yBend ? (y1 + y2) / 2 : (x1 + x2) / 2));
+    var c1x, c1y, c2x, c2y;
+    if (yBend) {
+      c1x = x1 + (x2 - x1) * CHART_CURVE_LEAN; c1y = bend;
+      c2x = x2 - (x2 - x1) * CHART_CURVE_LEAN; c2y = bend;
+    } else {
+      c1x = bend; c1y = y1 + (y2 - y1) * CHART_CURVE_LEAN;
+      c2x = bend; c2y = y2 - (y2 - y1) * CHART_CURVE_LEAN;
+    }
+    var pts = [];
+    for (var i = 0; i <= CHART_CURVE_SAMPLES; i++) {
+      var t = i / CHART_CURVE_SAMPLES;
+      var mt = 1 - t;
+      var a = mt * mt * mt, b = 3 * mt * mt * t, cc = 3 * mt * t * t, d = t * t * t;
+      pts.push({
+        x: a * x1 + b * c1x + cc * c2x + d * x2,
+        y: a * y1 + b * c1y + cc * c2y + d * y2
+      });
+    }
+    return pts;
+  }
+
+  /** A fine polyline stroked as one continuous line, standing in for the curve it samples. */
+  function curvedEdgePath(ctx, pts) {
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
-    for (var i = 1; i < pts.length - 1; i++) {
-      ctx.arcTo(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, CHART_ELBOW_R);
-    }
-    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.stroke();
   }
 
@@ -7403,49 +7960,24 @@ Press Enter to apply, Esc to cancel.">
   }
 
   /**
-   * The elbow's corner points, shared by drawChartEdge and the Play marker so the dot
-   * rides the exact line drawn on screen instead of cutting a straight shortcut through
-   * whatever boxes happen to sit between two steps.
+   * The direction the curve is actually travelling as it reaches its last point, from the
+   * sampled polyline's own final segment rather than a fixed per-orientation guess. Leaning
+   * the control points toward each other (see {@link CHART_CURVE_LEAN}) means the curve no
+   * longer arrives perfectly square to the box face the way the old pure elbow-style one
+   * did, so the arrowhead has to read the real approach angle or it ends up twisted against
+   * the line it caps.
    */
-  function chartEdgePoints(e) {
-    if (e.rail && chartVertical) {
-      // Out to a rail past the widest row, down to End's band, then left into End's side.
-      return [
-        { x: e.x1, y: e.y1 }, { x: e.railX, y: e.y1 },
-        { x: e.railX, y: e.y2 }, { x: e.x2, y: e.y2 }
-      ];
-    }
-    if (e.rail) {
-      // Down past the last row to a rail, across, then up into End's underside.
-      return [
-        { x: e.x1, y: e.y1 }, { x: e.x1, y: e.railY },
-        { x: e.x2, y: e.railY }, { x: e.x2, y: e.y2 }
-      ];
-    }
-    if (chartVertical) {
-      var midY = e.bend != null ? e.bend : (e.y1 + e.y2) / 2;
-      return [
-        { x: e.x1, y: e.y1 }, { x: e.x1, y: midY },
-        { x: e.x2, y: midY }, { x: e.x2, y: e.y2 }
-      ];
-    }
-    var midX = e.bend != null ? e.bend : (e.x1 + e.x2) / 2;
-    return [
-      { x: e.x1, y: e.y1 }, { x: midX, y: e.y1 },
-      { x: midX, y: e.y2 }, { x: e.x2, y: e.y2 }
-    ];
-  }
-
-  function chartEdgeArrowDir(e) {
-    if (e.rail && chartVertical) return { dx: -1, dy: 0 };
-    if (e.rail) return { dx: 0, dy: -1 };
-    if (chartVertical) return { dx: 0, dy: 1 };
-    return { dx: 1, dy: 0 };
+  function chartEdgeArrowDir(pts) {
+    var b = pts[pts.length - 1], a = pts[pts.length - 2];
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var len = Math.hypot(dx, dy) || 1;
+    return { dx: dx / len, dy: dy / len };
   }
 
   function drawChartEdge(ctx, c, e) {
-    elbowPath(ctx, chartEdgePoints(e));
-    var dir = chartEdgeArrowDir(e);
+    var pts = chartEdgePoints(e);
+    curvedEdgePath(ctx, pts);
+    var dir = chartEdgeArrowDir(pts);
     arrowhead(ctx, c, e.x2, e.y2, dir.dx, dir.dy);
   }
 
@@ -7518,9 +8050,18 @@ Press Enter to apply, Esc to cancel.">
     var w = CHART_TERM_W, h = 34;
     var cx = n.x + n.w / 2, cy = n.y + n.h / 2;
     var x = cx - w / 2, y = cy - h / 2;
+    var canShade = !!ctx.createLinearGradient;
+    if (canShade) {
+      ctx.shadowColor = c.dark ? 'rgba(0,0,0,0.45)' : 'rgba(15,23,42,0.16)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
+    }
     roundRect(ctx, x, y, w, h, h / 2);
     ctx.fillStyle = c.heat;
     ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
     if (over) {
       roundRect(ctx, x, y, w, h, h / 2);
       ctx.fillStyle = c.hoverFill;
@@ -7539,28 +8080,60 @@ Press Enter to apply, Esc to cancel.">
     drawChartNumBadge(ctx, c, n, x, y);
   }
 
+  var CHART_NODE_R = 10;
+
   function drawChartNode(ctx, c, n) {
     if (n.term) { drawChartTerminator(ctx, c, n); return; }
     var over = chartHoverKey === n.key;
     var fill = chartNodeFill(c, n);
+    // The gradient and the shadow share one capability check: the SVG export runs every
+    // draw call through a context shim (see {@link svgContext}) built for paths, fills and
+    // text and nothing past that — no gradients, no shadow properties. Setting the shadow
+    // ones there is a harmless no-op (they land on a plain object nothing reads); asking it
+    // for a gradient is not, so that call is skipped there and the box falls back to a flat
+    // fill instead of taking the whole export down with it.
+    var canShade = !!ctx.createLinearGradient;
 
-    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
-    ctx.fillStyle = c.box;
+    // A soft drop shadow under the box, the way a card sits slightly off the page instead
+    // of flush with it. Set only for this one fill — the shape's opaque base — and cleared
+    // right after, since a canvas shadow follows every draw call while it is set and would
+    // otherwise smear under the wash, the border and the text drawn on top of it too.
+    if (canShade) {
+      ctx.shadowColor = c.dark ? 'rgba(0,0,0,0.45)' : 'rgba(15,23,42,0.16)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
+    }
+    roundRect(ctx, n.x, n.y, n.w, n.h, CHART_NODE_R);
+    if (canShade) {
+      var grad = ctx.createLinearGradient(n.x, n.y, n.x, n.y + n.h);
+      grad.addColorStop(0, c.dark ? '#2b3038' : '#ffffff');
+      grad.addColorStop(1, c.dark ? '#20242b' : '#f2f4f7');
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = c.box;
+    }
     ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
 
-    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
-    ctx.globalAlpha = 0.20;
+    // The step's status colour, washed over the raised base rather than replacing it, so
+    // the card keeps its lightly-lifted look and still reads green/amber/red/blue at a
+    // glance — a pastel tint of the status colour, the way the reference's coloured head
+    // cards sit on the same soft-card treatment as everything else on the diagram.
+    roundRect(ctx, n.x, n.y, n.w, n.h, CHART_NODE_R);
+    ctx.globalAlpha = 0.24;
     ctx.fillStyle = fill;
     ctx.fill();
     ctx.globalAlpha = 1;
 
     if (over) {
-      roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+      roundRect(ctx, n.x, n.y, n.w, n.h, CHART_NODE_R);
       ctx.fillStyle = c.hoverFill;
       ctx.fill();
     }
 
-    roundRect(ctx, n.x, n.y, n.w, n.h, 6);
+    roundRect(ctx, n.x, n.y, n.w, n.h, CHART_NODE_R);
     ctx.strokeStyle = over ? c.fg : fill;
     ctx.lineWidth = over ? 2 : 1.5;
     ctx.stroke();
@@ -7568,53 +8141,70 @@ Press Enter to apply, Esc to cancel.">
 
     drawChartNumBadge(ctx, c, n, n.x, n.y);
 
-    var mid = n.y + n.h / 2;
+    // Three stacked rows — class, method, metrics — instead of one crowded line: identity
+    // reads top to bottom the way a stack frame does, and the bottom row is where every
+    // number (time, share, repeats, recursion) lives so it can be scanned down a column of
+    // boxes without ever fighting the class/method text for space. Every row is centred on
+    // the box's own midline rather than pinned to either edge, so the block reads the same
+    // regardless of which line happens to be the widest. textAlign is not an option: the SVG
+    // export runs draw calls through a context shim that never implements it (see
+    // {@link drawChartNumBadge}), so centring is done by hand from each string's measured
+    // width instead of relying on the canvas to do it.
     var pad = 8;
-    var right = n.x + n.w - pad;
+    var cx = n.x + n.w / 2;
+    var maxW = n.w - pad * 2;
+    var yCls = n.y + 17;
+    var yMth = n.y + 33;
+    var yMeta = n.y + 49;
 
+    function centered(text, y) {
+      ctx.fillText(text, cx - ctx.measureText(text).width / 2, y);
+    }
+
+    if (n.isSql) {
+      ctx.font = 'bold 10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillStyle = c.sql;
+      centered('SQL', yCls);
+      ctx.font = FLOW_FONT;
+      ctx.fillStyle = c.mth;
+      centered(clip(ctx, n.mth, maxW), yMth);
+    } else {
+      ctx.font = 'bold 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillStyle = c.cls;
+      centered(clip(ctx, n.cls, maxW), yCls);
+      ctx.font = FLOW_FONT;
+      ctx.fillStyle = c.mth;
+      centered(clip(ctx, n.mth, maxW), yMth);
+    }
+
+    // Bottom row: time, then share of the run, then repeat count, then recursion — each
+    // only when it has something to say, laid out left to right but centred as one group.
+    ctx.font = '10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    var segs = [];
+    if (n.total > 0) segs.push({ text: fmt(n.total), color: c.muted });
     // Every box is the same size regardless of how long its step took, unlike the Flame
     // layout where width already says that — so the one thing this diagram cannot show by
     // shape alone, it says in text instead: the share of the whole run this step's calls
     // account for, worst offenders included even when they're a single fast-looking box.
     if (n.total > 0 && flowRootTotal > 0) {
-      var pct = (n.total / flowRootTotal) * 100;
-      var pctTxt = (pct >= 10 ? Math.round(pct) : pct >= 1 ? pct.toFixed(1)
-        : pct >= 0.1 ? '<1' : '<0.1') + '%';
-      var pctW = ctx.measureText(pctTxt).width;
-      ctx.fillStyle = c.muted;
-      ctx.fillText(pctTxt, right - pctW, mid);
-      right -= pctW + 6;
+      var pctVal = (n.total / flowRootTotal) * 100;
+      var pctTxt = (pctVal >= 10 ? Math.round(pctVal) : pctVal >= 1 ? pctVal.toFixed(1)
+        : pctVal >= 0.1 ? '<1' : '<0.1') + '%';
+      segs.push({ text: pctTxt, color: c.muted });
     }
-    if (n.n > 1) {
-      var rep = '×' + n.n;
-      var repW = ctx.measureText(rep).width;
-      ctx.fillStyle = c.badge;
-      ctx.fillText(rep, right - repW, mid);
-      right -= repW + 6;
-    }
-    if (n.recursive) {
-      var loop = '↻';
-      var loopW = ctx.measureText(loop).width;
-      ctx.fillStyle = c.accent;
-      ctx.fillText(loop, right - loopW, mid);
-      right -= loopW + 6;
-    }
+    if (n.n > 1) segs.push({ text: '×' + n.n, color: c.badge });
+    if (n.recursive) segs.push({ text: '↻', color: c.accent });
 
-    var x = n.x + pad;
-    var room = right - x;
-    if (room <= 0) return;
-    if (n.isSql) {
-      ctx.fillStyle = c.sql;
-      ctx.fillText(clip(ctx, n.mth, room), x, mid);
-      return;
-    }
-    var clsW = Math.min(ctx.measureText(n.cls).width, room);
-    ctx.fillStyle = c.cls;
-    ctx.fillText(clip(ctx, n.cls, room), x, mid);
-    if (room - clsW > 8) {
-      ctx.fillStyle = c.mth;
-      ctx.fillText(clip(ctx, n.mth, room - clsW), x + clsW, mid);
-    }
+    var gap = 6;
+    var widths = segs.map(function (s) { return ctx.measureText(s.text).width; });
+    var totalW = widths.reduce(function (a, b) { return a + b; }, 0) + gap * Math.max(0, segs.length - 1);
+    var mx = cx - totalW / 2;
+    segs.forEach(function (s, i) {
+      ctx.fillStyle = s.color;
+      ctx.fillText(s.text, mx, yMeta);
+      mx += widths[i] + gap;
+    });
+    ctx.font = FLOW_FONT;
   }
 
   /**
@@ -7728,6 +8318,31 @@ Press Enter to apply, Esc to cancel.">
       return;
     }
     if (flowFlame) {
+      if (flameCallersArm) {
+        // The button armed a pick; this click is the pick, not a normal zoom. Any zoom
+        // from before still has to go: it addresses a frame by seq/path, which the
+        // callers view's own root (identity-merged, no single seq of its own) cannot
+        // honour, and drawFlow ignores it anyway once flameCallersTarget takes over.
+        flameCallersArm = false;
+        flameRoot = null;
+        flameRootPath = null;
+        flameCallersTarget = n.key;
+        flameCallersBtn.classList.add('on');   // now "on" means showing a callers view
+        flameCallersBtn.textContent = 'Callers of ' + (n.isSql ? sqlLabel(n.sql) : n.cls + n.mth);
+        syncFlowSubViewControls();
+        hideFlowTip();
+        drawFlow();
+        return;
+      }
+      if (flameCallersTarget) {
+        // Already in a callers view: click any caller ring to re-target the same view on
+        // it, walking one caller at a time without leaving the view to restart it.
+        flameCallersTarget = n.key;
+        flameCallersBtn.textContent = 'Callers of ' + (n.isSql ? sqlLabel(n.sql) : n.cls + n.mth);
+        hideFlowTip();
+        drawFlow();
+        return;
+      }
       // Clicking the frame you are already zoomed into steps back out to its parent.
       if (flameMerged) {
         flameRootPath = (flameRootPath === n.path)
@@ -7901,8 +8516,16 @@ Press Enter to apply, Esc to cancel.">
       if (n.site != null) sub += ' · called at line ' + n.site;
     }
     if (flowFlame) {
-      var here = flameMerged ? (flameRootPath === n.path) : (flameRoot === n.seq);
-      sub += here ? ' · click to zoom out' : ' · click to zoom in';
+      if (flameCallersArm) {
+        sub += ' · click to see everything that calls this';
+      } else if (flameCallersTarget) {
+        sub += n.key === flameCallersTarget
+          ? ' · this is what the view is centred on'
+          : ' · click to see callers of this instead';
+      } else {
+        var here = flameMerged ? (flameRootPath === n.path) : (flameRoot === n.seq);
+        sub += here ? ' · click to zoom out' : ' · click to zoom in';
+      }
     }
     else if (n.hasKids && n.reps === 1) {
       sub += collapsedFlow[n.seq] ? ' · click to expand' : ' · click to fold';
@@ -7945,13 +8568,17 @@ Press Enter to apply, Esc to cancel.">
    */
   function syncFlowSubViewControls() {
     flowHotBtn.hidden = flowChart;
-    flameMergeBtn.hidden = !flowFlame;
+    // A caller view is inherently merged, so Merge repeats and its width floor have
+    // nothing of their own to offer while one is showing.
+    flameMergeBtn.hidden = !flowFlame || !!flameCallersTarget;
     // The width floor exists to rescue sub-pixel frames from a per-call layout. Merging
     // removes them at the source, so the control has nothing left to do and would only
     // offer to make the widths dishonest again.
-    if (flowMinWSel) flowMinWSel.hidden = !flowFlame || flameMerged;
+    if (flowMinWSel) flowMinWSel.hidden = !flowFlame || flameMerged || !!flameCallersTarget;
     // Grouping a run of identical neighbours is what merging already does, and more of it.
-    flowGroupBtn.hidden = flowFlame && flameMerged;
+    flowGroupBtn.hidden = flowFlame && (flameMerged || !!flameCallersTarget);
+    if (flameCallersBtn) flameCallersBtn.hidden = !flowFlame;
+    if (chartMinimapBtn) chartMinimapBtn.hidden = !flowChart;
   }
 
   flameMergeBtn.addEventListener('click', function () {
@@ -7966,6 +8593,33 @@ Press Enter to apply, Esc to cancel.">
     hideFlowTip();
     drawFlow();
   });
+
+  if (flameCallersBtn) {
+    flameCallersBtn.addEventListener('click', function () {
+      if (flameCallersTarget) {
+        // Already showing a callers view: the button's job now is to leave it.
+        flameCallersTarget = null;
+        flameCallersArm = false;
+        flameCallersBtn.classList.remove('on');
+        flameCallersBtn.textContent = 'Callers of…';
+        syncFlowSubViewControls();
+        hideFlowTip();
+        drawFlow();
+        return;
+      }
+      flameCallersArm = !flameCallersArm;
+      flameCallersBtn.classList.toggle('on', flameCallersArm);
+      flameCallersBtn.textContent = flameCallersArm ? 'Click a frame…' : 'Callers of…';
+    });
+  }
+
+  if (chartMinimapBtn) {
+    chartMinimapBtn.addEventListener('click', function () {
+      chartMinimapOn = !chartMinimapOn;
+      chartMinimapBtn.classList.toggle('on', chartMinimapOn);
+      paintMinimap();
+    });
+  }
 
   flowToggle(flowSqlBtn, function () { return flowSql; }, function (v) { flowSql = v; });
   flowToggle(flowGroupBtn, function () { return flowGroup; }, function (v) { flowGroup = v; });
@@ -8021,16 +8675,32 @@ Press Enter to apply, Esc to cancel.">
   function setFlowView(view) {
     flowFlame = view === 'flame';
     flowChart = view === 'chart';
-    if (!flowFlame) { flameRoot = null; flameRootPath = null; }
+    if (!flowFlame) {
+      flameRoot = null;
+      flameRootPath = null;
+      flameCallersArm = false;
+      flameCallersTarget = null;
+      if (flameCallersBtn) {
+        flameCallersBtn.classList.remove('on');
+        flameCallersBtn.textContent = 'Callers of…';
+      }
+    }
     Object.keys(FLOW_VIEW_BTNS).forEach(function (v) {
       var on = v === view;
       FLOW_VIEW_BTNS[v].classList.toggle('on', on);
       FLOW_VIEW_BTNS[v].setAttribute('aria-selected', String(on));
     });
+    // Each layout has its own shape and height. A scroll position left over from whichever
+    // one was on screen before can sit well past the new one's much shorter content — Steps
+    // on a large run scrolls for pages, Flame is a few hundred pixels tall — and painting
+    // only what is "on screen" at that stale offset then draws nothing at all.
+    flowWrap.scrollTop = 0;
+    flowWrap.scrollLeft = 0;
     stopChartAnim();
     chartPlayIdx = 0;
     chartProgress = 0;
     chartOrientBtn.hidden = !flowChart;
+    chartLayerBtn.hidden = !flowChart;
     chartPlaySeg.hidden = !flowChart;
     chartLegend.hidden = !flowChart;
     chartSpeedSel.hidden = !flowChart;
@@ -8051,6 +8721,14 @@ Press Enter to apply, Esc to cancel.">
     chartOrientBtn.title = chartVertical
       ? 'Switch back to the left-to-right layout'
       : 'Switch to a top-to-bottom layout with Start/End';
+    hideFlowTip();
+    drawFlow();
+  });
+
+  chartLayerBtn.addEventListener('click', function () {
+    chartSortByLayer = !chartSortByLayer;
+    chartLayerBtn.classList.toggle('on', chartSortByLayer);
+    chartLayerBtn.textContent = chartSortByLayer ? 'Sort: by layer' : 'Sort: call order';
     hideFlowTip();
     drawFlow();
   });

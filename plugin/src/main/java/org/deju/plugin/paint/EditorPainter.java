@@ -27,6 +27,7 @@ import com.intellij.util.messages.MessageBusConnection;
 import org.jetbrains.annotations.NotNull;
 
 import org.deju.plugin.DejuSettings;
+import org.deju.plugin.contract.CallNode;
 import org.deju.plugin.contract.DejuPayload;
 import org.deju.plugin.contract.FileCoverage;
 import org.deju.plugin.contract.LineCoverage;
@@ -117,13 +118,37 @@ public final class EditorPainter {
             annotateOpenEditors(vf, fc);
         }
         listenForLaterOpens();
-        openTabs(plan);
+        openTabs(plan, firstMethodByClass(payload));
         warnUnresolved(unresolved);
         reportTrimmed(plan);
     }
 
+    /**
+     * The method the call tree first entered each class through, by class name — so a file
+     * with several traced methods opens at the one execution actually went through, not
+     * whichever happens to be declared first in the file. Empty for a payload recorded by an
+     * agent too old to send a call tree; every file then falls back to its first executed
+     * line (see {@link #focusLine}).
+     */
+    private static Map<String, String> firstMethodByClass(DejuPayload payload) {
+        Map<String, String> result = new HashMap<>();
+        List<CallNode> calls = payload.getCalls();
+        if (calls == null) {
+            return result;
+        }
+        for (CallNode node : calls) {
+            String cls = node.getClassName();
+            // A SQL node carries no class of its own; nodes arrive in execution order, so the
+            // first one seen for a class is the one that mattered.
+            if (cls != null) {
+                result.putIfAbsent(cls, node.getMethodName());
+            }
+        }
+        return result;
+    }
+
     /** Opens the plan's tabs and gives each one its timing column. */
-    private void openTabs(PaintPlan plan) {
+    private void openTabs(PaintPlan plan, Map<String, String> firstMethodByClass) {
         VirtualFile focusTarget = null;
         List<VirtualFile> resolved = new ArrayList<>(plan.open.size());
         for (FileCoverage fc : plan.open) {
@@ -140,12 +165,44 @@ public final class EditorPainter {
             if (vf == null) {
                 continue;
             }
+            FileCoverage fc = plan.open.get(i);
+            int line0 = focusLine(fc, firstMethodByClass.get(fc.getFqClassName()));
             Editor editor = FileEditorManager.getInstance(project)
-                    .openTextEditor(new OpenFileDescriptor(project, vf, 0, 0), vf.equals(focusTarget));
+                    .openTextEditor(new OpenFileDescriptor(project, vf, line0, 0), vf.equals(focusTarget));
             if (editor != null) {
-                registerTiming(editor, plan.open.get(i));
+                registerTiming(editor, fc);
             }
         }
+    }
+
+    /**
+     * Where to land the caret on open: the declaration line of whichever method the call
+     * tree actually entered this class through, so "Show" drops the reader straight into the
+     * traced code instead of the top of the class. Falls back to the file's first executed
+     * line — still real code the run touched, just not tied to one particular method — for a
+     * class with no matching call node (payload from an old agent, or coverage with no call
+     * frame; see {@link PaintPlan}).
+     */
+    private static int focusLine(FileCoverage fc, String methodName) {
+        Integer methodLine = null;
+        Integer anyLine = null;
+        for (LineCoverage lc : fc.getLines()) {
+            int line0 = lc.getLine() - 1;
+            if (line0 < 0) {
+                continue;
+            }
+            if (anyLine == null || line0 < anyLine) {
+                anyLine = line0;
+            }
+            if (methodName != null && methodName.equals(lc.getMethodName())
+                    && Boolean.TRUE.equals(lc.getMethodStart())) {
+                methodLine = line0;
+            }
+        }
+        if (methodLine != null) {
+            return methodLine;
+        }
+        return anyLine != null ? anyLine : 0;
     }
 
     /**
@@ -247,18 +304,21 @@ public final class EditorPainter {
             Long self = lc.getTimeMicros();
             if (methodTotal != null) {
                 // Method's first line: headline the inclusive total; self time in the tooltip.
-                text.put(line0, "▸ " + TimingGutterProvider.format(methodTotal)
-                        + TimingGutterProvider.suffixPercent(methodTotal, runMicros));
+                // No leading glyph — the column is already the widest thing in the gutter at
+                // the editor's own font size, and a marker earns its width less than a
+                // shorter line does.
+                text.put(line0, TimingGutterProvider.formatWithPercent(methodTotal, runMicros));
                 Long methodSelf = lc.getMethodSelfMicros();
-                tips.put(line0, "Method total " + TimingGutterProvider.format(methodTotal)
+                tips.put(line0, "Method total (every call to it in this run) "
+                        + TimingGutterProvider.format(methodTotal)
                         + TimingGutterProvider.suffixPercent(methodTotal, runMicros)
                         + (methodSelf != null ? "  ·  self " + TimingGutterProvider.format(methodSelf)
                                 + TimingGutterProvider.suffixPercent(methodSelf, runMicros) : "")
                         + ofRun());
             } else if (self != null) {
-                text.put(line0, TimingGutterProvider.format(self)
-                        + TimingGutterProvider.suffixPercent(self, runMicros));
-                tips.put(line0, "Line self time " + TimingGutterProvider.format(self)
+                text.put(line0, TimingGutterProvider.formatWithPercent(self, runMicros));
+                tips.put(line0, "Line self time (every call to this method in this run) "
+                        + TimingGutterProvider.format(self)
                         + TimingGutterProvider.suffixPercent(self, runMicros) + ofRun());
             }
         }

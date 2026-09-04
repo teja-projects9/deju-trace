@@ -18,11 +18,14 @@ import org.deju.plugin.DejuSettings;
  * launched by docker-compose is out of the IDE's reach; that path still needs the agent
  * flag in its own compose/env.
  *
- * <p>Injection is gated on {@link DejuSettings#autoAttach} and a non-empty
- * {@link DejuSettings#includes}, and is skipped if the run already carries a deju agent
- * flag (a manual one, or a re-patch of the same launch), so the agent is never installed
- * twice. The bundled agent is nevertheless extracted on every launch, so a pre-existing
- * flag can never block the refresh that keeps it current.
+ * <p>Injection is gated on {@link DejuSettings#autoAttach}, and is skipped if the run already
+ * carries a deju agent flag (a manual one, or a re-patch of the same launch), so the agent is
+ * never installed twice. The bundled agent is nevertheless extracted on every launch, so a
+ * pre-existing flag can never block the refresh that keeps it current.
+ *
+ * <p>{@link DejuSettings#includes} is used when set; when it is empty, {@link IncludesGuess}
+ * is tried against this run's own main class before giving up, so a Spring Boot run
+ * configuration &mdash; the common case &mdash; auto-attaches with no Settings visit at all.
  */
 public final class DejuProgramPatcher extends JavaProgramPatcher {
 
@@ -34,12 +37,17 @@ public final class DejuProgramPatcher extends JavaProgramPatcher {
         if (!settings.autoAttach) {
             return;
         }
-        String includes = settings.includes == null ? "" : settings.includes.trim();
-        if (includes.isEmpty()) {
-            return; // Nothing to instrument, auto-attach is a no-op until packages are set.
-        }
         if (javaParameters == null) {
             return;
+        }
+        String includes = settings.includes == null ? "" : settings.includes.trim();
+        boolean guessed = false;
+        if (includes.isEmpty()) {
+            includes = IncludesGuess.fromMainClass(javaParameters.getMainClass());
+            if (includes.isEmpty()) {
+                return; // Nothing configured and nothing to guess it from; still a no-op.
+            }
+            guessed = true;
         }
 
         ParametersList vmParameters = javaParameters.getVMParametersList();
@@ -83,7 +91,9 @@ public final class DejuProgramPatcher extends JavaProgramPatcher {
                 + ",includes=" + includesArg;
         vmParameters.add(arg);
         LOG.info("Deju: auto-attached agent to run '" + safeName(configuration)
-                + "' (port=" + settings.port + ", includes=" + includesArg + ")");
+                + "' (port=" + settings.port + ", includes=" + includesArg
+                + (guessed ? ", guessed from the run's main class - set Includes in"
+                        + " Settings > Tools > Deju Trace to override" : "") + ")");
     }
 
     private static String safeName(RunProfile configuration) {
