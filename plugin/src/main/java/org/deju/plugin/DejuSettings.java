@@ -78,8 +78,11 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
     public boolean autoAttach = DEFAULT_AUTO_ATTACH;
     /**
      * Package prefixes the auto-attached agent instruments, comma- or colon-separated,
-     * e.g. {@code org.deju}. Empty means "instrument nothing", so auto-attach
-     * is a no-op until this is set.
+     * e.g. {@code org.deju}. Empty is not necessarily "instrument nothing" any more: the
+     * auto-attach path ({@code DejuProgramPatcher}) first tries to guess a prefix from the
+     * run configuration's own main class ({@code IncludesGuess}) before giving up, so a
+     * typical Spring Boot run needs no visit here at all. Set explicitly to override that
+     * guess, or when there is no main class to guess from (a multi-module app, a test run).
      */
     public String includes = DEFAULT_INCLUDES;
 
@@ -97,12 +100,12 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
      * <p>A single request routinely touches dozens of classes once builders and mappers are
      * counted, and opening a tab for each buries the file the user was actually looking at.
      * Files are opened in execution order, so the cap keeps the start of the call tree; the
-     * rest are named in a notification rather than dropped silently. Zero or less means no
-     * limit, for anyone who preferred the old behaviour.
+     * rest are named in a notification rather than dropped silently. Zero opens none at all —
+     * paint only, no tabs — for anyone who wants the coverage colour without any tab churn.
      *
-     * <p>Every recorded file is painted either way, so a file past the cap still shows its
-     * coverage the moment it is opened by hand. The limit is only about how many tabs appear
-     * unasked, which is why it is deliberately low.
+     * <p>Every recorded file is painted either way, so a file past the cap (zero included)
+     * still shows its coverage the moment it is opened by hand. The limit is only about how
+     * many tabs appear unasked, which is why it is deliberately low.
      */
     public int maxOpenFiles = DEFAULT_MAX_OPEN_FILES;
 

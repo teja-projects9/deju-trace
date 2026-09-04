@@ -89,7 +89,7 @@ final class TimingGutterProvider implements TextAnnotationGutterProvider {
     }
 
     /**
-     * That duration's share of the whole run, as {@code "  12%"}, ready to append to a
+     * That duration's share of the whole run, as {@code " 12%"}, ready to append to a
      * formatted time. Empty when there is no run length to divide by, because a column that
      * silently falls back to a percentage of something else is worse than no percentage.
      *
@@ -97,6 +97,12 @@ final class TimingGutterProvider implements TextAnnotationGutterProvider {
      * {@code <0.1%} both say "not this line", while three decimals on every trivial line
      * would widen the gutter for noise. Anything at or above 10% loses its decimal, since by
      * then the figure is a headline, not a measurement.
+     *
+     * <p>One space, not two, ahead of every figure this column shows: {@link
+     * TextAnnotationGutterProvider} has no font-size hook of its own — it renders at the
+     * editor's own code size, the platform gives an annotation column no smaller size to opt
+     * into — so the only lever this class has over how heavy the column reads is how much
+     * of it there is.
      */
     static String suffixPercent(long micros, long runMicros) {
         if (runMicros <= 0) {
@@ -104,12 +110,26 @@ final class TimingGutterProvider implements TextAnnotationGutterProvider {
         }
         double p = (micros * 100.0) / runMicros;
         if (p >= 10) {
-            return "  " + Math.round(p) + "%";
+            return " " + Math.round(p) + "%";
         }
         if (p >= 0.1) {
-            return "  " + String.format("%.1f", p) + "%";
+            return " " + String.format("%.1f", p) + "%";
         }
-        return p > 0 ? "  <0.1%" : "  0%";
+        return p > 0 ? " <0.1%" : " 0%";
+    }
+
+    /**
+     * The gutter/report's compact per-line label: percent leads, since it is the figure that
+     * is comparable line to line, with the absolute duration bracketed alongside it —
+     * {@code "12% [8.4 ms]"}. Square brackets rather than round: parentheses already carry a
+     * different, softer "aside" meaning throughout this UI (see the branch-coverage counts
+     * next to a line of source), and this figure is not an aside. Falls back to the bare
+     * duration when there is no run length to show a percentage against.
+     */
+    static String formatWithPercent(long micros, long runMicros) {
+        String time = format(micros);
+        String suffix = suffixPercent(micros, runMicros);
+        return suffix.isEmpty() ? time : suffix.trim() + " [" + time + "]";
     }
 
     /** One decimal, but drop a trailing ".0", and no decimals once we're in the hundreds. */

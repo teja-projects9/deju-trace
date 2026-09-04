@@ -123,7 +123,9 @@ public final class DejuConfigurable implements Configurable {
                         + " and still need the agent flag in their own compose/env.</html>"));
 
         JComponent includesHint = hint("Package prefixes of the application you are tracing,"
-                + " e.g. com.example (comma- or colon-separated).");
+                + " e.g. com.example (comma- or colon-separated). Left empty, auto-attach"
+                + " guesses one from the run configuration's main class (works for a typical"
+                + " Spring Boot app); set it here to override the guess.");
 
         JButton browseButton = UiStyle.compact(new JButton("Add source root…", AllIcons.Nodes.Folder));
         browseButton.setToolTipText("Choose a source root (e.g. …/module/src/main/java) and append it");
@@ -142,7 +144,7 @@ public final class DejuConfigurable implements Configurable {
                         + " method's own file first. Anything beyond the limit is named in a notification,"
                         + " is painted anyway, and stays in the exported report. Use"
                         + " the button below to jump to any other class in the run."
-                        + " 0 = open every file.</html>");
+                        + " 0 = open none — coverage colour with no tabs at all.</html>");
 
         JComponent historyCapacityHint = hint(
                 "<html>How many recorded runs the tool window keeps per project (1–"
@@ -377,10 +379,10 @@ public final class DejuConfigurable implements Configurable {
         try {
             parsedMax = Integer.parseInt(maxOpenFilesField.getText().trim());
         } catch (NumberFormatException e) {
-            throw new ConfigurationException("Max files to open must be a number (0 for no limit).");
+            throw new ConfigurationException("Max files to open must be a number (0 opens none).");
         }
         if (parsedMax < 0) {
-            throw new ConfigurationException("Max files to open cannot be negative (0 means no limit).");
+            throw new ConfigurationException("Max files to open cannot be negative (0 opens none).");
         }
         int parsedHistory;
         try {

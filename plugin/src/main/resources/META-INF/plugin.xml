@@ -77,6 +77,59 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.5.0</b>: a minimap for the Flow Chart, and callers for the Flame Graph</p>
+        <ul>
+          <li><b>New: Minimap.</b> A corner overview of the whole Flow Chart, with a box
+          marking what's on screen &mdash; click or drag it to jump straight to any part of
+          a large diagram instead of scrolling to find it.</li>
+          <li><b>New: Callers of&hellip; on the Flame Graph.</b> Pick a frame and see every
+          call site that reaches it, merged by caller and stacked upward from it &mdash; a
+          sandwich view for "what's calling this expensive thing everywhere", rather than
+          only being able to read a single call path top to bottom.</li>
+        </ul>
+        <p><b>2.4.1</b>: a redesigned Flow Chart, a clearer Call Tree, and accurate line timing</p>
+        <ul>
+          <li><b>Flow Chart redesigned.</b> Each box is now three centered rows &mdash;
+          class, method, and its time and share of the run &mdash; drawn with a soft
+          gradient and shadow. Connectors are curves instead of elbows, and no longer bunch
+          or cross where several arrows meet the same box.</li>
+          <li><b>New: Flow Chart boxes group by package.</b> Adjacent boxes that share a
+          Java package now sit on a soft colour-coded backdrop with a label, so a run
+          through several layers of the same feature reads as one block instead of a row of
+          identical-looking boxes.</li>
+          <li><b>New: Sort: by layer</b> on the Flow Chart reorders each row by a guessed
+          architectural layer &mdash; controller, service, repository/DAO, then SQL &mdash;
+          instead of call order.</li>
+          <li><b>Flame Graph frames now show their time and share</b> directly on the frame
+          once it's wide enough to hold them, not only in the tooltip.</li>
+          <li><b>Call Tree decluttered.</b> Indent guide lines mark nesting depth, and a
+          frame's own total now reads bolder than the lines beneath it, so the call
+          hierarchy and what's a total versus a self time are both easier to tell apart at a
+          glance.</li>
+          <li><b>Fixed: Show's per-line time in the editor.</b> Its font is smaller, and the
+          time and share now read together as e.g. <code>12% [8.4 ms]</code> instead of two
+          crowded numbers &mdash; the report's Call Tree and Files line time now show the
+          same format.</li>
+          <li><b>Fixed: Show didn't navigate to the method, only the top of the file.</b>
+          Opening a file from Show now lands on the exact line the traced method starts
+          at.</li>
+          <li><b>Fixed: a max open files of 0 opened every file instead of none.</b> Zero
+          now means paint the coverage colour without opening any tabs at all &mdash; the
+          "just show me the colour" case the setting exists for.</li>
+          <li><b>Fixed: recursive calls' timing was inflated.</b> A self-recursive method
+          double- (or worse-) counted its own time, once for the outer call and again for
+          each nested call inside it; only the outermost call's span is banked now.</li>
+          <li><b>Clarified: what a line's timing figure covers.</b> A line's self time and a
+          method's total are summed across every call to that line or method anywhere in
+          the run, not scoped to the one call they're shown under &mdash; tooltips
+          throughout the report and the editor gutter now say so, rather than leaving a
+          loop's line looking like it cost more than the frame containing it.</li>
+          <li><b>New: Includes can be left blank.</b> With <b>Auto-attach</b> on, a run with
+          no <b>Includes</b> configured now guesses a starting package from the run
+          configuration's own main class &mdash; exact for a typical Spring Boot app, since
+          its main class already sits at the root of what it component-scans &mdash; instead
+          of silently instrumenting nothing until the field is filled in by hand.</li>
+        </ul>
         <p><b>2.4.0</b>: a flowchart, a flame graph, and findings that read like a report</p>
         <ul>
           <li>Renamed for clarity: <b>API Flow</b> is now <b>Flow Chart</b>, and it is the
