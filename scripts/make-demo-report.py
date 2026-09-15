@@ -170,10 +170,10 @@ public class DiscountPolicy {
 
     private final LoyaltyService loyalty;
 
-    /** Members get 10% off; orders over 20.00 get a further 5%. */
+    /** Members with good credit get 10% off; orders over 20.00 get a further 5%. */
     public Money apply(Money subtotal, long customerId) {
         Money total = subtotal;
-        if (loyalty.isMember(customerId)) {
+        if (loyalty.isMember(customerId) && loyalty.hasCredit(customerId)) {
             total = total.minusPercent(10);
         }
         if (total.isOver(Money.pounds(20))) {
@@ -260,8 +260,10 @@ public record OrderLineDto(String drink, int pricePence) {
 }
 
 # ------------------------------------------------------------------------- coverage ---
-# (line, status, branchesCovered, branchesTotal, selfMicros) per method.
+# (line, status, branchesCovered, branchesTotal, selfMicros[, operandStatus]) per method.
 # The first tuple of each method also carries the method's inclusive/self total.
+# operandStatus demonstrates per-operand true/false coloring on a compound `&&`/`||`
+# line: one entry per decision in source order, TRUE_ONLY/FALSE_ONLY/MIXED/SKIPPED/OTHER.
 
 COVERAGE = {
     "com.example.order.OrderController": [
@@ -307,7 +309,7 @@ COVERAGE = {
     "com.example.pricing.DiscountPolicy": [
         ("apply", 3980, 70, [
             (13, "FULL", None, None, 9),
-            (14, "PARTIAL", 1, 2, 3910),
+            (14, "PARTIAL", 2, 4, 3910, ["TRUE_ONLY", "FALSE_ONLY"]),
             (15, "FULL", None, None, 22),
             (17, "PARTIAL", 1, 2, 27),
             (18, "NONE", None, None, None),
@@ -389,12 +391,15 @@ def build_files(coverage=None):
         lines = []
         for method, total, self_micros, entries in methods:
             first = True
-            for line_no, status, bc, bt, micros in entries:
+            for entry in entries:
+                line_no, status, bc, bt, micros = entry[:5]
+                operand_status = entry[5] if len(entry) > 5 else None
                 lines.append({
                     "line": line_no,
                     "status": status,
                     "branchesCovered": bc,
                     "branchesTotal": bt,
+                    "operandStatus": operand_status,
                     "timeMicros": micros,
                     # Carried on the method's first covered line only; the report shows it
                     # as "▸ total" and uses self time for the "slowest first" ranking.
@@ -667,8 +672,8 @@ def scaled_coverage(calls):
                 method,
                 new_total,
                 max(1, int(self_micros * factor)),
-                [(ln, st, bc, bt, (max(1, int(us * factor)) if us is not None else None))
-                 for ln, st, bc, bt, us in entries],
+                [(ln, st, bc, bt, (max(1, int(us * factor)) if us is not None else None), *rest)
+                 for ln, st, bc, bt, us, *rest in entries],
             ))
         out[fqcn] = scaled_methods
     return out

@@ -142,6 +142,32 @@ h1{font-size:1.05rem;margin:0;}
 .toggle:disabled:hover{background:var(--control);border-color:var(--hairline);}
 
 /* ------------------------------------------------------------------ files --- */
+/* IDE view: a file list down the side, one file's source filling the rest of the page —
+   same split as a real editor's project panel plus the pane it opens files into. */
+.idewrap{display:flex;align-items:flex-start;gap:.9rem;}
+.filesidebar{flex:0 0 15rem;max-width:40vw;max-height:calc(100vh - var(--metaH) - var(--toolbarH) - 2rem);
+  overflow-y:auto;position:sticky;top:calc(var(--metaH) + var(--toolbarH) + .7rem);
+  border:1px solid var(--hairline);border-radius:var(--radius);background:var(--panel);
+  padding:.35rem;}
+.filesidebar .fsitem{display:flex;align-items:center;gap:.4rem;padding:.35rem .5rem;
+  border-radius:var(--radius-sm);cursor:pointer;font-size:.8rem;}
+.filesidebar .fsitem:hover{background:var(--control-hover);}
+.filesidebar .fsitem.on{background:var(--accent);color:#fff;}
+.filesidebar .fsitem .fsnum{flex:0 0 auto;min-width:1.3rem;text-align:right;
+  color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums;}
+.filesidebar .fsitem.on .fsnum{color:rgba(255,255,255,.85);}
+.filesidebar .fsitem .fsname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;}
+.filesidebar .fsitem .fsred{flex:0 0 auto;font-size:.68rem;font-weight:700;color:var(--none);}
+.filesidebar .fsitem.on .fsred{color:#fff;}
+.filesidebar .fsitem[hidden]{display:none;}
+.filemain{flex:1 1 auto;min-width:0;}
+.filemain .file{margin:0;}
+/* A line whose recorded call ctrl+alt+click can follow to another file. Marked with a small
+   arrow after the line rather than on the token itself, since the report has no real parser
+   to point at just the call expression — same treatment as the branch-coverage note beside
+   it, not a claim about exactly which word is special. */
+.goarrow{color:var(--accent);font-weight:700;margin-left:.4rem;}
+tr.gorow:hover td.code{background:var(--control-hover);cursor:pointer;}
 /* No overflow on .file: an overflow value here would make it the nearest scroll
    container and the sticky h2 would never stick. The radius is clipped by
    .scroll instead. */
@@ -166,6 +192,21 @@ h1{font-size:1.05rem;margin:0;}
 .file.collapsed h2{border-bottom:none;border-radius:var(--radius);}
 .file.collapsed .scroll{display:none;}
 .scroll{overflow-x:auto;border-radius:0 0 var(--radius) var(--radius);}
+
+/* ------------------------------------------------------------- treecrumb --- */
+/* The current call stack, pinned under the toolbar. Sticky rather than fixed, so it
+   only appears once the tree has scrolled underneath it and never floats over the
+   toolbar or the summary row above the tree. */
+.treecrumb{position:sticky;top:calc(var(--metaH) + var(--toolbarH));z-index:4;
+  display:flex;align-items:center;gap:.25rem;overflow-x:auto;white-space:nowrap;
+  padding:.35rem .6rem;margin-bottom:.5rem;border-radius:8px;
+  background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  border:1px solid var(--hairline);box-shadow:var(--elev-sm);
+  font-size:.74rem;color:var(--muted);}
+.treecrumb .seg{flex:0 0 auto;cursor:pointer;padding:.1rem .35rem;border-radius:5px;color:var(--fg);}
+.treecrumb .seg:hover{background:var(--control-hover);}
+.treecrumb .seg .m{color:var(--muted);}
+.treecrumb .sep{flex:0 0 auto;color:var(--muted);}
 
 /* ------------------------------------------------------------------- rows --- */
 table{border-collapse:collapse;width:100%;
@@ -193,6 +234,9 @@ tr.NONE{background:var(--none-bg);} tr.NONE td.code{box-shadow:inset 3px 0 0 var
 tr.cursor td{background:var(--heat);}
 tr.cursor td.code{box-shadow:inset 3px 0 0 var(--accent);}
 .br{color:var(--muted);font-size:.72rem;}
+.cond-true{background:var(--full-bg);box-shadow:inset 0 -2px 0 var(--full);border-radius:2px;}
+.cond-false{background:var(--none-bg);box-shadow:inset 0 -2px 0 var(--none);border-radius:2px;}
+.cond-neutral{opacity:.6;border-bottom:1px dashed var(--muted);}
 
 /* ----------------------------------------------------- method sections --- */
 tr.mrow td{
@@ -213,6 +257,15 @@ tr.mrow:first-child td{border-top:none;}
 .treewrap{border:1px solid var(--border);border-radius:8px;}
 #treeTable{width:100%;}
 .fidelity{font-size:.74rem;color:var(--muted);margin:0 0 .5rem;}
+/* What the two clicks on a frame do, built from the exact glyphs the rows themselves use. */
+.clickhint{display:flex;align-items:center;flex-wrap:wrap;gap:.55rem;
+  font-size:.76rem;color:var(--muted);margin:0 0 .6rem;}
+.clickhint .hintpart{display:inline-flex;align-items:center;gap:.3rem;}
+.clickhint .hintsep{color:var(--border);}
+.clickhint .fcaret{color:var(--muted);width:auto;}
+.clickhint .dtag{flex:0 0 auto;font-size:.66rem;font-weight:700;letter-spacing:.03em;
+  padding:.05rem .32rem;border-radius:99px;border:1px solid var(--border);color:var(--muted);}
+.clickhint .dtag.on{border-color:var(--accent);color:var(--accent);}
 
 tr.frame td{
   padding:.26rem .5rem;background:var(--panel);
@@ -239,6 +292,13 @@ tr.frame.hot td{background:var(--heat);}
 .fhead .fsep{color:var(--muted);}
 .fhead .fmethod{font-weight:600;font-size:.82rem;}
 .fhead .fkind{color:var(--muted);font-weight:400;font-style:italic;font-size:.76rem;}
+/* Whether this frame's own source is currently shown. Muted and outlined when it isn't —
+   an invitation, not a warning — filled with the accent once a click has opened it, the
+   same "on" language the toolbar's own toggle buttons use. */
+.fhead .dtag{flex:0 0 auto;font-size:.66rem;font-weight:700;letter-spacing:.03em;
+  padding:.05rem .32rem;border-radius:99px;border:1px solid var(--border);color:var(--muted);
+  cursor:pointer;}
+.fhead .dtag.on{border-color:var(--accent);color:var(--accent);}
 .fhead .fsite{color:var(--muted);font-size:.72rem;}
 .fhead .fsite a{color:inherit;text-decoration:none;}
 .fhead .fsite a:hover{color:var(--accent);text-decoration:underline;}
@@ -651,7 +711,7 @@ tr:hover .rowcopy,.graphrow:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
   :root{--toolbarH:0px;--metaH:0px;}
   body{padding:0;background:#fff;color:#000;}
   header .headtools,.toolbar,#tabSeg,.legend,.search,#fileMenu,.help,.act,
-  .zoomseg,#flowPngBtn{display:none !important;}
+  .zoomseg,#flowPngBtn,.treecrumb{display:none !important;}
   .meta{position:static;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;
     border-bottom:none;}
   .meta,.summary{break-inside:avoid;}

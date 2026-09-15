@@ -95,6 +95,12 @@ class InstrumentationTest {
                 // region="EMEA" takes exactly one edge of each => 2 covered.
                 assertEquals(Integer.valueOf(4), lc.getBranchesTotal(), "compound if has 4 edges");
                 assertEquals(Integer.valueOf(2), lc.getBranchesCovered(), "one edge per decision taken");
+                // region="EMEA": `region != null` is true; `!region.isEmpty()`'s own tested
+                // value (isEmpty()) came out false, so the raw per-decision status is
+                // FALSE_ONLY (the report renderer flips it to display green, given the
+                // source text's leading `!`).
+                assertEquals(List.of("TRUE_ONLY", "FALSE_ONLY"), lc.getOperandStatus(),
+                        "per-decision status for the compound condition");
             } else if (lc.getStatus() == LineStatus.NONE) {
                 sawRed = true;
             } else if (lc.getStatus() == LineStatus.FULL) {
@@ -220,10 +226,75 @@ class InstrumentationTest {
             for (LineCoverage lc : fc.getLines()) {
                 if (lc.getBranchesTotal() != null && lc.getBranchesTotal() == 4) {
                     sawDecisionLine = true;
+                    // region == null: `region != null` observed false; `!region.isEmpty()`
+                    // short-circuited away, so its own decision was never evaluated at all.
+                    assertEquals(List.of("FALSE_ONLY", "SKIPPED"), lc.getOperandStatus(),
+                            "the short-circuited operand should be SKIPPED, not guessed");
                 }
             }
         }
         assertTrue(sawDecisionLine, "the compound if line should still be recorded as a decision");
+    }
+
+    /**
+     * A plain-boolean {@code &&} chain (no negation, no null-checks) driven through
+     * several inputs to exercise every per-decision status the operand-coloring
+     * feature can produce: a value seen only true, only false, seen both ways across
+     * evaluations of the same line (a loop), and skipped entirely by a short-circuit.
+     */
+    @Test
+    void computesPerOperandStatusForPlainBooleanChain() throws Exception {
+        AtomicReference<DejuPayload> last = new AtomicReference<>();
+        Class<?> fixture = instrumentedFixture(last);
+        String target = FIXTURE + "#loopChain";
+        CoverageRuntime.arm(target);
+
+        Object instance = fixture.getDeclaredConstructor().newInstance();
+        Method loopChain = fixture.getMethod("loopChain", boolean[].class);
+
+        last.set(null);
+        loopChain.invoke(instance, new boolean[] { true, true, true });
+        assertOperandStatus(last.get(), List.of("TRUE_ONLY", "TRUE_ONLY"));
+
+        last.set(null);
+        loopChain.invoke(instance, new boolean[] { false, false, false });
+        assertOperandStatus(last.get(), List.of("FALSE_ONLY", "SKIPPED"));
+
+        last.set(null);
+        loopChain.invoke(instance, new boolean[] { true, false, false });
+        assertOperandStatus(last.get(), List.of("MIXED", "FALSE_ONLY"));
+    }
+
+    /**
+     * A relational decision (`x > 5`) mixed with a plain boolean one (`flag`) on the
+     * same line must classify the relational one as OTHER, which is what makes the
+     * report fall back to today's whole-line yellow for that line instead of guessing
+     * a color for an operand it can't safely resolve.
+     */
+    @Test
+    void classifiesRelationalOperandsAsOther() throws Exception {
+        AtomicReference<DejuPayload> last = new AtomicReference<>();
+        Class<?> fixture = instrumentedFixture(last);
+        CoverageRuntime.arm(FIXTURE + "#mixedKinds");
+
+        Object instance = fixture.getDeclaredConstructor().newInstance();
+        fixture.getMethod("mixedKinds", int.class, boolean.class).invoke(instance, 10, true);
+
+        assertOperandStatus(last.get(), List.of("OTHER", "TRUE_ONLY"));
+    }
+
+    private static void assertOperandStatus(DejuPayload p, List<String> expected) {
+        assertNotNull(p, "a payload should be emitted");
+        boolean found = false;
+        for (FileCoverage fc : p.getFiles()) {
+            for (LineCoverage lc : fc.getLines()) {
+                if (lc.getOperandStatus() != null) {
+                    assertEquals(expected, lc.getOperandStatus());
+                    found = true;
+                }
+            }
+        }
+        assertTrue(found, "expected exactly one line with operandStatus set");
     }
 
     private static byte[] readClassBytes(String className) throws Exception {

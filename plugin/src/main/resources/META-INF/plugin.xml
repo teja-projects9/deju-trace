@@ -77,6 +77,37 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.6.0</b>: a call tree you can read at a glance, an IDE-style file view,
+        and per-operand branch coloring</p>
+        <ul>
+          <li><b>Call Tree shows the full call structure by default.</b> Nothing is
+          collapsed automatically any more &mdash; the caret is the only way to fold a
+          call away. Each frame's own source lines are now a separate <b>src</b> toggle
+          you click independently, off by default except on the trace root, so opening
+          a call no longer also dumps every line of code underneath it. A hint above
+          the tree explains what each click does.</li>
+          <li><b>New: a sticky breadcrumb</b> above the Call Tree tracks which call
+          you're scrolled into, so a deeply nested trace never leaves you unsure where
+          you are.</li>
+          <li><b>Files is now IDE view.</b> Instead of every file stacked one after
+          another, a sidebar lists them by class name (no package) and position, and
+          the main pane shows one file's full source at a time, opening on the trace
+          point's own file by default.</li>
+          <li><b>New: Ctrl/Cmd+Alt+click a call in IDE view</b> to jump straight to the
+          method it calls into &mdash; the same "go to declaration" a real IDE gives
+          you.</li>
+          <li><b>New: compound conditions are colored per operand.</b> <code>isA &&
+          isB</code> used to paint the whole line yellow the moment the two disagreed.
+          Each plain boolean operand now shows green when it was true, red when it was
+          false, and a muted underline when a short-circuit skipped it or it varied
+          across a loop &mdash; so you can see which half actually failed. A comparison
+          like <code>x &gt; 5</code> can't be colored this way safely and still shows
+          as a single yellow line.</li>
+          <li><b>Fixed: clicking a line in the Call Tree to reveal its source jumped
+          the page.</b> Rebuilding the tree used to forget every row's real height and
+          re-guess it; row heights now persist across a rebuild, so the scroll position
+          holds.</li>
+        </ul>
         <p><b>2.5.0</b>: a minimap for the Flow Chart, and callers for the Flame Graph</p>
         <ul>
           <li><b>New: Minimap.</b> A corner overview of the whole Flow Chart, with a box

@@ -62,7 +62,8 @@ __STYLES__
 <!--tab:trace-->  <span class="ctlgroup" id="traceControls">
   <div class="seg" id="viewSeg" role="tablist">
     <button class="segbtn on" id="viewTree" type="button" role="tab" aria-selected="true">Tree</button>
-    <button class="segbtn" id="viewFiles" type="button" role="tab" aria-selected="false">Files</button>
+    <button class="segbtn" id="viewFiles" type="button" role="tab" aria-selected="false"
+            title="One file at a time, IDE-style — a file list down the side, full source in the middle">IDE</button>
   </div>
 
   <!-- Tree view only -->
@@ -243,13 +244,25 @@ Press Enter to apply, Esc to cancel.">
   <!-- Tree view: every invocation in execution order -->
   <section id="treeView">
     <p class="fidelity" id="fidelity"></p>
+    <!-- What the two clicks do, spelled out once at the top rather than left for the reader
+         to guess from the caret and the src tag alone. Script fills it in (and hides it when
+         there is no tree) so the glyphs it shows match the real ones exactly. -->
+    <p class="clickhint" id="clickHint" hidden></p>
+    <!-- The call stack above whatever is currently at the top of the viewport, so a run
+         that jumps between classes and back never leaves the reader unsure which method
+         they are inside of. -->
+    <div class="treecrumb" id="treeCrumb" hidden></div>
     <div class="scroll treewrap"><table id="treeTable"></table></div>
     <div class="empty" id="treeEmpty" hidden>No calls match the current filters.</div>
   </section>
 
-  <!-- Files view: per-file line coverage -->
+  <!-- Files view: one file at a time, IDE-style — a file list down the side, the
+       selected file's full source filling the rest of the page. -->
   <section id="filesView" hidden>
-    <div id="root"></div>
+    <div class="idewrap">
+      <nav id="fileSidebar" class="filesidebar" aria-label="Files"></nav>
+      <div id="root" class="filemain"></div>
+    </div>
     <div id="empty" class="empty" hidden>No lines match the current filters.</div>
   </section>
 </div>
@@ -305,7 +318,7 @@ Press Enter to apply, Esc to cancel.">
       <dt><kbd>v</kbd></dt><dd>Switch between Tree and Files</dd>
       <dt><kbd>/</kbd></dt><dd>Focus the filter. Every tab has one and each keeps its own</dd>
       <dt><kbd>n</kbd> / <kbd>p</kbd></dt><dd>Next / previous problem line</dd>
-      <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous call frame (Tree) or file (Files)</dd>
+      <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous call frame (Tree) or file (IDE)</dd>
       <dt><kbd>e</kbd> / <kbd>c</kbd></dt><dd>Expand all / collapse all</dd>
       <dt><kbd>h</kbd></dt><dd>Toggle the hot path (Tree)</dd>
       <dt><kbd>f</kbd></dt><dd>Open the file picker</dd>
@@ -406,6 +419,16 @@ Press Enter to apply, Esc to cancel.">
     <i>within</i> a method are shown in source order and merged across invocations, so a
     loop body appears once rather than once per iteration, and a method called twice shows
     the same lines under both frames.</p>
+    <p><b>Structure and detail fold apart.</b> The tree opens with every call already in
+    place &mdash; the full shape of who called what, with nothing collapsed &mdash; but a
+    frame's own source lines and the queries they issued stay out of the way until asked
+    for, marked by the <b>src</b> tag. Click anywhere on a row to show or hide that one
+    frame's detail; click its <b>caret</b> specifically to fold away everything <i>it</i>
+    called, for the rare branch that is wide enough to be worth putting away. The two stay
+    independent: reading one frame's lines never pulls in its children's lines too.
+    <b>Expand all</b> reveals every frame's detail at once, back to how every earlier
+    version of this tree read; <b>Collapse all</b> hides it all again and reopens anything
+    folded by its caret.</p>
     <p><b>Essential / Full.</b> <i>Essential</i> folds calls into your excluded types
     (entities, DTOs, other data classes) into a single <b>&hellip; N excluded calls</b> row
     at the call site, the count and total time stay visible, and clicking the row
@@ -421,7 +444,7 @@ Press Enter to apply, Esc to cancel.">
     <b>Settings &rarr; Tools &rarr; Deju Trace</b>, or with <b>Excluded types&hellip;</b>
     in the Deju tool window; the recording itself is always complete, so nothing here is
     ever lost. A nested class follows the class it lives in, so excluding a wrapper also
-    excludes the builder generated inside it. In the Files view, excluded types are
+    excludes the builder generated inside it. In the IDE view, excluded types are
     rendered like any other file but start folded shut.</p>
     <p>Exclusions are applied when a report is <i>written</i>, so this file is a snapshot of
     the rules at that moment, changing them later never alters an existing report.
@@ -432,16 +455,22 @@ Press Enter to apply, Esc to cancel.">
     recorded. A long statement is trimmed to three lines with <b>Show full query</b> to open
     it; the <b>SQL</b> button in the toolbar hides queries altogether when you want to read
     control flow on its own.</p>
+    <p><b>The IDE view.</b> A file list down the side, one file's full source filling the
+    rest of the page &mdash; the same split as a real editor's project panel and the pane it
+    opens files into, and it opens on the trace point's own file. <b>Ctrl/Cmd+Alt+click</b> a
+    line that made a recorded call to open the class and method it called, wherever that
+    class lives; the small <b>↷</b> after a line is what marks one. This only ever knows
+    about a call the agent actually recorded, so a line into a JDK type or a third-party jar
+    has nowhere on this page to go, and the click quietly does nothing.</p>
     <p><b>Files.</b> The <b>Files</b> dropdown works in both views and means the same thing
-    in each: unticking a file removes it from the Files view and hides its calls, and
-    everything underneath them, from the Tree, so you can strip a trace down to the layer
+    in each: unticking a file removes it from the IDE view's sidebar and hides its calls,
+    and everything underneath them, from the Tree, so you can strip a trace down to the layer
     you care about. The traced method's own frame always stays, since hiding the entry point
-    would empty the diagram. Data classes and generated code start ticked but folded shut,
-    so the page opens on the code worth reading without anything being filtered out behind
-    your back.</p>
+    would empty the diagram. Data classes and generated code start ticked but folded shut, so
+    opening one from the sidebar does not land you on a wall of generated code by accident.</p>
     <p><b>Open in IDE</b> uses <code>jetbrains://</code> links, which are handled by
     JetBrains Toolbox. If nothing happens when you click a line number, Toolbox is not
-    installed, use <b>Copy path</b> in the Files view instead.</p>
+    installed, use <b>Copy path</b> in the IDE view instead.</p>
     <p><b>Sharing a spot.</b> The address bar follows what you are looking at, tab, view,
     filter and the selected step, so the link in it opens this report where you are. The
     copy button on a step (or <kbd>Shift</kbd>+<kbd>C</kbd>) puts that one frame on the

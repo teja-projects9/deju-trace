@@ -22,6 +22,31 @@ public class CoverageFixture {
         return region.length();
     }
 
+    /**
+     * A plain-boolean {@code &&} chain with no negation/null-checks, armed as its own
+     * target so a test can drive it multiple times and see {@code TRUE_ONLY} /
+     * {@code FALSE_ONLY} / {@code MIXED} / {@code SKIPPED} on the two decisions,
+     * independent of {@link #entry}'s own call tree.
+     */
+    public int loopChain(boolean[] values) {
+        int hits = 0;
+        for (int i = 0; i + 1 < values.length; i++) {
+            if (values[i] && values[i + 1]) {
+                hits++;
+            }
+        }
+        return hits;
+    }
+
+    /**
+     * A relational decision mixed with a plain boolean one, so a test can confirm the
+     * relational operand comes out {@code OTHER} (excluded from true/false coloring),
+     * rather than being guessed.
+     */
+    public boolean mixedKinds(int x, boolean flag) {
+        return x > 5 && flag;
+    }
+
     public int all() {
         return 5;
     }

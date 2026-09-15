@@ -226,8 +226,6 @@
   var rollupOn = true;
   var rollupAvailable = 0;   // roll-up rows the current filters leave on screen
 
-  var AUTO_COLLAPSE_ABOVE = 15;   // file count past which the Files view starts collapsed
-  var AUTO_EXPAND_TOP = 5;        // slowest N left open in that case
   var FOLD_RUN_AFTER = 3;         // identical consecutive sibling calls shown before folding
   // Rows are virtualised now, so this is a guard on how much the tree walk will build,
   // not on what gets laid out. It sits above the agent's own 200k call ceiling so an
@@ -451,6 +449,113 @@
       if (m[0].length === 0) { TOKEN.lastIndex++; }   // never spin on a zero-width match
     }
     if (at < text.length) td.appendChild(document.createTextNode(text.slice(at)));
+  }
+
+  // ------------------------------------------------------ operand coloring ---
+  // Per-operand true/false coloring for a compound `&&`/`||` line (l.operandStatus,
+  // set by PayloadBuilder). Two independent safety nets, either of which falls back
+  // to the plain whole-line paintCode()+branches-annotation rendering: the split must
+  // find exactly one fewer top-level `&&`/`||` than there are decisions, and every
+  // resulting operand must look like a simple (optionally negated) boolean atom, no
+  // comparison/arithmetic/ternary syntax. See the operand-coloring design notes.
+
+  var COND_ATOM = /^!*\s*[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*\s*(?:\([^()]*\))?\s*$/;
+  var COND_LEAD_TRIM = [
+    /^\s*\}?\s*(?:else\s+)?(?:if|while)\s*\(\s*/,
+    /^\s*return\s+/,
+    /^\s*[A-Za-z_$][\w$]*\s*=\s*/
+  ];
+  var COND_TAIL_TRIM = [/\)\s*\{?\s*$/, /;\s*$/];
+
+  /**
+   * Splits `text` at every top-level `&&`/`||` (outside strings/brackets, and at the
+   * shallowest bracket depth any such operator is found at — so `if (isA && isB)`
+   * splits on the operator sitting just inside the `if`'s own parens). Stops scanning
+   * at an unguarded line comment. Returns null unless it finds exactly `expectedCount
+   * - 1` such operators, alternating operand/operator/operand/.../operand.
+   */
+  function splitBooleanOperands(text, expectedCount) {
+    var n = text.length, depth = 0, inStr = null, i = 0;
+    var ops = [];
+    while (i < n) {
+      var c = text[i];
+      if (inStr) {
+        if (c === '\\') { i += 2; continue; }
+        if (c === inStr) inStr = null;
+        i++; continue;
+      }
+      if (c === '"' || c === '\'') { inStr = c; i++; continue; }
+      if (c === '/' && text[i + 1] === '/') break;   // line comment: stop scanning
+      if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+      if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+      if ((c === '&' && text[i + 1] === '&') || (c === '|' && text[i + 1] === '|')) {
+        ops.push({ index: i, depth: depth });
+        i += 2; continue;
+      }
+      i++;
+    }
+    if (!ops.length) return null;
+    var minDepth = ops[0].depth;
+    for (var k = 1; k < ops.length; k++) if (ops[k].depth < minDepth) minDepth = ops[k].depth;
+    var splitAt = ops.filter(function (p) { return p.depth === minDepth; });
+    if (splitAt.length !== expectedCount - 1) return null;
+    var parts = [], last = 0;
+    splitAt.forEach(function (p) {
+      parts.push(text.slice(last, p.index));
+      parts.push(text.slice(p.index, p.index + 2));
+      last = p.index + 2;
+    });
+    parts.push(text.slice(last));
+    return parts;
+  }
+
+  function condAtomOk(text, isFirst, isLast) {
+    var t = text;
+    if (isFirst) COND_LEAD_TRIM.forEach(function (re) { t = t.replace(re, ''); });
+    if (isLast) COND_TAIL_TRIM.forEach(function (re) { t = t.replace(re, ''); });
+    return COND_ATOM.test(t);
+  }
+
+  function condTitle(cls, status) {
+    if (cls === 'cond-true') return 'true every time this line ran';
+    if (cls === 'cond-false') return 'false every time this line ran';
+    if (status === 'MIXED') return 'varied across multiple evaluations of this line in this run';
+    return 'never evaluated — short-circuited away every time';
+  }
+
+  /**
+   * Renders a compound-condition line with each operand colored by its own recorded
+   * true/false status, and returns true; or leaves `td` untouched and returns false
+   * when the line doesn't qualify, so the caller can fall back to the plain
+   * paintCode() + branches-annotation rendering it already does for every other line.
+   */
+  function paintConditionalLine(td, l) {
+    var statuses = l.operandStatus;
+    if (!statuses || statuses.length < 2 || statuses.indexOf('OTHER') >= 0) return false;
+    var text = l.code != null ? l.code : '';
+    var parts = splitBooleanOperands(text, statuses.length);
+    if (!parts) return false;
+    for (var i = 0; i < parts.length; i += 2) {
+      if (!condAtomOk(parts[i], i === 0, i === parts.length - 1)) return false;
+    }
+    for (var j = 0, opI = 0; j < parts.length; j++) {
+      if (j % 2 === 1) { paintCode(td, parts[j]); continue; }
+      var status = statuses[opI++];
+      var cls;
+      if (status === 'TRUE_ONLY' || status === 'FALSE_ONLY') {
+        var negations = (parts[j].match(/!/g) || []).length;
+        var rawTrue = status === 'TRUE_ONLY';
+        var displayTrue = (negations % 2 === 0) ? rawTrue : !rawTrue;
+        cls = displayTrue ? 'cond-true' : 'cond-false';
+      } else {
+        cls = 'cond-neutral';
+      }
+      var span = el('span', cls);
+      paintCode(span, parts[j]);
+      span.title = condTitle(cls, status);
+      td.appendChild(span);
+    }
+    return true;
   }
 
   // ------------------------------------------------------------------- sql ---
@@ -774,7 +879,11 @@
 
   var root = byId('root');
   var fileList = byId('fileList');
+  var fileSidebar = byId('fileSidebar');
   var entries = [];
+  // The one file the main pane currently shows. Null until the first time the Files view
+  // is actually needed, so a report with no trace tree still opens without picking one.
+  var selectedEntry = null;
   /** Class name -> its entry, so the Tree view can honour the same file selection. */
   var entryByClass = {};
 
@@ -801,13 +910,18 @@
 
   files.forEach(function (f, idx) {
     var box = el('section', 'file');
-    var displayName = f.fqClassName || f.sourceFileName || ('file ' + (idx + 1));
+    // The package is where it lives, not what it's called — the sidebar and header both
+    // lead with the plain class name, same as an IDE's file list or tab strip, and keep the
+    // fully qualified name only as the parenthetical/tooltip for whoever needs it.
+    var fqName = f.fqClassName || null;
+    var displayName = fqName ? simpleName(fqName) : (f.sourceFileName || ('file ' + (idx + 1)));
 
     var h = el('h2');
     var caret = el('span', 'caret', '▾ ');
     h.appendChild(caret);
     h.appendChild(el('span', 'fname', displayName));
-    if (f.sourceFileName) h.appendChild(el('span', 'src', '(' + f.sourceFileName + ')'));
+    var subtitle = (fqName && fqName !== displayName) ? fqName : f.sourceFileName;
+    if (subtitle) h.appendChild(el('span', 'src', '(' + subtitle + ')'));
     var stats = el('div', 'stats');
     h.appendChild(stats);
     box.appendChild(h);
@@ -922,6 +1036,19 @@
     entryByClass[f.fqClassName] = entry;
     rows.forEach(function (r) { r.entry = entry; });
     entries.push(entry);
+
+    // The sidebar's entry for this file, built alongside the box it opens — same data,
+    // a lighter row. Kept off the DOM until applySort places every item in the same
+    // order the file list itself uses, which is also what numbers it.
+    var fsItem = el('div', 'fsitem');
+    var fsNum = el('span', 'fsnum');
+    fsItem.appendChild(fsNum);
+    fsItem.appendChild(el('span', 'fsname', displayName));
+    if (red) fsItem.appendChild(el('span', 'fsred', String(red)));
+    fsItem.title = (fqName || displayName) + (red ? ' — ' + red + ' unexecuted line(s)' : '');
+    fsItem.addEventListener('click', function () { selectFile(entry); });
+    entry.sidebarItem = fsItem;
+    entry.fsNum = fsNum;
   });
 
   ordered = entries.slice();
@@ -959,7 +1086,10 @@
   /** One source line: the timing cell, the line number, and the coloured code. */
   function lineRow(rec, f) {
     var l = rec.model;
-    var tr = el('tr', rec.status);
+    var target = rec.section && f.fqClassName != null
+      ? callTargetByLine[f.fqClassName + '#' + rec.section.name + ':' + l.line]
+      : null;
+    var tr = el('tr', rec.status + (target ? ' gorow' : ''));
     var tm = el('td', 'time');
     var micros = (l.methodTotalMicros != null) ? l.methodTotalMicros : l.timeMicros;
     if (micros != null) {
@@ -973,10 +1103,19 @@
         + (lp ? ' · ' + lp + ' of the run' : '');
     }
     var code = el('td', 'code');
-    paintCode(code, l.code != null ? l.code : '');
+    if (!paintConditionalLine(code, l)) paintCode(code, l.code != null ? l.code : '');
     if (l.branchesTotal) {
       code.appendChild(el('span', 'br',
         '   (' + l.branchesCovered + '/' + l.branchesTotal + ' branches)'));
+    }
+    if (target) {
+      var arrow = el('span', 'goarrow', '↷');
+      arrow.title = 'Ctrl/Cmd+Alt+click to open '
+        + (methodLabel(target.methodName, target.className)) + '()';
+      code.appendChild(arrow);
+      tr.addEventListener('click', function (ev) {
+        if (ev.altKey && (ev.ctrlKey || ev.metaKey)) navigateToMethod(target.className, target.methodName);
+      });
     }
     tr.appendChild(tm);
     tr.appendChild(lineCell(f, l.line));
@@ -1059,11 +1198,30 @@
   var treeView = byId('treeView');
   var filesView = byId('filesView');
   var treeEmpty = byId('treeEmpty');
+  var treeCrumb = byId('treeCrumb');
   var childrenBySeq = {};
   var nodeBySeq = {};
   var roots = [];
   var treeRows = [];
   var collapsedSeqs = {};
+  // A frame's own source lines (and the SQL it issued) are hidden until asked for, the same
+  // way its children are: seq -> true once a plain click has revealed them. Independent of
+  // collapsedSeqs so structure and detail can be opened one at a time, on purpose.
+  var detailShown = {};
+  // A rebuild throws away every row object — collapsing a frame, revealing a detail, typing
+  // into the filter — but the row a seq or a source line renders to is the same row it was
+  // last time, so its height is worth remembering rather than re-guessing at the generic
+  // estimate. Never cleared: heights only get more of them cached, never wrong once learned.
+  var heightCache = {};
+  /** A stable identity for a row that survives being rebuilt, or null for one that does not
+   *  render the same content every time (a fold or roll-up summary), which is left to the
+   *  plain estimate rather than risk seeding it from an unrelated row's height. */
+  function rowKey(r) {
+    if (r.kind === 'frame') return 'f' + r.node.seq;
+    if (r.sql) return 's' + r.node.seq;
+    if (r.kind === 'line' && r.file) return 'l' + r.file.fqClassName + ':' + r.line;
+    return null;
+  }
   var expandedFolds = {};
   var hotSeqs = {};
   var hotOn = false;
@@ -1086,9 +1244,32 @@
     nodeBySeq[c.seq] = c;
     if (c.parentSeq < 0) {
       roots.push(c);
+      // The trace point's own source is the one frame the reader always came here to read,
+      // so it starts open; every other frame's detail still waits for a click.
+      detailShown[c.seq] = true;
     } else {
       // calls[] is already in execution order, so pushing in order keeps siblings in it.
       (childrenBySeq[c.parentSeq] = childrenBySeq[c.parentSeq] || []).push(c);
+    }
+  });
+
+  /**
+   * Where a ctrl+alt+click on a line of source actually goes: caller class#method + line ->
+   * the class and method it called there.
+   *
+   * <p>There is no real parser here, only what was recorded, so this only ever knows about a
+   * line that made a call the agent actually saw. The first invocation recorded at a call
+   * site wins; a line that dispatched to different targets across the run (an interface
+   * called through different implementations) can only point at one of them.
+   */
+  var callTargetByLine = {};
+  calls.forEach(function (c) {
+    if (c.parentSeq < 0 || c.callSiteLine == null) return;
+    var parent = nodeBySeq[c.parentSeq];
+    if (!parent || parent.className == null) return;
+    var key = parent.className + '#' + parent.methodName + ':' + c.callSiteLine;
+    if (callTargetByLine[key] === undefined) {
+      callTargetByLine[key] = c.sql != null ? null : { className: c.className, methodName: c.methodName };
     }
   });
 
@@ -1254,7 +1435,9 @@
       // pass, which only runs on a scroll or resize. Left stale, the cached offset below
       // this row is wrong until the next scroll event corrects it mid-scroll, which on
       // its own was a second way for the page to jump under a reader's feet.
-      var hh = tr.offsetHeight;
+      var hh = tr.getBoundingClientRect().height;
+      var hk = rowKey(r);
+      if (hk) heightCache[hk] = hh;
       if (hh && r.vi != null && rowHeights[r.vi] !== hh) {
         rowHeights[r.vi] = hh;
         rebuildOffsets();
@@ -1276,7 +1459,12 @@
     var file = fileByClass[node.className];
     var kids = childrenBySeq[node.seq] || [];
     var lines = linesByMethod[node.className + '#' + node.methodName] || [];
-    var foldable = kids.length > 0 || lines.length > 0;
+    // Structure (who this called) and detail (what its own lines did) fold independently,
+    // so each has its own affordance and its own gesture: the caret — and ctrl/cmd+click
+    // anywhere on the row — is always structural, a plain click always toggles detail.
+    var hasKids = kids.length > 0;
+    var hasLines = lines.length > 0;
+    var foldable = hasKids || hasLines;
 
     // The signature is kept lower-cased on the record so the code filter can match a frame
     // by class or method name, not only by the source text underneath it.
@@ -1290,13 +1478,19 @@
 
     var head = el('div', 'fhead');
     head.appendChild(el('span', 'step', String(node.seq + 1)));
-    var caret = el('span', 'fcaret', foldable ? (collapsedSeqs[node.seq] ? '▸' : '▾') : ' ');
+    var caret = el('span', 'fcaret', hasKids ? (collapsedSeqs[node.seq] ? '▸' : '▾') : ' ');
+    if (hasKids) caret.title = 'Collapse or expand what this called';
     head.appendChild(caret);
     head.appendChild(el('span', 'ffile', (file && file.sourceFileName) || simpleName(node.className) || '?'));
     head.appendChild(el('span', 'fsep', '·'));
     head.appendChild(el('span', 'fmethod', methodLabel(node.methodName, node.className) + '()'));
     var kind = methodKind(node.methodName);
     if (kind) head.appendChild(el('span', 'fkind', kind));
+    if (hasLines) {
+      var dtag = el('span', 'dtag' + (detailShown[node.seq] ? ' on' : ''), 'src');
+      dtag.title = 'Click to show or hide this call’s own source lines';
+      head.appendChild(dtag);
+    }
 
     // "called at :N" points at the CALLER's line, so it links into the caller's file.
     if (node.callSiteLine != null) {
@@ -1334,9 +1528,20 @@
     tr.appendChild(td);
 
     if (foldable) {
-      tr.addEventListener('click', function () {
-        if (collapsedSeqs[node.seq]) delete collapsedSeqs[node.seq];
-        else collapsedSeqs[node.seq] = true;
+      tr.addEventListener('click', function (ev) {
+        // Which part of the row was clicked decides what happens, not a modifier key: the
+        // caret always folds structure, anywhere else on the row always toggles this frame's
+        // own detail. Two different targets rather than two gestures on the same one.
+        var structural = hasKids && ev.target === caret;
+        if (structural) {
+          if (collapsedSeqs[node.seq]) delete collapsedSeqs[node.seq];
+          else collapsedSeqs[node.seq] = true;
+        } else if (hasLines) {
+          if (detailShown[node.seq]) delete detailShown[node.seq];
+          else detailShown[node.seq] = true;
+        } else {
+          return;
+        }
         refreshTree();
       });
     }
@@ -1376,7 +1581,7 @@
     var code = el('td', 'code tcode');
     code.style.setProperty('--depth', depth);
     var text = lineModel.code != null ? lineModel.code : '';
-    paintCode(code, text);
+    if (!paintConditionalLine(code, lineModel)) paintCode(code, text);
     if (lineModel.branchesTotal) {
       code.appendChild(el('span', 'br',
         '   (' + lineModel.branchesCovered + '/' + lineModel.branchesTotal + ' branches)'));
@@ -1586,15 +1791,33 @@
 
     var row = frameRow(node, depth, parentRow);
     treeRows.push(row);
-    if (honourCollapse && collapsedSeqs[node.seq]) return;
 
+    // A plain click reveals this one frame's own detail — its source lines and the queries
+    // they issued — independently of whether its children are structurally expanded. A
+    // search still has to reach into unopened detail to find what it is looking for, the
+    // same reason a structural collapse is overridden below while filtering.
+    var showDetail = detailShown[node.seq] || !honourCollapse;
     var file = fileByClass[node.className];
-    var lines = linesByMethod[node.className + '#' + node.methodName] || [];
+    var lines = showDetail ? (linesByMethod[node.className + '#' + node.methodName] || []) : [];
+
+    if (honourCollapse && collapsedSeqs[node.seq]) {
+      // Structurally collapsed: nothing about what this frame called, but its own lines are
+      // a separate question and can still be open, so they are shown flat rather than
+      // threaded between calls that are not there to thread them around.
+      for (var li0 = 0; li0 < lines.length; li0++) {
+        treeRows.push(codeRow(lines[li0], file, depth + 1, row));
+        if (treeRows.length >= MAX_TREE_ROWS) { treeTruncated = true; return; }
+      }
+      return;
+    }
+
     var kids = (childrenBySeq[node.seq] || []).filter(function (k) {
       if (!timeOk(k.totalMicros || 0)) return false;
       // A query belongs to the frame that issued it, not to a file of its own, so it is
-      // never hidden by the file picker, only by its caller disappearing.
-      return k.sql != null || classSelected(k.className);
+      // never hidden by the file picker, only by its caller disappearing — but it is still
+      // part of this frame's detail, not its structure, so it waits for the same click.
+      if (k.sql != null) return showDetail;
+      return classSelected(k.className);
     });
 
     // With grouping on, every repeat of one call under this parent is counted up front so
@@ -1795,6 +2018,57 @@
   }
 
   /**
+   * The call stack above whichever row sits at the top of the viewport, root first.
+   *
+   * <p>Walks {@code .parent} links rather than re-deriving anything from {@code node}, so
+   * it agrees with whatever the tree actually nested the row under, folds and all.
+   */
+  function crumbChainAt(y) {
+    var idx = rowAt(y);
+    if (idx >= visRows.length) idx = visRows.length - 1;
+    var r = visRows[idx];
+    if (!r) return [];
+    var chain = [];
+    for (var f = (r.kind === 'frame' ? r : r.parent); f; f = f.parent) chain.unshift(f);
+    return chain;
+  }
+
+  /**
+   * Keeps the sticky trail above the tree in sync with whatever the reader has scrolled
+   * to. Without it, a run whose lines call out to several other classes and back reads as
+   * one flat list with no way to tell "back in the caller" from "one level deeper" once the
+   * call that made the jump has scrolled out of view.
+   */
+  function updateTreeCrumb() {
+    if (!treeCrumb) return;
+    if (view !== 'tree' || tab !== 'trace' || !padTop || !rowOffsets || visRows.length === 0) {
+      treeCrumb.hidden = true;
+      return;
+    }
+    var band = treeBand();
+    var chain = crumbChainAt(band.top);
+    // At the very top of the run the first frame's own header is already the top row on
+    // screen, so the trail would just repeat what is one line below it.
+    if (chain.length === 0 || (chain.length === 1 && band.top <= 0)) {
+      treeCrumb.hidden = true;
+      return;
+    }
+    treeCrumb.hidden = false;
+    treeCrumb.textContent = '';
+    chain.forEach(function (fr, i) {
+      if (i > 0) treeCrumb.appendChild(el('span', 'sep', '›'));
+      var node = fr.node;
+      var file = fileByClass[node.className];
+      var seg = el('span', 'seg');
+      seg.appendChild(el('span', null, (file && file.sourceFileName) || simpleName(node.className) || '?'));
+      seg.appendChild(el('span', 'm', ' · ' + methodLabel(node.methodName, node.className) + '()'));
+      seg.title = 'Jump to this call (step ' + (node.seq + 1) + ')';
+      seg.addEventListener('click', function () { setCursor(fr); });
+      treeCrumb.appendChild(seg);
+    });
+  }
+
+  /**
    * Draws the rows the page is currently over, and settles the estimates behind them.
    *
    * <p>Rows are not a uniform height, so the offsets start as estimates and are corrected
@@ -1811,6 +2085,7 @@
     // the wrong element, or on none. Re-applied here rather than in paintTreeWindow so it
     // survives all three measurement passes and is only put on once.
     if (landedSeq != null) paintLanded();
+    updateTreeCrumb();
   }
 
   /** One pass. Returns true when measurement moved the rows and another pass is due. */
@@ -1841,8 +2116,12 @@
     // after the pass rather than per row keeps this to a single extra reflow.
     var changed = false;
     for (var k = from; k < to; k++) {
-      var hh = visRows[k].tr.offsetHeight;
+      var hh = visRows[k].tr.getBoundingClientRect().height;
       if (hh && rowHeights[k] !== hh) { rowHeights[k] = hh; changed = true; }
+      if (hh) {
+        var hk = rowKey(visRows[k]);
+        if (hk) heightCache[hk] = hh;
+      }
     }
     if (changed) {
       rebuildOffsets();
@@ -1923,12 +2202,16 @@
       if (!r.vis) return;
       r.vi = visRows.length;
       visRows.push(r);
-      // Only rows still in the document have a height worth keeping. The parentNode test
-      // matters: after a rebuild every row is detached, and asking a detached row for its
-      // offsetHeight forces a layout of an empty table, which makes the browser clamp the
-      // page scroll to zero — that was what threw the reader back to the top of the run
-      // every time a frame was collapsed.
-      rowHeights.push(r.tr && r.tr.parentNode ? r.tr.offsetHeight : 0);
+      // Only rows still in the document have a height worth reading directly. The
+      // parentNode test matters: after a rebuild every row is detached, and asking a
+      // detached row for its offsetHeight forces a layout of an empty table, which makes
+      // the browser clamp the page scroll to zero — that was what threw the reader back to
+      // the top of the run every time a frame was collapsed. A row that was measured before
+      // the rebuild falls back to that measurement instead of the generic estimate, which is
+      // what keeps a screen full of frame rows — each taller than the estimate — from
+      // compounding into a visible jump the next time any one of them is clicked.
+      var cachedH = rowKey(r) ? heightCache[rowKey(r)] : undefined;
+      rowHeights.push(r.tr && r.tr.parentNode ? r.tr.getBoundingClientRect().height : (cachedH || 0));
       if (r.sql && r.kind === 'line') shownSql++;
       else if (r.kind === 'line') shownLines++;
       else if (r.kind === 'frame') shownFrames++;
@@ -1993,6 +2276,26 @@
     window.scrollTo(0, Math.max(0, pageTop + rowOffsets[at] - a.gap));
     renderDirty = true;
     renderTreeWindow();
+    // rowOffsets[at] is still built on the estimate for whatever sits above the window this
+    // just painted — a full rebuild throws away every measured height, and a frame row runs
+    // taller than a code line, so a stretch of frames between the page top and the anchor
+    // compounds into real drift. That is what made the row you clicked slide out from under
+    // the pointer. Settling against the anchor's own rendered position, once it has one,
+    // corrects for that drift regardless of where it came from, instead of trusting the
+    // estimate that placed it there.
+    // One correction is not always enough: scrolling to fix the drift can itself bring a
+    // new row into the window that needed measuring, which moves things again by a little.
+    // Bounded at four rather than looped forever, since a row that never settles (one still
+    // resizing itself, a race with something else on the page) should stop costing reflows
+    // instead of arguing with itself indefinitely.
+    var row = visRows[at];
+    for (var pass = 0; pass < 4 && row.tr && row.tr.parentNode; pass++) {
+      var drift = row.tr.getBoundingClientRect().top - a.gap;
+      if (Math.abs(drift) < 0.5) break;
+      window.scrollBy(0, drift);
+      renderDirty = true;
+      renderTreeWindow();
+    }
   }
 
   var lastRefreshQuery = null;
@@ -2059,10 +2362,11 @@
   }
 
   function applyFileFilters() {
+    if (!selectedEntry) selectedEntry = defaultFileEntry();
     var q = queryFor('trace').trim().toLowerCase();
-    var shownLines = 0, shownFiles = 0;
+    var shownLines = 0, shownFiles = 0, firstMatch = null;
     entries.forEach(function (e) {
-      if (!e.checkbox.checked) { e.box.hidden = true; return; }
+      if (!e.checkbox.checked) { e.matches = false; return; }
       var anyVisible = false;
       e.rows.forEach(function (r) {
         r.vis = statusOn[r.status]
@@ -2080,15 +2384,30 @@
         if (s.tr) s.tr.style.display = s.vis ? '' : 'none';
         if (s.vis) anyVisible = true;
       });
-      e.box.hidden = !anyVisible;
-      if (anyVisible) shownFiles++;
+      e.matches = anyVisible;
+      if (anyVisible) { shownFiles++; if (!firstMatch) firstMatch = e; }
+    });
+    // A search the selected file stops matching would otherwise leave the main pane showing
+    // a file's worth of nothing, with no clue which of the others actually matched.
+    if (selectedEntry && !selectedEntry.matches && firstMatch) selectedEntry = firstMatch;
+    // Whatever just became selected is shown open, whether it got there by a click that
+    // already did this or by landing here on its own account (a fresh default, a search
+    // that moved the selection): a generated or excluded file starts collapsed, and that
+    // has to be undone the moment it is the one thing on screen.
+    if (selectedEntry) setCollapsed(selectedEntry, false);
+    entries.forEach(function (e) {
+      e.box.hidden = !e.matches || e !== selectedEntry;
+      if (e.sidebarItem) e.sidebarItem.hidden = !e.matches;
+    });
+    Array.prototype.forEach.call(fileSidebar.children, function (n) {
+      n.classList.toggle('on', !!selectedEntry && n === selectedEntry.sidebarItem);
     });
     attachVisibleFiles();
     countEl.textContent = 'Showing ' + shownLines + ' of ' + totalLines
       + ' line(s) · ' + shownFiles + ' file(s)';
-    // Keyed on files, not lines: collapsing every method section leaves the files on
-    // screen with no lines under them, and "No lines match the current filters" printed
-    // over a page full of file headers reads as a bug in the report.
+    // Keyed on files, not lines: collapsing every method section leaves the file on screen
+    // with no lines under it, and "No lines match the current filters" printed over its
+    // header would read as a bug in the report.
     emptyEl.hidden = shownFiles !== 0;
     updateNotice();
     if (cursor && cursor.tr
@@ -2225,9 +2544,61 @@
       list.sort(function (a, b) { return a.order - b.order; });
     }
     ordered = list;
-    list.forEach(function (e) { root.appendChild(e.box); });
+    list.forEach(function (e, i) {
+      root.appendChild(e.box);
+      fileSidebar.appendChild(e.sidebarItem);
+      e.fsNum.textContent = (i + 1) + '.';
+    });
   }
   sortEl.addEventListener('change', applySort);
+
+  /** The file the main pane opens on when nothing has picked one yet: the trace point's own
+   *  file, so Files and Tree agree on where a reader starts, falling back to the sorted
+   *  list's first entry when there is no call tree to take the trace point from. */
+  function defaultFileEntry() {
+    var rootEntry = (treeAvailable && roots.length) ? entryByClass[roots[0].className] : null;
+    return rootEntry || ordered[0] || entries[0] || null;
+  }
+
+  /** Shows exactly one file's source in the main pane, IDE-tab style. */
+  function selectFile(entry) {
+    if (!entry || entry === selectedEntry) return;
+    selectedEntry = entry;
+    if (entry.sidebarItem) entry.sidebarItem.scrollIntoView({ block: 'nearest' });
+    applyFileFilters();
+  }
+
+  /**
+   * Ctrl+Alt+click on a line that made a recorded call: opens the class it called into, at
+   * the method it called, the same "go to declaration" a real IDE gives a ctrl/cmd+click.
+   *
+   * <p>Only ever knows about calls the agent actually recorded — see callTargetByLine — so a
+   * class with no resolved source (a JDK type, a third-party jar) has nowhere to go, and this
+   * quietly does nothing rather than open an empty pane.
+   */
+  function navigateToMethod(className, methodName) {
+    var entry = entryByClass[className];
+    if (!entry) return;
+    selectFile(entry);
+    var section = null;
+    for (var i = 0; i < entry.sections.length; i++) {
+      if (entry.sections[i].name === methodName) { section = entry.sections[i]; break; }
+    }
+    if (section && section.collapsed) {
+      section.collapsed = false;
+      applyFileFilters();
+    }
+    if (section && section.tr) {
+      section.tr.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      // Restarting the animation matters when the same section is landed on twice in a row:
+      // without the reflow between removals the browser treats it as one running animation.
+      section.tr.classList.remove('landed');
+      void section.tr.offsetWidth;
+      section.tr.classList.add('landed');
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }
 
   // -------------------------------------------------------------------- fold ---
 
@@ -2239,12 +2610,19 @@
   function foldAll(collapsed) {
     if (view === 'tree') {
       collapsedSeqs = {};
+      detailShown = {};
       if (collapsed) {
         // Collapse every frame that has something under it, except the roots, a fully
-        // collapsed tree with no visible entry point would be a dead end.
+        // collapsed tree with no visible entry point would be a dead end. Same state the
+        // tree opens on; this is the button that gets you back to it.
         calls.forEach(function (c) {
           if (c.parentSeq >= 0) collapsedSeqs[c.seq] = true;
         });
+      } else {
+        // "Expand all" means everything, detail included: every frame's own lines and
+        // queries too, not only its structure — the one-page, nothing-hidden view the tree
+        // used to open on by default.
+        calls.forEach(function (c) { detailShown[c.seq] = true; });
       }
       refreshTree();
     } else {
@@ -2713,7 +3091,7 @@
             ['timeline', 'Timeline'], ['findings', 'Findings']
           ], tabs: true
         },
-        { key: 'view', label: 'Call Tree view', options: [['tree', 'Tree'], ['files', 'Files']] },
+        { key: 'view', label: 'Call Tree view', options: [['tree', 'Tree'], ['files', 'IDE']] },
         { key: 'density', label: 'Density', options: [['normal', 'Normal'], ['compact', 'Compact']] },
         { key: 'theme', label: 'Theme', options: [['auto', 'Follow my system'], ['light', 'Light'], ['dark', 'Dark']] }
       ],
@@ -2781,9 +3159,10 @@
       return;
     }
     applyPrefs();
-    // The tree's cached row heights were measured at the old density, and the timeline
-    // draws its bars from measured widths; both have to be taken again.
-    if (view === 'tree') { renderDirty = true; renderTreeWindow(); }
+    // The tree's cached row heights, including the ones kept across a rebuild, were
+    // measured at the old density, and the timeline draws its bars from measured widths;
+    // both have to be taken again.
+    if (view === 'tree') { heightCache = {}; renderDirty = true; renderTreeWindow(); }
     if (tab === 'timeline' && timelineBuilt) renderTimeline();
   }
 
@@ -2973,7 +3352,7 @@
       });
     } else {
       ordered.forEach(function (e) {
-        if (!e.checkbox.checked || e.box.hidden) return;
+        if (!e.checkbox.checked) return;
         e.rows.forEach(function (r) {
           if (r.status !== 'FULL' && statusOn[r.status]) out.push(r);
         });
@@ -2989,6 +3368,7 @@
     var next = i === -1 ? (delta > 0 ? 0 : list.length - 1) : (i + delta + list.length) % list.length;
     var rec = list[next];
     if (view === 'files') {
+      selectFile(rec.entry);
       setCollapsed(rec.entry, false);
       if (rec.section && rec.section.collapsed) {
         rec.section.collapsed = false;
@@ -3004,7 +3384,7 @@
     if (view === 'tree') {
       return treeRows.filter(function (r) { return r.kind === 'frame' && r.vis; });
     }
-    return ordered.filter(function (e) { return e.checkbox.checked && !e.box.hidden; });
+    return ordered.filter(function (e) { return e.checkbox.checked; });
   }
 
   function jumpStop(delta) {
@@ -3021,7 +3401,8 @@
       scrollTreeToRow(s);
       return;
     }
-    s.h.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    selectFile(s);
+    window.scrollTo(0, 0);
   }
 
   function isTyping(t) {
@@ -3202,9 +3583,6 @@
       msgs.push('Tree display truncated at ' + MAX_TREE_ROWS
         + ' rows. Use "≥ 1 ms" to prune fast calls, or collapse frames.');
     }
-    if (view === 'files' && entries.length > AUTO_COLLAPSE_ABOVE) {
-      msgs.push(entries.length + ' files. Press e to expand everything, ? for shortcuts.');
-    }
     noticeEl.hidden = msgs.length === 0;
     noticeEl.textContent = msgs.join('  ');
   }
@@ -3217,15 +3595,24 @@
       + "that step's own total if the method was called more than once."
     : '';
 
-  // Files view starts collapsed when long, with the slowest few open, so it opens as an
-  // index rather than a wall of code.
-  if (entries.length > AUTO_COLLAPSE_ABOVE) {
-    var hottest = entries.slice()
-      .sort(function (a, b) { return (b.selfWeight - a.selfWeight) || (a.order - b.order); })
-      .slice(0, AUTO_EXPAND_TOP);
-    entries.forEach(function (e) { setCollapsed(e, true); });
-    hottest.forEach(function (e) { setCollapsed(e, false); });
-  }
+  // What the two clicks on a frame do, built from the exact same glyphs the rows use, so
+  // this reads as a key rather than a second description that could drift from them.
+  (function buildClickHint() {
+    var hint = byId('clickHint');
+    if (!treeAvailable) return;
+    hint.hidden = false;
+    function part(caretGlyph, dtagOn, text) {
+      var span = el('span', 'hintpart');
+      if (caretGlyph) span.appendChild(el('span', 'fcaret', caretGlyph));
+      else span.appendChild(el('span', 'dtag' + (dtagOn ? ' on' : ''), 'src'));
+      span.appendChild(el('span', null, ' ' + text));
+      return span;
+    }
+    hint.appendChild(part('▸', false, 'expands what a call made'));
+    hint.appendChild(el('span', 'hintsep', '·'));
+    hint.appendChild(part(null, true, 'on a row shows or hides its own source'));
+  })();
+
   // Data classes and generated code fold shut on arrival, whatever the file count. This is
   // what the file picker used to do by starting them unticked, moved somewhere it cannot be
   // mistaken for a filter: the header, the line counts and the timings all stay on screen,
