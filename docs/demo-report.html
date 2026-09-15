@@ -150,6 +150,32 @@ h1{font-size:1.05rem;margin:0;}
 .toggle:disabled:hover{background:var(--control);border-color:var(--hairline);}
 
 /* ------------------------------------------------------------------ files --- */
+/* IDE view: a file list down the side, one file's source filling the rest of the page —
+   same split as a real editor's project panel plus the pane it opens files into. */
+.idewrap{display:flex;align-items:flex-start;gap:.9rem;}
+.filesidebar{flex:0 0 15rem;max-width:40vw;max-height:calc(100vh - var(--metaH) - var(--toolbarH) - 2rem);
+  overflow-y:auto;position:sticky;top:calc(var(--metaH) + var(--toolbarH) + .7rem);
+  border:1px solid var(--hairline);border-radius:var(--radius);background:var(--panel);
+  padding:.35rem;}
+.filesidebar .fsitem{display:flex;align-items:center;gap:.4rem;padding:.35rem .5rem;
+  border-radius:var(--radius-sm);cursor:pointer;font-size:.8rem;}
+.filesidebar .fsitem:hover{background:var(--control-hover);}
+.filesidebar .fsitem.on{background:var(--accent);color:#fff;}
+.filesidebar .fsitem .fsnum{flex:0 0 auto;min-width:1.3rem;text-align:right;
+  color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums;}
+.filesidebar .fsitem.on .fsnum{color:rgba(255,255,255,.85);}
+.filesidebar .fsitem .fsname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;}
+.filesidebar .fsitem .fsred{flex:0 0 auto;font-size:.68rem;font-weight:700;color:var(--none);}
+.filesidebar .fsitem.on .fsred{color:#fff;}
+.filesidebar .fsitem[hidden]{display:none;}
+.filemain{flex:1 1 auto;min-width:0;}
+.filemain .file{margin:0;}
+/* A line whose recorded call ctrl+alt+click can follow to another file. Marked with a small
+   arrow after the line rather than on the token itself, since the report has no real parser
+   to point at just the call expression — same treatment as the branch-coverage note beside
+   it, not a claim about exactly which word is special. */
+.goarrow{color:var(--accent);font-weight:700;margin-left:.4rem;}
+tr.gorow:hover td.code{background:var(--control-hover);cursor:pointer;}
 /* No overflow on .file: an overflow value here would make it the nearest scroll
    container and the sticky h2 would never stick. The radius is clipped by
    .scroll instead. */
@@ -174,6 +200,21 @@ h1{font-size:1.05rem;margin:0;}
 .file.collapsed h2{border-bottom:none;border-radius:var(--radius);}
 .file.collapsed .scroll{display:none;}
 .scroll{overflow-x:auto;border-radius:0 0 var(--radius) var(--radius);}
+
+/* ------------------------------------------------------------- treecrumb --- */
+/* The current call stack, pinned under the toolbar. Sticky rather than fixed, so it
+   only appears once the tree has scrolled underneath it and never floats over the
+   toolbar or the summary row above the tree. */
+.treecrumb{position:sticky;top:calc(var(--metaH) + var(--toolbarH));z-index:4;
+  display:flex;align-items:center;gap:.25rem;overflow-x:auto;white-space:nowrap;
+  padding:.35rem .6rem;margin-bottom:.5rem;border-radius:8px;
+  background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  border:1px solid var(--hairline);box-shadow:var(--elev-sm);
+  font-size:.74rem;color:var(--muted);}
+.treecrumb .seg{flex:0 0 auto;cursor:pointer;padding:.1rem .35rem;border-radius:5px;color:var(--fg);}
+.treecrumb .seg:hover{background:var(--control-hover);}
+.treecrumb .seg .m{color:var(--muted);}
+.treecrumb .sep{flex:0 0 auto;color:var(--muted);}
 
 /* ------------------------------------------------------------------- rows --- */
 table{border-collapse:collapse;width:100%;
@@ -201,6 +242,9 @@ tr.NONE{background:var(--none-bg);} tr.NONE td.code{box-shadow:inset 3px 0 0 var
 tr.cursor td{background:var(--heat);}
 tr.cursor td.code{box-shadow:inset 3px 0 0 var(--accent);}
 .br{color:var(--muted);font-size:.72rem;}
+.cond-true{background:var(--full-bg);box-shadow:inset 0 -2px 0 var(--full);border-radius:2px;}
+.cond-false{background:var(--none-bg);box-shadow:inset 0 -2px 0 var(--none);border-radius:2px;}
+.cond-neutral{opacity:.6;border-bottom:1px dashed var(--muted);}
 
 /* ----------------------------------------------------- method sections --- */
 tr.mrow td{
@@ -221,6 +265,15 @@ tr.mrow:first-child td{border-top:none;}
 .treewrap{border:1px solid var(--border);border-radius:8px;}
 #treeTable{width:100%;}
 .fidelity{font-size:.74rem;color:var(--muted);margin:0 0 .5rem;}
+/* What the two clicks on a frame do, built from the exact glyphs the rows themselves use. */
+.clickhint{display:flex;align-items:center;flex-wrap:wrap;gap:.55rem;
+  font-size:.76rem;color:var(--muted);margin:0 0 .6rem;}
+.clickhint .hintpart{display:inline-flex;align-items:center;gap:.3rem;}
+.clickhint .hintsep{color:var(--border);}
+.clickhint .fcaret{color:var(--muted);width:auto;}
+.clickhint .dtag{flex:0 0 auto;font-size:.66rem;font-weight:700;letter-spacing:.03em;
+  padding:.05rem .32rem;border-radius:99px;border:1px solid var(--border);color:var(--muted);}
+.clickhint .dtag.on{border-color:var(--accent);color:var(--accent);}
 
 tr.frame td{
   padding:.26rem .5rem;background:var(--panel);
@@ -247,6 +300,13 @@ tr.frame.hot td{background:var(--heat);}
 .fhead .fsep{color:var(--muted);}
 .fhead .fmethod{font-weight:600;font-size:.82rem;}
 .fhead .fkind{color:var(--muted);font-weight:400;font-style:italic;font-size:.76rem;}
+/* Whether this frame's own source is currently shown. Muted and outlined when it isn't —
+   an invitation, not a warning — filled with the accent once a click has opened it, the
+   same "on" language the toolbar's own toggle buttons use. */
+.fhead .dtag{flex:0 0 auto;font-size:.66rem;font-weight:700;letter-spacing:.03em;
+  padding:.05rem .32rem;border-radius:99px;border:1px solid var(--border);color:var(--muted);
+  cursor:pointer;}
+.fhead .dtag.on{border-color:var(--accent);color:var(--accent);}
 .fhead .fsite{color:var(--muted);font-size:.72rem;}
 .fhead .fsite a{color:inherit;text-decoration:none;}
 .fhead .fsite a:hover{color:var(--accent);text-decoration:underline;}
@@ -659,7 +719,7 @@ tr:hover .rowcopy,.graphrow:hover .rowcopy,.rowcopy:focus-visible{opacity:1;}
   :root{--toolbarH:0px;--metaH:0px;}
   body{padding:0;background:#fff;color:#000;}
   header .headtools,.toolbar,#tabSeg,.legend,.search,#fileMenu,.help,.act,
-  .zoomseg,#flowPngBtn{display:none !important;}
+  .zoomseg,#flowPngBtn,.treecrumb{display:none !important;}
   .meta{position:static;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;
     border-bottom:none;}
   .meta,.summary{break-inside:avoid;}
@@ -775,7 +835,8 @@ tr.landed td,.file.landed h2,.tlrow.landed{
 <!--tab:trace-->  <span class="ctlgroup" id="traceControls">
   <div class="seg" id="viewSeg" role="tablist">
     <button class="segbtn on" id="viewTree" type="button" role="tab" aria-selected="true">Tree</button>
-    <button class="segbtn" id="viewFiles" type="button" role="tab" aria-selected="false">Files</button>
+    <button class="segbtn" id="viewFiles" type="button" role="tab" aria-selected="false"
+            title="One file at a time, IDE-style — a file list down the side, full source in the middle">IDE</button>
   </div>
 
   <!-- Tree view only -->
@@ -956,13 +1017,25 @@ Press Enter to apply, Esc to cancel.">
   <!-- Tree view: every invocation in execution order -->
   <section id="treeView">
     <p class="fidelity" id="fidelity"></p>
+    <!-- What the two clicks do, spelled out once at the top rather than left for the reader
+         to guess from the caret and the src tag alone. Script fills it in (and hides it when
+         there is no tree) so the glyphs it shows match the real ones exactly. -->
+    <p class="clickhint" id="clickHint" hidden></p>
+    <!-- The call stack above whatever is currently at the top of the viewport, so a run
+         that jumps between classes and back never leaves the reader unsure which method
+         they are inside of. -->
+    <div class="treecrumb" id="treeCrumb" hidden></div>
     <div class="scroll treewrap"><table id="treeTable"></table></div>
     <div class="empty" id="treeEmpty" hidden>No calls match the current filters.</div>
   </section>
 
-  <!-- Files view: per-file line coverage -->
+  <!-- Files view: one file at a time, IDE-style — a file list down the side, the
+       selected file's full source filling the rest of the page. -->
   <section id="filesView" hidden>
-    <div id="root"></div>
+    <div class="idewrap">
+      <nav id="fileSidebar" class="filesidebar" aria-label="Files"></nav>
+      <div id="root" class="filemain"></div>
+    </div>
     <div id="empty" class="empty" hidden>No lines match the current filters.</div>
   </section>
 </div>
@@ -1018,7 +1091,7 @@ Press Enter to apply, Esc to cancel.">
       <dt><kbd>v</kbd></dt><dd>Switch between Tree and Files</dd>
       <dt><kbd>/</kbd></dt><dd>Focus the filter. Every tab has one and each keeps its own</dd>
       <dt><kbd>n</kbd> / <kbd>p</kbd></dt><dd>Next / previous problem line</dd>
-      <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous call frame (Tree) or file (Files)</dd>
+      <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous call frame (Tree) or file (IDE)</dd>
       <dt><kbd>e</kbd> / <kbd>c</kbd></dt><dd>Expand all / collapse all</dd>
       <dt><kbd>h</kbd></dt><dd>Toggle the hot path (Tree)</dd>
       <dt><kbd>f</kbd></dt><dd>Open the file picker</dd>
@@ -1119,6 +1192,16 @@ Press Enter to apply, Esc to cancel.">
     <i>within</i> a method are shown in source order and merged across invocations, so a
     loop body appears once rather than once per iteration, and a method called twice shows
     the same lines under both frames.</p>
+    <p><b>Structure and detail fold apart.</b> The tree opens with every call already in
+    place &mdash; the full shape of who called what, with nothing collapsed &mdash; but a
+    frame's own source lines and the queries they issued stay out of the way until asked
+    for, marked by the <b>src</b> tag. Click anywhere on a row to show or hide that one
+    frame's detail; click its <b>caret</b> specifically to fold away everything <i>it</i>
+    called, for the rare branch that is wide enough to be worth putting away. The two stay
+    independent: reading one frame's lines never pulls in its children's lines too.
+    <b>Expand all</b> reveals every frame's detail at once, back to how every earlier
+    version of this tree read; <b>Collapse all</b> hides it all again and reopens anything
+    folded by its caret.</p>
     <p><b>Essential / Full.</b> <i>Essential</i> folds calls into your excluded types
     (entities, DTOs, other data classes) into a single <b>&hellip; N excluded calls</b> row
     at the call site, the count and total time stay visible, and clicking the row
@@ -1134,7 +1217,7 @@ Press Enter to apply, Esc to cancel.">
     <b>Settings &rarr; Tools &rarr; Deju Trace</b>, or with <b>Excluded types&hellip;</b>
     in the Deju tool window; the recording itself is always complete, so nothing here is
     ever lost. A nested class follows the class it lives in, so excluding a wrapper also
-    excludes the builder generated inside it. In the Files view, excluded types are
+    excludes the builder generated inside it. In the IDE view, excluded types are
     rendered like any other file but start folded shut.</p>
     <p>Exclusions are applied when a report is <i>written</i>, so this file is a snapshot of
     the rules at that moment, changing them later never alters an existing report.
@@ -1145,16 +1228,22 @@ Press Enter to apply, Esc to cancel.">
     recorded. A long statement is trimmed to three lines with <b>Show full query</b> to open
     it; the <b>SQL</b> button in the toolbar hides queries altogether when you want to read
     control flow on its own.</p>
+    <p><b>The IDE view.</b> A file list down the side, one file's full source filling the
+    rest of the page &mdash; the same split as a real editor's project panel and the pane it
+    opens files into, and it opens on the trace point's own file. <b>Ctrl/Cmd+Alt+click</b> a
+    line that made a recorded call to open the class and method it called, wherever that
+    class lives; the small <b>↷</b> after a line is what marks one. This only ever knows
+    about a call the agent actually recorded, so a line into a JDK type or a third-party jar
+    has nowhere on this page to go, and the click quietly does nothing.</p>
     <p><b>Files.</b> The <b>Files</b> dropdown works in both views and means the same thing
-    in each: unticking a file removes it from the Files view and hides its calls, and
-    everything underneath them, from the Tree, so you can strip a trace down to the layer
+    in each: unticking a file removes it from the IDE view's sidebar and hides its calls,
+    and everything underneath them, from the Tree, so you can strip a trace down to the layer
     you care about. The traced method's own frame always stays, since hiding the entry point
-    would empty the diagram. Data classes and generated code start ticked but folded shut,
-    so the page opens on the code worth reading without anything being filtered out behind
-    your back.</p>
+    would empty the diagram. Data classes and generated code start ticked but folded shut, so
+    opening one from the sidebar does not land you on a wall of generated code by accident.</p>
     <p><b>Open in IDE</b> uses <code>jetbrains://</code> links, which are handled by
     JetBrains Toolbox. If nothing happens when you click a line number, Toolbox is not
-    installed, use <b>Copy path</b> in the Files view instead.</p>
+    installed, use <b>Copy path</b> in the IDE view instead.</p>
     <p><b>Sharing a spot.</b> The address bar follows what you are looking at, tab, view,
     filter and the selected step, so the link in it opens this report where you are. The
     copy button on a step (or <kbd>Shift</kbd>+<kbd>C</kbd>) puts that one frame on the
@@ -1189,7 +1278,7 @@ Press Enter to apply, Esc to cancel.">
 <!-- What the export dialog chose. Read once at load; absent in a report written by an older
      plugin, in which case the script's own defaults apply and nothing changes. -->
 <script type="application/json" id="deju-prefs">{"openTab": "trace", "view": "tree", "density": "normal", "theme": "auto", "showTime": true, "showPercent": true, "showStep": true, "showLine": true, "sql": true, "groupRepeats": false, "collapseTree": false, "collapseSections": false}</script>
-<script type="application/json" id="deju-data">{"target": "com.example.order.OrderController#placeOrder", "startedAtIso": "2026-07-31T09:24:18.221Z", "durationMs": 48, "cpuMicros": 43100, "projectName": "example-api", "files": [{"fqClassName": "com.example.order.OrderController", "sourceFileName": "OrderController.java", "path": "src/main/java/com/example/order/OrderController.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderController.java", "lines": [{"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3, "methodTotalMicros": 47900, "methodSelfMicros": 560, "methodName": "placeOrder", "methodStart": true, "code": "    @PostMapping"}, {"line": 22, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 41, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        if (request.items().isEmpty()) {"}, {"line": 23, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "            return ResponseEntity.badRequest().build();"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 47340, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        OrderDto receipt = orders.place(request);"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        return ResponseEntity.ok(receipt);"}]}, {"fqClassName": "com.example.order.OrderService", "sourceFileName": "OrderService.java", "path": "src/main/java/com/example/order/OrderService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderService.java", "lines": [{"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 18, "methodTotalMicros": 47340, "methodSelfMicros": 350, "methodName": "place", "methodStart": true, "code": "        for (String name : request.items()) {"}, {"line": 22, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "            order.add(menu.findByName(name));   // one query per drink"}, {"line": 23, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12650, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        }"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 640, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        Money total = discounts.apply(subtotal, request.customerId());"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3980, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        loyalty.award(request.customerId(), total);"}, {"line": 27, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 2210, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        orders.save(order, total);"}, {"line": 28, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 27200, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        return OrderDto.of(order, total);"}, {"line": 29, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 310, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "    }"}]}, {"fqClassName": "com.example.menu.MenuRepository", "sourceFileName": "MenuRepository.java", "path": "src/main/java/com/example/menu/MenuRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/menu/MenuRepository.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12650, "methodTotalMicros": 12650, "methodSelfMicros": 190, "methodName": "findByName", "methodStart": true, "code": "        return jdbc.queryForObject("}]}, {"fqClassName": "com.example.pricing.PriceCalculator", "sourceFileName": "PriceCalculator.java", "path": "src/main/java/com/example/pricing/PriceCalculator.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/PriceCalculator.java", "lines": [{"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 11, "methodTotalMicros": 640, "methodSelfMicros": 90, "methodName": "total", "methodStart": true, "code": "        Money sum = Money.ZERO;"}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 17, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 512, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "            sum = sum.plus(priceOf(line.drink(), size));"}, {"line": 19, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        return sum;"}, {"line": 22, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 180, "methodTotalMicros": 512, "methodSelfMicros": 512, "methodName": "priceOf", "methodStart": true, "code": "    Money priceOf(Drink drink, Size size) {"}, {"line": 23, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 121, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        Money price = drink.basePrice();"}, {"line": 24, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 96, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        if (size == Size.LARGE) {"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 115, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        }"}]}, {"fqClassName": "com.example.pricing.DiscountPolicy", "sourceFileName": "DiscountPolicy.java", "path": "src/main/java/com/example/pricing/DiscountPolicy.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/DiscountPolicy.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 9, "methodTotalMicros": 3980, "methodSelfMicros": 70, "methodName": "apply", "methodStart": true, "code": "        Money total = subtotal;"}, {"line": 14, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 3910, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (loyalty.isMember(customerId)) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 22, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(10);"}, {"line": 17, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "timeMicros": 27, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (total.isOver(Money.pounds(20))) {"}, {"line": 18, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(5);"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        return total;"}]}, {"fqClassName": "com.example.loyalty.LoyaltyService", "sourceFileName": "LoyaltyService.java", "path": "src/main/java/com/example/loyalty/LoyaltyService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/loyalty/LoyaltyService.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3860, "methodTotalMicros": 3910, "methodSelfMicros": 50, "methodName": "isMember", "methodStart": true, "code": "                \"select count(*) from membership where customer_id = ?\","}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "isMember", "methodStart": false, "code": "    }"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 18, "methodTotalMicros": 2210, "methodSelfMicros": 60, "methodName": "award", "methodStart": true, "code": "        int points = total.wholePounds();"}, {"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 2150, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "award", "methodStart": false, "code": "        jdbc.update(\"update customer set points = points + ? where id = ?\","}]}, {"fqClassName": "com.example.order.OrderRepository", "sourceFileName": "OrderRepository.java", "path": "src/main/java/com/example/order/OrderRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderRepository.java", "lines": [{"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 3100, "methodTotalMicros": 27200, "methodSelfMicros": 200, "methodName": "save", "methodStart": true, "code": "        jdbc.update(\"insert into customer_order (customer_id, total_pence) values (?, ?)\","}, {"line": 14, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "timeMicros": 21, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 23900, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "            jdbc.update(\"insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)\","}]}, {"fqClassName": "com.example.order.OrderDto", "sourceFileName": "OrderDto.java", "path": "src/main/java/com/example/order/OrderDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderDto.java", "lines": [{"line": 9, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 14, "methodTotalMicros": 310, "methodSelfMicros": 120, "methodName": "of", "methodStart": true, "code": "        return new OrderDto("}, {"line": 10, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.id(),"}, {"line": 11, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 11, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.currency(),"}, {"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.pence(),"}, {"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 190, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.lines().stream().map(OrderLineDto::of).toList());"}]}, {"fqClassName": "com.example.order.OrderLineDto", "sourceFileName": "OrderLineDto.java", "path": "src/main/java/com/example/order/OrderLineDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderLineDto.java", "lines": [{"line": 6, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "timeMicros": 190, "methodTotalMicros": 190, "methodSelfMicros": 190, "methodName": "of", "methodStart": true, "code": "        return new OrderLineDto(line.drink().name(), line.pricePence());"}]}], "calls": {"n": 36, "classTable": ["com.example.order.OrderController", "com.example.order.OrderService", "com.example.menu.MenuRepository", "com.example.pricing.PriceCalculator", "com.example.pricing.DiscountPolicy", "com.example.loyalty.LoyaltyService", "com.example.order.OrderRepository", "com.example.order.OrderDto", "com.example.order.OrderLineDto"], "methodTable": ["placeOrder", "place", "findByName", "total", "priceOf", "apply", "isMember", "award", "save", "of"], "sqlTable": ["select id, name, base_price_pence from drink where name = ?", "select count(*) from membership where customer_id = ?", "update customer set points = points + ? where id = ?", "insert into customer_order (customer_id, total_pence) values (?, ?)", "insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)"], "parentSeq": [-1, 0, 1, 2, 1, 4, 1, 6, 1, 8, 1, 10, 1, 12, 12, 12, 12, 12, 1, 18, 19, 1, 21, 1, 23, 23, 23, 23, 23, 23, 1, 30, 30, 30, 30, 30], "className": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 3, 3, 3, 3, 3, 4, 5, -1, 5, -1, 6, -1, -1, -1, -1, -1, -1, 7, 8, 8, 8, 8, 8], "methodName": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 4, 4, 4, 4, 4, 5, 6, -1, 7, -1, 8, -1, -1, -1, -1, -1, -1, 9, 9, 9, 9, 9, 9], "sql": [-1, -1, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, 2, -1, 3, 4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1], "callSiteLine": [null, 25, 23, 13, 23, 13, 23, 13, 23, 13, 23, 13, 25, 17, 17, 17, 17, 17, 26, 14, 13, 27, 21, 28, 12, 15, 15, 15, 15, 15, 29, 13, 13, 13, 13, 13], "totalMicros": [47900, 47340, 8120, 8000, 1180, 1060, 1090, 970, 1150, 1030, 1110, 990, 640, 140, 96, 92, 94, 90, 3980, 3910, 3860, 2210, 2150, 27200, 3100, 4900, 4780, 4760, 4740, 4720, 310, 52, 36, 34, 34, 34]}, "callsTruncated": false, "agentVersion": "2.1.0", "pluginVersion": "2.1.0", "excludedClasses": ["com.example.order.OrderDto", "com.example.order.OrderLineDto"], "excludedOmitted": false}</script>
+<script type="application/json" id="deju-data">{"target": "com.example.order.OrderController#placeOrder", "startedAtIso": "2026-07-31T09:24:18.221Z", "durationMs": 48, "cpuMicros": 43100, "projectName": "example-api", "files": [{"fqClassName": "com.example.order.OrderController", "sourceFileName": "OrderController.java", "path": "src/main/java/com/example/order/OrderController.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderController.java", "lines": [{"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3, "methodTotalMicros": 47900, "methodSelfMicros": 560, "methodName": "placeOrder", "methodStart": true, "code": "    @PostMapping"}, {"line": 22, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "operandStatus": null, "timeMicros": 41, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        if (request.items().isEmpty()) {"}, {"line": 23, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "            return ResponseEntity.badRequest().build();"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 47340, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        OrderDto receipt = orders.place(request);"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        return ResponseEntity.ok(receipt);"}]}, {"fqClassName": "com.example.order.OrderService", "sourceFileName": "OrderService.java", "path": "src/main/java/com/example/order/OrderService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderService.java", "lines": [{"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 18, "methodTotalMicros": 47340, "methodSelfMicros": 350, "methodName": "place", "methodStart": true, "code": "        for (String name : request.items()) {"}, {"line": 22, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "            order.add(menu.findByName(name));   // one query per drink"}, {"line": 23, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12650, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        }"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 640, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        Money total = discounts.apply(subtotal, request.customerId());"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3980, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        loyalty.award(request.customerId(), total);"}, {"line": 27, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 2210, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        orders.save(order, total);"}, {"line": 28, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 27200, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        return OrderDto.of(order, total);"}, {"line": 29, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 310, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "    }"}]}, {"fqClassName": "com.example.menu.MenuRepository", "sourceFileName": "MenuRepository.java", "path": "src/main/java/com/example/menu/MenuRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/menu/MenuRepository.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12650, "methodTotalMicros": 12650, "methodSelfMicros": 190, "methodName": "findByName", "methodStart": true, "code": "        return jdbc.queryForObject("}]}, {"fqClassName": "com.example.pricing.PriceCalculator", "sourceFileName": "PriceCalculator.java", "path": "src/main/java/com/example/pricing/PriceCalculator.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/PriceCalculator.java", "lines": [{"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 11, "methodTotalMicros": 640, "methodSelfMicros": 90, "methodName": "total", "methodStart": true, "code": "        Money sum = Money.ZERO;"}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 17, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 512, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "            sum = sum.plus(priceOf(line.drink(), size));"}, {"line": 19, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        return sum;"}, {"line": 22, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 180, "methodTotalMicros": 512, "methodSelfMicros": 512, "methodName": "priceOf", "methodStart": true, "code": "    Money priceOf(Drink drink, Size size) {"}, {"line": 23, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 121, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        Money price = drink.basePrice();"}, {"line": 24, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 96, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        if (size == Size.LARGE) {"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 115, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        }"}]}, {"fqClassName": "com.example.pricing.DiscountPolicy", "sourceFileName": "DiscountPolicy.java", "path": "src/main/java/com/example/pricing/DiscountPolicy.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/DiscountPolicy.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": 3980, "methodSelfMicros": 70, "methodName": "apply", "methodStart": true, "code": "        Money total = subtotal;"}, {"line": 14, "status": "PARTIAL", "branchesCovered": 2, "branchesTotal": 4, "operandStatus": ["TRUE_ONLY", "FALSE_ONLY"], "timeMicros": 3910, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (loyalty.isMember(customerId) && loyalty.hasCredit(customerId)) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 22, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(10);"}, {"line": 17, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "operandStatus": null, "timeMicros": 27, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (total.isOver(Money.pounds(20))) {"}, {"line": 18, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(5);"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        return total;"}]}, {"fqClassName": "com.example.loyalty.LoyaltyService", "sourceFileName": "LoyaltyService.java", "path": "src/main/java/com/example/loyalty/LoyaltyService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/loyalty/LoyaltyService.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3860, "methodTotalMicros": 3910, "methodSelfMicros": 50, "methodName": "isMember", "methodStart": true, "code": "                \"select count(*) from membership where customer_id = ?\","}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "isMember", "methodStart": false, "code": "    }"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 18, "methodTotalMicros": 2210, "methodSelfMicros": 60, "methodName": "award", "methodStart": true, "code": "        int points = total.wholePounds();"}, {"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 2150, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "award", "methodStart": false, "code": "        jdbc.update(\"update customer set points = points + ? where id = ?\","}]}, {"fqClassName": "com.example.order.OrderRepository", "sourceFileName": "OrderRepository.java", "path": "src/main/java/com/example/order/OrderRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderRepository.java", "lines": [{"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3100, "methodTotalMicros": 27200, "methodSelfMicros": 200, "methodName": "save", "methodStart": true, "code": "        jdbc.update(\"insert into customer_order (customer_id, total_pence) values (?, ?)\","}, {"line": 14, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 21, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 23900, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "            jdbc.update(\"insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)\","}]}, {"fqClassName": "com.example.order.OrderDto", "sourceFileName": "OrderDto.java", "path": "src/main/java/com/example/order/OrderDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderDto.java", "lines": [{"line": 9, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": 310, "methodSelfMicros": 120, "methodName": "of", "methodStart": true, "code": "        return new OrderDto("}, {"line": 10, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.id(),"}, {"line": 11, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 11, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.currency(),"}, {"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.pence(),"}, {"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 190, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.lines().stream().map(OrderLineDto::of).toList());"}]}, {"fqClassName": "com.example.order.OrderLineDto", "sourceFileName": "OrderLineDto.java", "path": "src/main/java/com/example/order/OrderLineDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderLineDto.java", "lines": [{"line": 6, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 190, "methodTotalMicros": 190, "methodSelfMicros": 190, "methodName": "of", "methodStart": true, "code": "        return new OrderLineDto(line.drink().name(), line.pricePence());"}]}], "calls": {"n": 36, "classTable": ["com.example.order.OrderController", "com.example.order.OrderService", "com.example.menu.MenuRepository", "com.example.pricing.PriceCalculator", "com.example.pricing.DiscountPolicy", "com.example.loyalty.LoyaltyService", "com.example.order.OrderRepository", "com.example.order.OrderDto", "com.example.order.OrderLineDto"], "methodTable": ["placeOrder", "place", "findByName", "total", "priceOf", "apply", "isMember", "award", "save", "of"], "sqlTable": ["select id, name, base_price_pence from drink where name = ?", "select count(*) from membership where customer_id = ?", "update customer set points = points + ? where id = ?", "insert into customer_order (customer_id, total_pence) values (?, ?)", "insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)"], "parentSeq": [-1, 0, 1, 2, 1, 4, 1, 6, 1, 8, 1, 10, 1, 12, 12, 12, 12, 12, 1, 18, 19, 1, 21, 1, 23, 23, 23, 23, 23, 23, 1, 30, 30, 30, 30, 30], "className": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 3, 3, 3, 3, 3, 4, 5, -1, 5, -1, 6, -1, -1, -1, -1, -1, -1, 7, 8, 8, 8, 8, 8], "methodName": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 4, 4, 4, 4, 4, 5, 6, -1, 7, -1, 8, -1, -1, -1, -1, -1, -1, 9, 9, 9, 9, 9, 9], "sql": [-1, -1, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, 2, -1, 3, 4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1], "callSiteLine": [null, 25, 23, 13, 23, 13, 23, 13, 23, 13, 23, 13, 25, 17, 17, 17, 17, 17, 26, 14, 13, 27, 21, 28, 12, 15, 15, 15, 15, 15, 29, 13, 13, 13, 13, 13], "totalMicros": [47900, 47340, 8120, 8000, 1180, 1060, 1090, 970, 1150, 1030, 1110, 990, 640, 140, 96, 92, 94, 90, 3980, 3910, 3860, 2210, 2150, 27200, 3100, 4900, 4780, 4760, 4740, 4720, 310, 52, 36, 34, 34, 34]}, "callsTruncated": false, "agentVersion": "2.1.0", "pluginVersion": "2.1.0", "excludedClasses": ["com.example.order.OrderDto", "com.example.order.OrderLineDto"], "excludedOmitted": false}</script>
 <script>
 /*
  * Deju HTML report behaviour. Inlined verbatim into a <script> element by
@@ -1419,8 +1508,6 @@ Press Enter to apply, Esc to cancel.">
   var rollupOn = true;
   var rollupAvailable = 0;   // roll-up rows the current filters leave on screen
 
-  var AUTO_COLLAPSE_ABOVE = 15;   // file count past which the Files view starts collapsed
-  var AUTO_EXPAND_TOP = 5;        // slowest N left open in that case
   var FOLD_RUN_AFTER = 3;         // identical consecutive sibling calls shown before folding
   // Rows are virtualised now, so this is a guard on how much the tree walk will build,
   // not on what gets laid out. It sits above the agent's own 200k call ceiling so an
@@ -1644,6 +1731,113 @@ Press Enter to apply, Esc to cancel.">
       if (m[0].length === 0) { TOKEN.lastIndex++; }   // never spin on a zero-width match
     }
     if (at < text.length) td.appendChild(document.createTextNode(text.slice(at)));
+  }
+
+  // ------------------------------------------------------ operand coloring ---
+  // Per-operand true/false coloring for a compound `&&`/`||` line (l.operandStatus,
+  // set by PayloadBuilder). Two independent safety nets, either of which falls back
+  // to the plain whole-line paintCode()+branches-annotation rendering: the split must
+  // find exactly one fewer top-level `&&`/`||` than there are decisions, and every
+  // resulting operand must look like a simple (optionally negated) boolean atom, no
+  // comparison/arithmetic/ternary syntax. See the operand-coloring design notes.
+
+  var COND_ATOM = /^!*\s*[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*\s*(?:\([^()]*\))?\s*$/;
+  var COND_LEAD_TRIM = [
+    /^\s*\}?\s*(?:else\s+)?(?:if|while)\s*\(\s*/,
+    /^\s*return\s+/,
+    /^\s*[A-Za-z_$][\w$]*\s*=\s*/
+  ];
+  var COND_TAIL_TRIM = [/\)\s*\{?\s*$/, /;\s*$/];
+
+  /**
+   * Splits `text` at every top-level `&&`/`||` (outside strings/brackets, and at the
+   * shallowest bracket depth any such operator is found at — so `if (isA && isB)`
+   * splits on the operator sitting just inside the `if`'s own parens). Stops scanning
+   * at an unguarded line comment. Returns null unless it finds exactly `expectedCount
+   * - 1` such operators, alternating operand/operator/operand/.../operand.
+   */
+  function splitBooleanOperands(text, expectedCount) {
+    var n = text.length, depth = 0, inStr = null, i = 0;
+    var ops = [];
+    while (i < n) {
+      var c = text[i];
+      if (inStr) {
+        if (c === '\\') { i += 2; continue; }
+        if (c === inStr) inStr = null;
+        i++; continue;
+      }
+      if (c === '"' || c === '\'') { inStr = c; i++; continue; }
+      if (c === '/' && text[i + 1] === '/') break;   // line comment: stop scanning
+      if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+      if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+      if ((c === '&' && text[i + 1] === '&') || (c === '|' && text[i + 1] === '|')) {
+        ops.push({ index: i, depth: depth });
+        i += 2; continue;
+      }
+      i++;
+    }
+    if (!ops.length) return null;
+    var minDepth = ops[0].depth;
+    for (var k = 1; k < ops.length; k++) if (ops[k].depth < minDepth) minDepth = ops[k].depth;
+    var splitAt = ops.filter(function (p) { return p.depth === minDepth; });
+    if (splitAt.length !== expectedCount - 1) return null;
+    var parts = [], last = 0;
+    splitAt.forEach(function (p) {
+      parts.push(text.slice(last, p.index));
+      parts.push(text.slice(p.index, p.index + 2));
+      last = p.index + 2;
+    });
+    parts.push(text.slice(last));
+    return parts;
+  }
+
+  function condAtomOk(text, isFirst, isLast) {
+    var t = text;
+    if (isFirst) COND_LEAD_TRIM.forEach(function (re) { t = t.replace(re, ''); });
+    if (isLast) COND_TAIL_TRIM.forEach(function (re) { t = t.replace(re, ''); });
+    return COND_ATOM.test(t);
+  }
+
+  function condTitle(cls, status) {
+    if (cls === 'cond-true') return 'true every time this line ran';
+    if (cls === 'cond-false') return 'false every time this line ran';
+    if (status === 'MIXED') return 'varied across multiple evaluations of this line in this run';
+    return 'never evaluated — short-circuited away every time';
+  }
+
+  /**
+   * Renders a compound-condition line with each operand colored by its own recorded
+   * true/false status, and returns true; or leaves `td` untouched and returns false
+   * when the line doesn't qualify, so the caller can fall back to the plain
+   * paintCode() + branches-annotation rendering it already does for every other line.
+   */
+  function paintConditionalLine(td, l) {
+    var statuses = l.operandStatus;
+    if (!statuses || statuses.length < 2 || statuses.indexOf('OTHER') >= 0) return false;
+    var text = l.code != null ? l.code : '';
+    var parts = splitBooleanOperands(text, statuses.length);
+    if (!parts) return false;
+    for (var i = 0; i < parts.length; i += 2) {
+      if (!condAtomOk(parts[i], i === 0, i === parts.length - 1)) return false;
+    }
+    for (var j = 0, opI = 0; j < parts.length; j++) {
+      if (j % 2 === 1) { paintCode(td, parts[j]); continue; }
+      var status = statuses[opI++];
+      var cls;
+      if (status === 'TRUE_ONLY' || status === 'FALSE_ONLY') {
+        var negations = (parts[j].match(/!/g) || []).length;
+        var rawTrue = status === 'TRUE_ONLY';
+        var displayTrue = (negations % 2 === 0) ? rawTrue : !rawTrue;
+        cls = displayTrue ? 'cond-true' : 'cond-false';
+      } else {
+        cls = 'cond-neutral';
+      }
+      var span = el('span', cls);
+      paintCode(span, parts[j]);
+      span.title = condTitle(cls, status);
+      td.appendChild(span);
+    }
+    return true;
   }
 
   // ------------------------------------------------------------------- sql ---
@@ -1967,7 +2161,11 @@ Press Enter to apply, Esc to cancel.">
 
   var root = byId('root');
   var fileList = byId('fileList');
+  var fileSidebar = byId('fileSidebar');
   var entries = [];
+  // The one file the main pane currently shows. Null until the first time the Files view
+  // is actually needed, so a report with no trace tree still opens without picking one.
+  var selectedEntry = null;
   /** Class name -> its entry, so the Tree view can honour the same file selection. */
   var entryByClass = {};
 
@@ -1994,13 +2192,18 @@ Press Enter to apply, Esc to cancel.">
 
   files.forEach(function (f, idx) {
     var box = el('section', 'file');
-    var displayName = f.fqClassName || f.sourceFileName || ('file ' + (idx + 1));
+    // The package is where it lives, not what it's called — the sidebar and header both
+    // lead with the plain class name, same as an IDE's file list or tab strip, and keep the
+    // fully qualified name only as the parenthetical/tooltip for whoever needs it.
+    var fqName = f.fqClassName || null;
+    var displayName = fqName ? simpleName(fqName) : (f.sourceFileName || ('file ' + (idx + 1)));
 
     var h = el('h2');
     var caret = el('span', 'caret', '▾ ');
     h.appendChild(caret);
     h.appendChild(el('span', 'fname', displayName));
-    if (f.sourceFileName) h.appendChild(el('span', 'src', '(' + f.sourceFileName + ')'));
+    var subtitle = (fqName && fqName !== displayName) ? fqName : f.sourceFileName;
+    if (subtitle) h.appendChild(el('span', 'src', '(' + subtitle + ')'));
     var stats = el('div', 'stats');
     h.appendChild(stats);
     box.appendChild(h);
@@ -2115,6 +2318,19 @@ Press Enter to apply, Esc to cancel.">
     entryByClass[f.fqClassName] = entry;
     rows.forEach(function (r) { r.entry = entry; });
     entries.push(entry);
+
+    // The sidebar's entry for this file, built alongside the box it opens — same data,
+    // a lighter row. Kept off the DOM until applySort places every item in the same
+    // order the file list itself uses, which is also what numbers it.
+    var fsItem = el('div', 'fsitem');
+    var fsNum = el('span', 'fsnum');
+    fsItem.appendChild(fsNum);
+    fsItem.appendChild(el('span', 'fsname', displayName));
+    if (red) fsItem.appendChild(el('span', 'fsred', String(red)));
+    fsItem.title = (fqName || displayName) + (red ? ' — ' + red + ' unexecuted line(s)' : '');
+    fsItem.addEventListener('click', function () { selectFile(entry); });
+    entry.sidebarItem = fsItem;
+    entry.fsNum = fsNum;
   });
 
   ordered = entries.slice();
@@ -2152,7 +2368,10 @@ Press Enter to apply, Esc to cancel.">
   /** One source line: the timing cell, the line number, and the coloured code. */
   function lineRow(rec, f) {
     var l = rec.model;
-    var tr = el('tr', rec.status);
+    var target = rec.section && f.fqClassName != null
+      ? callTargetByLine[f.fqClassName + '#' + rec.section.name + ':' + l.line]
+      : null;
+    var tr = el('tr', rec.status + (target ? ' gorow' : ''));
     var tm = el('td', 'time');
     var micros = (l.methodTotalMicros != null) ? l.methodTotalMicros : l.timeMicros;
     if (micros != null) {
@@ -2166,10 +2385,19 @@ Press Enter to apply, Esc to cancel.">
         + (lp ? ' · ' + lp + ' of the run' : '');
     }
     var code = el('td', 'code');
-    paintCode(code, l.code != null ? l.code : '');
+    if (!paintConditionalLine(code, l)) paintCode(code, l.code != null ? l.code : '');
     if (l.branchesTotal) {
       code.appendChild(el('span', 'br',
         '   (' + l.branchesCovered + '/' + l.branchesTotal + ' branches)'));
+    }
+    if (target) {
+      var arrow = el('span', 'goarrow', '↷');
+      arrow.title = 'Ctrl/Cmd+Alt+click to open '
+        + (methodLabel(target.methodName, target.className)) + '()';
+      code.appendChild(arrow);
+      tr.addEventListener('click', function (ev) {
+        if (ev.altKey && (ev.ctrlKey || ev.metaKey)) navigateToMethod(target.className, target.methodName);
+      });
     }
     tr.appendChild(tm);
     tr.appendChild(lineCell(f, l.line));
@@ -2252,11 +2480,30 @@ Press Enter to apply, Esc to cancel.">
   var treeView = byId('treeView');
   var filesView = byId('filesView');
   var treeEmpty = byId('treeEmpty');
+  var treeCrumb = byId('treeCrumb');
   var childrenBySeq = {};
   var nodeBySeq = {};
   var roots = [];
   var treeRows = [];
   var collapsedSeqs = {};
+  // A frame's own source lines (and the SQL it issued) are hidden until asked for, the same
+  // way its children are: seq -> true once a plain click has revealed them. Independent of
+  // collapsedSeqs so structure and detail can be opened one at a time, on purpose.
+  var detailShown = {};
+  // A rebuild throws away every row object — collapsing a frame, revealing a detail, typing
+  // into the filter — but the row a seq or a source line renders to is the same row it was
+  // last time, so its height is worth remembering rather than re-guessing at the generic
+  // estimate. Never cleared: heights only get more of them cached, never wrong once learned.
+  var heightCache = {};
+  /** A stable identity for a row that survives being rebuilt, or null for one that does not
+   *  render the same content every time (a fold or roll-up summary), which is left to the
+   *  plain estimate rather than risk seeding it from an unrelated row's height. */
+  function rowKey(r) {
+    if (r.kind === 'frame') return 'f' + r.node.seq;
+    if (r.sql) return 's' + r.node.seq;
+    if (r.kind === 'line' && r.file) return 'l' + r.file.fqClassName + ':' + r.line;
+    return null;
+  }
   var expandedFolds = {};
   var hotSeqs = {};
   var hotOn = false;
@@ -2279,9 +2526,32 @@ Press Enter to apply, Esc to cancel.">
     nodeBySeq[c.seq] = c;
     if (c.parentSeq < 0) {
       roots.push(c);
+      // The trace point's own source is the one frame the reader always came here to read,
+      // so it starts open; every other frame's detail still waits for a click.
+      detailShown[c.seq] = true;
     } else {
       // calls[] is already in execution order, so pushing in order keeps siblings in it.
       (childrenBySeq[c.parentSeq] = childrenBySeq[c.parentSeq] || []).push(c);
+    }
+  });
+
+  /**
+   * Where a ctrl+alt+click on a line of source actually goes: caller class#method + line ->
+   * the class and method it called there.
+   *
+   * <p>There is no real parser here, only what was recorded, so this only ever knows about a
+   * line that made a call the agent actually saw. The first invocation recorded at a call
+   * site wins; a line that dispatched to different targets across the run (an interface
+   * called through different implementations) can only point at one of them.
+   */
+  var callTargetByLine = {};
+  calls.forEach(function (c) {
+    if (c.parentSeq < 0 || c.callSiteLine == null) return;
+    var parent = nodeBySeq[c.parentSeq];
+    if (!parent || parent.className == null) return;
+    var key = parent.className + '#' + parent.methodName + ':' + c.callSiteLine;
+    if (callTargetByLine[key] === undefined) {
+      callTargetByLine[key] = c.sql != null ? null : { className: c.className, methodName: c.methodName };
     }
   });
 
@@ -2447,7 +2717,9 @@ Press Enter to apply, Esc to cancel.">
       // pass, which only runs on a scroll or resize. Left stale, the cached offset below
       // this row is wrong until the next scroll event corrects it mid-scroll, which on
       // its own was a second way for the page to jump under a reader's feet.
-      var hh = tr.offsetHeight;
+      var hh = tr.getBoundingClientRect().height;
+      var hk = rowKey(r);
+      if (hk) heightCache[hk] = hh;
       if (hh && r.vi != null && rowHeights[r.vi] !== hh) {
         rowHeights[r.vi] = hh;
         rebuildOffsets();
@@ -2469,7 +2741,12 @@ Press Enter to apply, Esc to cancel.">
     var file = fileByClass[node.className];
     var kids = childrenBySeq[node.seq] || [];
     var lines = linesByMethod[node.className + '#' + node.methodName] || [];
-    var foldable = kids.length > 0 || lines.length > 0;
+    // Structure (who this called) and detail (what its own lines did) fold independently,
+    // so each has its own affordance and its own gesture: the caret — and ctrl/cmd+click
+    // anywhere on the row — is always structural, a plain click always toggles detail.
+    var hasKids = kids.length > 0;
+    var hasLines = lines.length > 0;
+    var foldable = hasKids || hasLines;
 
     // The signature is kept lower-cased on the record so the code filter can match a frame
     // by class or method name, not only by the source text underneath it.
@@ -2483,13 +2760,19 @@ Press Enter to apply, Esc to cancel.">
 
     var head = el('div', 'fhead');
     head.appendChild(el('span', 'step', String(node.seq + 1)));
-    var caret = el('span', 'fcaret', foldable ? (collapsedSeqs[node.seq] ? '▸' : '▾') : ' ');
+    var caret = el('span', 'fcaret', hasKids ? (collapsedSeqs[node.seq] ? '▸' : '▾') : ' ');
+    if (hasKids) caret.title = 'Collapse or expand what this called';
     head.appendChild(caret);
     head.appendChild(el('span', 'ffile', (file && file.sourceFileName) || simpleName(node.className) || '?'));
     head.appendChild(el('span', 'fsep', '·'));
     head.appendChild(el('span', 'fmethod', methodLabel(node.methodName, node.className) + '()'));
     var kind = methodKind(node.methodName);
     if (kind) head.appendChild(el('span', 'fkind', kind));
+    if (hasLines) {
+      var dtag = el('span', 'dtag' + (detailShown[node.seq] ? ' on' : ''), 'src');
+      dtag.title = 'Click to show or hide this call’s own source lines';
+      head.appendChild(dtag);
+    }
 
     // "called at :N" points at the CALLER's line, so it links into the caller's file.
     if (node.callSiteLine != null) {
@@ -2527,9 +2810,20 @@ Press Enter to apply, Esc to cancel.">
     tr.appendChild(td);
 
     if (foldable) {
-      tr.addEventListener('click', function () {
-        if (collapsedSeqs[node.seq]) delete collapsedSeqs[node.seq];
-        else collapsedSeqs[node.seq] = true;
+      tr.addEventListener('click', function (ev) {
+        // Which part of the row was clicked decides what happens, not a modifier key: the
+        // caret always folds structure, anywhere else on the row always toggles this frame's
+        // own detail. Two different targets rather than two gestures on the same one.
+        var structural = hasKids && ev.target === caret;
+        if (structural) {
+          if (collapsedSeqs[node.seq]) delete collapsedSeqs[node.seq];
+          else collapsedSeqs[node.seq] = true;
+        } else if (hasLines) {
+          if (detailShown[node.seq]) delete detailShown[node.seq];
+          else detailShown[node.seq] = true;
+        } else {
+          return;
+        }
         refreshTree();
       });
     }
@@ -2569,7 +2863,7 @@ Press Enter to apply, Esc to cancel.">
     var code = el('td', 'code tcode');
     code.style.setProperty('--depth', depth);
     var text = lineModel.code != null ? lineModel.code : '';
-    paintCode(code, text);
+    if (!paintConditionalLine(code, lineModel)) paintCode(code, text);
     if (lineModel.branchesTotal) {
       code.appendChild(el('span', 'br',
         '   (' + lineModel.branchesCovered + '/' + lineModel.branchesTotal + ' branches)'));
@@ -2779,15 +3073,33 @@ Press Enter to apply, Esc to cancel.">
 
     var row = frameRow(node, depth, parentRow);
     treeRows.push(row);
-    if (honourCollapse && collapsedSeqs[node.seq]) return;
 
+    // A plain click reveals this one frame's own detail — its source lines and the queries
+    // they issued — independently of whether its children are structurally expanded. A
+    // search still has to reach into unopened detail to find what it is looking for, the
+    // same reason a structural collapse is overridden below while filtering.
+    var showDetail = detailShown[node.seq] || !honourCollapse;
     var file = fileByClass[node.className];
-    var lines = linesByMethod[node.className + '#' + node.methodName] || [];
+    var lines = showDetail ? (linesByMethod[node.className + '#' + node.methodName] || []) : [];
+
+    if (honourCollapse && collapsedSeqs[node.seq]) {
+      // Structurally collapsed: nothing about what this frame called, but its own lines are
+      // a separate question and can still be open, so they are shown flat rather than
+      // threaded between calls that are not there to thread them around.
+      for (var li0 = 0; li0 < lines.length; li0++) {
+        treeRows.push(codeRow(lines[li0], file, depth + 1, row));
+        if (treeRows.length >= MAX_TREE_ROWS) { treeTruncated = true; return; }
+      }
+      return;
+    }
+
     var kids = (childrenBySeq[node.seq] || []).filter(function (k) {
       if (!timeOk(k.totalMicros || 0)) return false;
       // A query belongs to the frame that issued it, not to a file of its own, so it is
-      // never hidden by the file picker, only by its caller disappearing.
-      return k.sql != null || classSelected(k.className);
+      // never hidden by the file picker, only by its caller disappearing — but it is still
+      // part of this frame's detail, not its structure, so it waits for the same click.
+      if (k.sql != null) return showDetail;
+      return classSelected(k.className);
     });
 
     // With grouping on, every repeat of one call under this parent is counted up front so
@@ -2988,6 +3300,57 @@ Press Enter to apply, Esc to cancel.">
   }
 
   /**
+   * The call stack above whichever row sits at the top of the viewport, root first.
+   *
+   * <p>Walks {@code .parent} links rather than re-deriving anything from {@code node}, so
+   * it agrees with whatever the tree actually nested the row under, folds and all.
+   */
+  function crumbChainAt(y) {
+    var idx = rowAt(y);
+    if (idx >= visRows.length) idx = visRows.length - 1;
+    var r = visRows[idx];
+    if (!r) return [];
+    var chain = [];
+    for (var f = (r.kind === 'frame' ? r : r.parent); f; f = f.parent) chain.unshift(f);
+    return chain;
+  }
+
+  /**
+   * Keeps the sticky trail above the tree in sync with whatever the reader has scrolled
+   * to. Without it, a run whose lines call out to several other classes and back reads as
+   * one flat list with no way to tell "back in the caller" from "one level deeper" once the
+   * call that made the jump has scrolled out of view.
+   */
+  function updateTreeCrumb() {
+    if (!treeCrumb) return;
+    if (view !== 'tree' || tab !== 'trace' || !padTop || !rowOffsets || visRows.length === 0) {
+      treeCrumb.hidden = true;
+      return;
+    }
+    var band = treeBand();
+    var chain = crumbChainAt(band.top);
+    // At the very top of the run the first frame's own header is already the top row on
+    // screen, so the trail would just repeat what is one line below it.
+    if (chain.length === 0 || (chain.length === 1 && band.top <= 0)) {
+      treeCrumb.hidden = true;
+      return;
+    }
+    treeCrumb.hidden = false;
+    treeCrumb.textContent = '';
+    chain.forEach(function (fr, i) {
+      if (i > 0) treeCrumb.appendChild(el('span', 'sep', '›'));
+      var node = fr.node;
+      var file = fileByClass[node.className];
+      var seg = el('span', 'seg');
+      seg.appendChild(el('span', null, (file && file.sourceFileName) || simpleName(node.className) || '?'));
+      seg.appendChild(el('span', 'm', ' · ' + methodLabel(node.methodName, node.className) + '()'));
+      seg.title = 'Jump to this call (step ' + (node.seq + 1) + ')';
+      seg.addEventListener('click', function () { setCursor(fr); });
+      treeCrumb.appendChild(seg);
+    });
+  }
+
+  /**
    * Draws the rows the page is currently over, and settles the estimates behind them.
    *
    * <p>Rows are not a uniform height, so the offsets start as estimates and are corrected
@@ -3004,6 +3367,7 @@ Press Enter to apply, Esc to cancel.">
     // the wrong element, or on none. Re-applied here rather than in paintTreeWindow so it
     // survives all three measurement passes and is only put on once.
     if (landedSeq != null) paintLanded();
+    updateTreeCrumb();
   }
 
   /** One pass. Returns true when measurement moved the rows and another pass is due. */
@@ -3034,8 +3398,12 @@ Press Enter to apply, Esc to cancel.">
     // after the pass rather than per row keeps this to a single extra reflow.
     var changed = false;
     for (var k = from; k < to; k++) {
-      var hh = visRows[k].tr.offsetHeight;
+      var hh = visRows[k].tr.getBoundingClientRect().height;
       if (hh && rowHeights[k] !== hh) { rowHeights[k] = hh; changed = true; }
+      if (hh) {
+        var hk = rowKey(visRows[k]);
+        if (hk) heightCache[hk] = hh;
+      }
     }
     if (changed) {
       rebuildOffsets();
@@ -3116,12 +3484,16 @@ Press Enter to apply, Esc to cancel.">
       if (!r.vis) return;
       r.vi = visRows.length;
       visRows.push(r);
-      // Only rows still in the document have a height worth keeping. The parentNode test
-      // matters: after a rebuild every row is detached, and asking a detached row for its
-      // offsetHeight forces a layout of an empty table, which makes the browser clamp the
-      // page scroll to zero — that was what threw the reader back to the top of the run
-      // every time a frame was collapsed.
-      rowHeights.push(r.tr && r.tr.parentNode ? r.tr.offsetHeight : 0);
+      // Only rows still in the document have a height worth reading directly. The
+      // parentNode test matters: after a rebuild every row is detached, and asking a
+      // detached row for its offsetHeight forces a layout of an empty table, which makes
+      // the browser clamp the page scroll to zero — that was what threw the reader back to
+      // the top of the run every time a frame was collapsed. A row that was measured before
+      // the rebuild falls back to that measurement instead of the generic estimate, which is
+      // what keeps a screen full of frame rows — each taller than the estimate — from
+      // compounding into a visible jump the next time any one of them is clicked.
+      var cachedH = rowKey(r) ? heightCache[rowKey(r)] : undefined;
+      rowHeights.push(r.tr && r.tr.parentNode ? r.tr.getBoundingClientRect().height : (cachedH || 0));
       if (r.sql && r.kind === 'line') shownSql++;
       else if (r.kind === 'line') shownLines++;
       else if (r.kind === 'frame') shownFrames++;
@@ -3186,6 +3558,26 @@ Press Enter to apply, Esc to cancel.">
     window.scrollTo(0, Math.max(0, pageTop + rowOffsets[at] - a.gap));
     renderDirty = true;
     renderTreeWindow();
+    // rowOffsets[at] is still built on the estimate for whatever sits above the window this
+    // just painted — a full rebuild throws away every measured height, and a frame row runs
+    // taller than a code line, so a stretch of frames between the page top and the anchor
+    // compounds into real drift. That is what made the row you clicked slide out from under
+    // the pointer. Settling against the anchor's own rendered position, once it has one,
+    // corrects for that drift regardless of where it came from, instead of trusting the
+    // estimate that placed it there.
+    // One correction is not always enough: scrolling to fix the drift can itself bring a
+    // new row into the window that needed measuring, which moves things again by a little.
+    // Bounded at four rather than looped forever, since a row that never settles (one still
+    // resizing itself, a race with something else on the page) should stop costing reflows
+    // instead of arguing with itself indefinitely.
+    var row = visRows[at];
+    for (var pass = 0; pass < 4 && row.tr && row.tr.parentNode; pass++) {
+      var drift = row.tr.getBoundingClientRect().top - a.gap;
+      if (Math.abs(drift) < 0.5) break;
+      window.scrollBy(0, drift);
+      renderDirty = true;
+      renderTreeWindow();
+    }
   }
 
   var lastRefreshQuery = null;
@@ -3252,10 +3644,11 @@ Press Enter to apply, Esc to cancel.">
   }
 
   function applyFileFilters() {
+    if (!selectedEntry) selectedEntry = defaultFileEntry();
     var q = queryFor('trace').trim().toLowerCase();
-    var shownLines = 0, shownFiles = 0;
+    var shownLines = 0, shownFiles = 0, firstMatch = null;
     entries.forEach(function (e) {
-      if (!e.checkbox.checked) { e.box.hidden = true; return; }
+      if (!e.checkbox.checked) { e.matches = false; return; }
       var anyVisible = false;
       e.rows.forEach(function (r) {
         r.vis = statusOn[r.status]
@@ -3273,15 +3666,30 @@ Press Enter to apply, Esc to cancel.">
         if (s.tr) s.tr.style.display = s.vis ? '' : 'none';
         if (s.vis) anyVisible = true;
       });
-      e.box.hidden = !anyVisible;
-      if (anyVisible) shownFiles++;
+      e.matches = anyVisible;
+      if (anyVisible) { shownFiles++; if (!firstMatch) firstMatch = e; }
+    });
+    // A search the selected file stops matching would otherwise leave the main pane showing
+    // a file's worth of nothing, with no clue which of the others actually matched.
+    if (selectedEntry && !selectedEntry.matches && firstMatch) selectedEntry = firstMatch;
+    // Whatever just became selected is shown open, whether it got there by a click that
+    // already did this or by landing here on its own account (a fresh default, a search
+    // that moved the selection): a generated or excluded file starts collapsed, and that
+    // has to be undone the moment it is the one thing on screen.
+    if (selectedEntry) setCollapsed(selectedEntry, false);
+    entries.forEach(function (e) {
+      e.box.hidden = !e.matches || e !== selectedEntry;
+      if (e.sidebarItem) e.sidebarItem.hidden = !e.matches;
+    });
+    Array.prototype.forEach.call(fileSidebar.children, function (n) {
+      n.classList.toggle('on', !!selectedEntry && n === selectedEntry.sidebarItem);
     });
     attachVisibleFiles();
     countEl.textContent = 'Showing ' + shownLines + ' of ' + totalLines
       + ' line(s) · ' + shownFiles + ' file(s)';
-    // Keyed on files, not lines: collapsing every method section leaves the files on
-    // screen with no lines under them, and "No lines match the current filters" printed
-    // over a page full of file headers reads as a bug in the report.
+    // Keyed on files, not lines: collapsing every method section leaves the file on screen
+    // with no lines under it, and "No lines match the current filters" printed over its
+    // header would read as a bug in the report.
     emptyEl.hidden = shownFiles !== 0;
     updateNotice();
     if (cursor && cursor.tr
@@ -3418,9 +3826,61 @@ Press Enter to apply, Esc to cancel.">
       list.sort(function (a, b) { return a.order - b.order; });
     }
     ordered = list;
-    list.forEach(function (e) { root.appendChild(e.box); });
+    list.forEach(function (e, i) {
+      root.appendChild(e.box);
+      fileSidebar.appendChild(e.sidebarItem);
+      e.fsNum.textContent = (i + 1) + '.';
+    });
   }
   sortEl.addEventListener('change', applySort);
+
+  /** The file the main pane opens on when nothing has picked one yet: the trace point's own
+   *  file, so Files and Tree agree on where a reader starts, falling back to the sorted
+   *  list's first entry when there is no call tree to take the trace point from. */
+  function defaultFileEntry() {
+    var rootEntry = (treeAvailable && roots.length) ? entryByClass[roots[0].className] : null;
+    return rootEntry || ordered[0] || entries[0] || null;
+  }
+
+  /** Shows exactly one file's source in the main pane, IDE-tab style. */
+  function selectFile(entry) {
+    if (!entry || entry === selectedEntry) return;
+    selectedEntry = entry;
+    if (entry.sidebarItem) entry.sidebarItem.scrollIntoView({ block: 'nearest' });
+    applyFileFilters();
+  }
+
+  /**
+   * Ctrl+Alt+click on a line that made a recorded call: opens the class it called into, at
+   * the method it called, the same "go to declaration" a real IDE gives a ctrl/cmd+click.
+   *
+   * <p>Only ever knows about calls the agent actually recorded — see callTargetByLine — so a
+   * class with no resolved source (a JDK type, a third-party jar) has nowhere to go, and this
+   * quietly does nothing rather than open an empty pane.
+   */
+  function navigateToMethod(className, methodName) {
+    var entry = entryByClass[className];
+    if (!entry) return;
+    selectFile(entry);
+    var section = null;
+    for (var i = 0; i < entry.sections.length; i++) {
+      if (entry.sections[i].name === methodName) { section = entry.sections[i]; break; }
+    }
+    if (section && section.collapsed) {
+      section.collapsed = false;
+      applyFileFilters();
+    }
+    if (section && section.tr) {
+      section.tr.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      // Restarting the animation matters when the same section is landed on twice in a row:
+      // without the reflow between removals the browser treats it as one running animation.
+      section.tr.classList.remove('landed');
+      void section.tr.offsetWidth;
+      section.tr.classList.add('landed');
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }
 
   // -------------------------------------------------------------------- fold ---
 
@@ -3432,12 +3892,19 @@ Press Enter to apply, Esc to cancel.">
   function foldAll(collapsed) {
     if (view === 'tree') {
       collapsedSeqs = {};
+      detailShown = {};
       if (collapsed) {
         // Collapse every frame that has something under it, except the roots, a fully
-        // collapsed tree with no visible entry point would be a dead end.
+        // collapsed tree with no visible entry point would be a dead end. Same state the
+        // tree opens on; this is the button that gets you back to it.
         calls.forEach(function (c) {
           if (c.parentSeq >= 0) collapsedSeqs[c.seq] = true;
         });
+      } else {
+        // "Expand all" means everything, detail included: every frame's own lines and
+        // queries too, not only its structure — the one-page, nothing-hidden view the tree
+        // used to open on by default.
+        calls.forEach(function (c) { detailShown[c.seq] = true; });
       }
       refreshTree();
     } else {
@@ -3906,7 +4373,7 @@ Press Enter to apply, Esc to cancel.">
             ['timeline', 'Timeline'], ['findings', 'Findings']
           ], tabs: true
         },
-        { key: 'view', label: 'Call Tree view', options: [['tree', 'Tree'], ['files', 'Files']] },
+        { key: 'view', label: 'Call Tree view', options: [['tree', 'Tree'], ['files', 'IDE']] },
         { key: 'density', label: 'Density', options: [['normal', 'Normal'], ['compact', 'Compact']] },
         { key: 'theme', label: 'Theme', options: [['auto', 'Follow my system'], ['light', 'Light'], ['dark', 'Dark']] }
       ],
@@ -3974,9 +4441,10 @@ Press Enter to apply, Esc to cancel.">
       return;
     }
     applyPrefs();
-    // The tree's cached row heights were measured at the old density, and the timeline
-    // draws its bars from measured widths; both have to be taken again.
-    if (view === 'tree') { renderDirty = true; renderTreeWindow(); }
+    // The tree's cached row heights, including the ones kept across a rebuild, were
+    // measured at the old density, and the timeline draws its bars from measured widths;
+    // both have to be taken again.
+    if (view === 'tree') { heightCache = {}; renderDirty = true; renderTreeWindow(); }
     if (tab === 'timeline' && timelineBuilt) renderTimeline();
   }
 
@@ -4166,7 +4634,7 @@ Press Enter to apply, Esc to cancel.">
       });
     } else {
       ordered.forEach(function (e) {
-        if (!e.checkbox.checked || e.box.hidden) return;
+        if (!e.checkbox.checked) return;
         e.rows.forEach(function (r) {
           if (r.status !== 'FULL' && statusOn[r.status]) out.push(r);
         });
@@ -4182,6 +4650,7 @@ Press Enter to apply, Esc to cancel.">
     var next = i === -1 ? (delta > 0 ? 0 : list.length - 1) : (i + delta + list.length) % list.length;
     var rec = list[next];
     if (view === 'files') {
+      selectFile(rec.entry);
       setCollapsed(rec.entry, false);
       if (rec.section && rec.section.collapsed) {
         rec.section.collapsed = false;
@@ -4197,7 +4666,7 @@ Press Enter to apply, Esc to cancel.">
     if (view === 'tree') {
       return treeRows.filter(function (r) { return r.kind === 'frame' && r.vis; });
     }
-    return ordered.filter(function (e) { return e.checkbox.checked && !e.box.hidden; });
+    return ordered.filter(function (e) { return e.checkbox.checked; });
   }
 
   function jumpStop(delta) {
@@ -4214,7 +4683,8 @@ Press Enter to apply, Esc to cancel.">
       scrollTreeToRow(s);
       return;
     }
-    s.h.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    selectFile(s);
+    window.scrollTo(0, 0);
   }
 
   function isTyping(t) {
@@ -4395,9 +4865,6 @@ Press Enter to apply, Esc to cancel.">
       msgs.push('Tree display truncated at ' + MAX_TREE_ROWS
         + ' rows. Use "≥ 1 ms" to prune fast calls, or collapse frames.');
     }
-    if (view === 'files' && entries.length > AUTO_COLLAPSE_ABOVE) {
-      msgs.push(entries.length + ' files. Press e to expand everything, ? for shortcuts.');
-    }
     noticeEl.hidden = msgs.length === 0;
     noticeEl.textContent = msgs.join('  ');
   }
@@ -4410,15 +4877,24 @@ Press Enter to apply, Esc to cancel.">
       + "that step's own total if the method was called more than once."
     : '';
 
-  // Files view starts collapsed when long, with the slowest few open, so it opens as an
-  // index rather than a wall of code.
-  if (entries.length > AUTO_COLLAPSE_ABOVE) {
-    var hottest = entries.slice()
-      .sort(function (a, b) { return (b.selfWeight - a.selfWeight) || (a.order - b.order); })
-      .slice(0, AUTO_EXPAND_TOP);
-    entries.forEach(function (e) { setCollapsed(e, true); });
-    hottest.forEach(function (e) { setCollapsed(e, false); });
-  }
+  // What the two clicks on a frame do, built from the exact same glyphs the rows use, so
+  // this reads as a key rather than a second description that could drift from them.
+  (function buildClickHint() {
+    var hint = byId('clickHint');
+    if (!treeAvailable) return;
+    hint.hidden = false;
+    function part(caretGlyph, dtagOn, text) {
+      var span = el('span', 'hintpart');
+      if (caretGlyph) span.appendChild(el('span', 'fcaret', caretGlyph));
+      else span.appendChild(el('span', 'dtag' + (dtagOn ? ' on' : ''), 'src'));
+      span.appendChild(el('span', null, ' ' + text));
+      return span;
+    }
+    hint.appendChild(part('▸', false, 'expands what a call made'));
+    hint.appendChild(el('span', 'hintsep', '·'));
+    hint.appendChild(part(null, true, 'on a row shows or hides its own source'));
+  })();
+
   // Data classes and generated code fold shut on arrival, whatever the file count. This is
   // what the file picker used to do by starting them unticked, moved somewhere it cannot be
   // mistaken for a filter: the header, the line counts and the timings all stay on screen,

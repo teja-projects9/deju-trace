@@ -243,6 +243,7 @@ public final class HtmlReportGenerator {
                 lineModel.put("status", lc.getStatus() == null ? "NONE" : lc.getStatus().name());
                 lineModel.put("branchesCovered", lc.getBranchesCovered());
                 lineModel.put("branchesTotal", lc.getBranchesTotal());
+                lineModel.put("operandStatus", lc.getOperandStatus());
                 lineModel.put("timeMicros", lc.getTimeMicros());
                 lineModel.put("methodTotalMicros", lc.getMethodTotalMicros());
                 // Self time is what identifies the method actually doing the slow work;

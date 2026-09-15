@@ -2,6 +2,8 @@ package org.deju.agent.contract;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import java.util.List;
+
 /**
  * Coverage of one source line. For decision points ({@link LineStatus#PARTIAL},
  * and any {@link LineStatus#FULL} line that had branches) the branch counts are
@@ -16,6 +18,15 @@ public class LineCoverage {
     private LineStatus status;
     private Integer branchesCovered;
     private Integer branchesTotal;
+    /**
+     * On a line with 2+ boolean decisions (a compound {@code &&}/{@code ||} condition),
+     * one entry per decision in source (left-to-right) order: {@code TRUE_ONLY},
+     * {@code FALSE_ONLY}, {@code MIXED} (both observed across this run, e.g. a loop),
+     * {@code SKIPPED} (never evaluated, e.g. short-circuited away every time), or
+     * {@code OTHER} (a relational decision the report can't safely color true/false —
+     * see the operand-coloring design notes). Null on every other line.
+     */
+    private List<String> operandStatus;
 
     /** Wall-clock time attributed to this line only, in microseconds (self time). */
     private Long timeMicros;
@@ -79,6 +90,14 @@ public class LineCoverage {
 
     public void setBranchesTotal(Integer branchesTotal) {
         this.branchesTotal = branchesTotal;
+    }
+
+    public List<String> getOperandStatus() {
+        return operandStatus;
+    }
+
+    public void setOperandStatus(List<String> operandStatus) {
+        this.operandStatus = operandStatus;
     }
 
     public Long getTimeMicros() {

@@ -3,6 +3,8 @@ package org.deju.plugin.contract;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import java.util.List;
+
 /** One line's coverage. Branch counts present only for decision lines. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -12,6 +14,7 @@ public class LineCoverage {
     private LineStatus status;
     private Integer branchesCovered;
     private Integer branchesTotal;
+    private List<String> operandStatus;
     private Long timeMicros;
     private Long methodTotalMicros;
     private Long methodSelfMicros;
@@ -48,6 +51,15 @@ public class LineCoverage {
 
     public void setBranchesTotal(Integer branchesTotal) {
         this.branchesTotal = branchesTotal;
+    }
+
+    /** Per-decision true/false breakdown for a compound {@code &&}/{@code ||} line (may be null). */
+    public List<String> getOperandStatus() {
+        return operandStatus;
+    }
+
+    public void setOperandStatus(List<String> operandStatus) {
+        this.operandStatus = operandStatus;
     }
 
     /** Self time attributed to this line, microseconds (may be null). */

@@ -1,7 +1,9 @@
 package org.deju.agent.runtime;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.deju.agent.AgentVersion;
@@ -75,6 +77,7 @@ final class PayloadBuilder {
                 }
 
                 LineCoverage lc = toLineCoverage(line, total, covered, hit);
+                lc.setOperandStatus(operandStatusFor(m, line, s));
                 applyMethodIdentity(lc, m, line);
                 applyTiming(lc, s, m, line, probeId);
                 mergeLine(lineMap, line, lc);
@@ -178,6 +181,39 @@ final class PayloadBuilder {
                 lc.setMethodSelfMicros(methodSelfNanos / 1000L);
             }
         }
+    }
+
+    /**
+     * Per-decision true/false breakdown for a compound {@code &&}/{@code ||} line, in
+     * source (left-to-right) order — see the operand-coloring design notes. Null unless
+     * the line has 2+ boolean decisions; a single-decision line is already fully
+     * described by the whole-line status.
+     */
+    private static List<String> operandStatusFor(MethodModel m, int line, Session s) {
+        List<Integer> decisionIds = m.getLineDecisions().get(line);
+        if (decisionIds == null || decisionIds.size() < 2) {
+            return null;
+        }
+        List<String> statuses = new ArrayList<>(decisionIds.size());
+        for (Integer decisionId : decisionIds) {
+            DecisionModel d = Registry.decision(decisionId);
+            Boolean rawTrueOnTaken = d == null ? null : d.rawTruthinessOnTaken();
+            if (d == null || d.getKind() != DecisionModel.Kind.BOOLEAN || rawTrueOnTaken == null) {
+                statuses.add("OTHER");
+                continue;
+            }
+            boolean takenHit = s.edgesHit.contains(Session.edgeKey(decisionId, 1));
+            boolean notTakenHit = s.edgesHit.contains(Session.edgeKey(decisionId, 0));
+            if (takenHit && notTakenHit) {
+                statuses.add("MIXED");
+            } else if (!takenHit && !notTakenHit) {
+                statuses.add("SKIPPED");
+            } else {
+                boolean rawTrueObserved = takenHit ? rawTrueOnTaken : !rawTrueOnTaken;
+                statuses.add(rawTrueObserved ? "TRUE_ONLY" : "FALSE_ONLY");
+            }
+        }
+        return statuses;
     }
 
     private static LineCoverage toLineCoverage(int line, int total, int covered, boolean hit) {

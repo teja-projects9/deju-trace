@@ -65,7 +65,7 @@ final class CoverageMethodVisitor extends MethodVisitor {
             case Opcodes.IFGE:
             case Opcodes.IFGT:
             case Opcodes.IFLE: {
-                int decisionId = registerBooleanDecision();
+                int decisionId = registerBooleanDecision(opcode);
                 super.visitInsn(Opcodes.DUP);          // duplicate the int being tested
                 pushInt(opcode);
                 pushInt(decisionId);
@@ -78,7 +78,7 @@ final class CoverageMethodVisitor extends MethodVisitor {
             case Opcodes.IF_ICMPGE:
             case Opcodes.IF_ICMPGT:
             case Opcodes.IF_ICMPLE: {
-                int decisionId = registerBooleanDecision();
+                int decisionId = registerBooleanDecision(opcode);
                 super.visitInsn(Opcodes.DUP2);         // duplicate both ints
                 pushInt(opcode);
                 pushInt(decisionId);
@@ -87,7 +87,7 @@ final class CoverageMethodVisitor extends MethodVisitor {
             }
             case Opcodes.IF_ACMPEQ:
             case Opcodes.IF_ACMPNE: {
-                int decisionId = registerBooleanDecision();
+                int decisionId = registerBooleanDecision(opcode);
                 super.visitInsn(Opcodes.DUP2);         // duplicate both refs
                 pushInt(opcode);
                 pushInt(decisionId);
@@ -97,7 +97,7 @@ final class CoverageMethodVisitor extends MethodVisitor {
             }
             case Opcodes.IFNULL:
             case Opcodes.IFNONNULL: {
-                int decisionId = registerBooleanDecision();
+                int decisionId = registerBooleanDecision(opcode);
                 super.visitInsn(Opcodes.DUP);          // duplicate the ref
                 pushInt(opcode);
                 pushInt(decisionId);
@@ -146,17 +146,17 @@ final class CoverageMethodVisitor extends MethodVisitor {
         int decisionId = Registry.newDecisionId();
         model.addDecision(currentLine, decisionId, edgeCount);
         Registry.putDecision(new DecisionModel(decisionId, model.getMethodGid(), currentLine,
-                DecisionModel.Kind.SWITCH, switchKeys));
+                DecisionModel.Kind.SWITCH, switchKeys, 0));
         super.visitInsn(Opcodes.DUP);              // duplicate the switch key
         pushInt(decisionId);
         super.visitMethodInsn(Opcodes.INVOKESTATIC, RUNTIME, "probeSwitch", "(II)V", false);
     }
 
-    private int registerBooleanDecision() {
+    private int registerBooleanDecision(int opcode) {
         int decisionId = Registry.newDecisionId();
         model.addDecision(currentLine, decisionId, 2); // taken / not-taken
         Registry.putDecision(new DecisionModel(decisionId, model.getMethodGid(), currentLine,
-                DecisionModel.Kind.BOOLEAN, null));
+                DecisionModel.Kind.BOOLEAN, null, opcode));
         return decisionId;
     }
 
