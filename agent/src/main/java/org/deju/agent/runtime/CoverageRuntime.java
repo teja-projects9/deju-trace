@@ -2,6 +2,7 @@ package org.deju.agent.runtime;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.deju.agent.AgentConfig;
 import org.deju.agent.contract.DejuPayload;
 import org.deju.agent.model.DecisionModel;
 import org.deju.agent.model.MethodModel;
@@ -42,6 +43,11 @@ public final class CoverageRuntime {
     /** Fully-qualified armed target ("pkg.Class#method"); null when disarmed. */
     private static volatile String armedTarget;
     private static volatile PayloadSink sink;
+    /**
+     * Invocations one recording may keep. Set once from the agent flag; every session reads
+     * it at construction.
+     */
+    private static volatile int maxCalls = AgentConfig.DEFAULT_MAX_CALLS;
 
     private CoverageRuntime() {
     }
@@ -50,6 +56,14 @@ public final class CoverageRuntime {
 
     public static void configure(PayloadSink payloadSink) {
         sink = payloadSink;
+    }
+
+    /**
+     * Sets the recording cap for sessions started from now on, as {@code maxCalls=} asked.
+     * An in-flight recording keeps the cap it began with.
+     */
+    public static void setMaxCalls(int n) {
+        maxCalls = n;
     }
 
     /** True once a sink is wired, so callers can avoid clobbering a working one. */
@@ -104,7 +118,7 @@ public final class CoverageRuntime {
             // concurrent sessions rather than corrupting; a queue would serialize them.
             return;
         }
-        Session ns = new Session(target, methodGid);
+        Session ns = new Session(target, methodGid, maxCalls);
         ns.methodsEntered.add(methodGid);
         ns.onEnter(methodGid, System.nanoTime());
         CURRENT.set(ns);

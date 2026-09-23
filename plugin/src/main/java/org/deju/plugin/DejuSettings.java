@@ -47,6 +47,11 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
     public static final boolean DEFAULT_CONTAINER_OR_REMOTE_JVM = false;
     /** See {@link #historyCapacity} and {@code DejuHistoryStore.MAX_CAPACITY}. */
     public static final int DEFAULT_HISTORY_CAPACITY = 10;
+    /** Matches the agent's own default, so leaving this alone changes nothing. */
+    public static final int DEFAULT_MAX_CALLS = 200_000;
+    /** Same bounds the agent clamps to, checked here so the user is told rather than overruled. */
+    public static final int MIN_MAX_CALLS = 1_000;
+    public static final int MAX_MAX_CALLS = 10_000_000;
 
     /**
      * Host the agent socket is reachable on. Loopback for a local app; for a container or a
@@ -135,6 +140,21 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
      */
     public int historyCapacity = DEFAULT_HISTORY_CAPACITY;
 
+    /**
+     * How many method invocations one recording may keep before the agent stops recording
+     * and marks the run capped.
+     *
+     * <p>Raise it when a report says a large share of the run is unrecorded: the missing
+     * work is everything that happened after the cap tripped. The cost is heap <i>in the
+     * traced application</i>, about 28 bytes per call (roughly 5.6 MB at the default, 28 MB
+     * at a million), briefly doubled while the arrays grow.
+     *
+     * <p>Applies to JVMs the IDE launches immediately, and to everything else only through
+     * the {@code maxCalls=} argument in <b>Copy agent VM option</b>: the flag is read once
+     * at JVM start, so a container has to be restarted for a change here to reach it.
+     */
+    public int maxCalls = DEFAULT_MAX_CALLS;
+
     public static DejuSettings getInstance() {
         return ApplicationManager.getApplication().getService(DejuSettings.class);
     }
@@ -150,6 +170,7 @@ public final class DejuSettings implements PersistentStateComponent<DejuSettings
         maxOpenFiles = DEFAULT_MAX_OPEN_FILES;
         containerOrRemoteJvm = DEFAULT_CONTAINER_OR_REMOTE_JVM;
         historyCapacity = DEFAULT_HISTORY_CAPACITY;
+        maxCalls = DEFAULT_MAX_CALLS;
     }
 
     @Override

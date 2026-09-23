@@ -76,6 +76,12 @@ public final class EditorPainter {
      */
     private long runMicros;
 
+    /**
+     * What each line handed off to the calls it made. Empty when the payload carried no call
+     * tree (an agent older than 1.1.0), which simply leaves the gutter as it was.
+     */
+    private CallSiteCosts callSites = CallSiteCosts.of(null);
+
     /** A registered timing column, kept so it can be removed on clear without touching others. */
     private record GutterHandle(Editor editor, TimingGutterProvider provider) {
     }
@@ -95,6 +101,7 @@ public final class EditorPainter {
     public void paint(DejuPayload payload) {
         clear();
         runMicros = runMicrosOf(payload);
+        callSites = CallSiteCosts.of(payload);
         TypeExclusionMatcher matcher = DejuExclusions.getInstance(project).matcher();
         PaintPlan plan = PaintPlan.of(payload, matcher::isExcluded, DejuSettings.getInstance().maxOpenFiles);
 
@@ -302,6 +309,7 @@ public final class EditorPainter {
             }
             Long methodTotal = lc.getMethodTotalMicros();
             Long self = lc.getTimeMicros();
+            CallSiteCosts.Site site = callSites.at(fc.getFqClassName(), lc.getLine());
             if (methodTotal != null) {
                 // Method's first line: headline the inclusive total; self time in the tooltip.
                 // No leading glyph — the column is already the widest thing in the gutter at
@@ -315,11 +323,29 @@ public final class EditorPainter {
                         + (methodSelf != null ? "  ·  self " + TimingGutterProvider.format(methodSelf)
                                 + TimingGutterProvider.suffixPercent(methodSelf, runMicros) : "")
                         + ofRun());
+            } else if (site != null && site.micros > (self == null ? 0L : self)) {
+                // A line that handed off more time than it kept leads with what it called.
+                // Self time stops when a call starts, so on exactly the lines that matter
+                // most it reads as a rounding error, and the half second the line really
+                // cost is only visible after opening the callee and reading a number there.
+                //
+                // Only when it is the larger of the two, so a line that calls a trivial
+                // getter still reports its own work rather than the getter's. Both figures
+                // are in the tooltip either way.
+                text.put(line0, TimingGutterProvider.CALL_ARROW + " "
+                        + TimingGutterProvider.formatWithPercent(site.micros, runMicros));
+                tips.put(line0, callSiteTooltip(site, self));
             } else if (self != null) {
                 text.put(line0, TimingGutterProvider.formatWithPercent(self, runMicros));
                 tips.put(line0, "Line self time (every call to this method in this run) "
                         + TimingGutterProvider.format(self)
-                        + TimingGutterProvider.suffixPercent(self, runMicros) + ofRun());
+                        + TimingGutterProvider.suffixPercent(self, runMicros)
+                        // A query is timed while its line is still running, so its cost is
+                        // already inside the self time above rather than beside it. Saying
+                        // what that line called is still the fastest way to see why it is slow.
+                        + (site != null ? "  ·  including " + TimingGutterProvider.format(site.micros)
+                                + " in " + site.describeTargets() : "")
+                        + ofRun());
             }
         }
         if (text.isEmpty()) {
@@ -328,6 +354,25 @@ public final class EditorPainter {
         TimingGutterProvider provider = new TimingGutterProvider(text, tips);
         editor.getGutter().registerTextAnnotation(provider);
         gutters.add(new GutterHandle(editor, provider));
+    }
+
+    /**
+     * The tooltip behind a call-site line: what it called, what that cost, and its own time
+     * kept separate underneath.
+     *
+     * <p>The two figures are never added together and the wording says so, because they do
+     * not partition the line's time: a query is timed while the line that issued it is still
+     * running, so it is <i>inside</i> the self time below, while a method call is outside it.
+     */
+    private String callSiteTooltip(CallSiteCosts.Site site, Long self) {
+        String what = site.calls == 1 ? "Called from this line: " : site.calls + " calls from this line: ";
+        return what + TimingGutterProvider.format(site.micros)
+                + TimingGutterProvider.suffixPercent(site.micros, runMicros)
+                + "  ·  " + site.describeTargets()
+                + (self != null ? "\nThis line's own time, not counting what it called: "
+                        + TimingGutterProvider.format(self)
+                        + TimingGutterProvider.suffixPercent(self, runMicros) : "")
+                + ofRun();
     }
 
     /** Names the denominator, so a percentage in a tooltip is not left to be guessed at. */
@@ -405,6 +450,7 @@ public final class EditorPainter {
         }
         painted.clear();
         runMicros = 0;
+        callSites = CallSiteCosts.of(null);
         for (RangeHighlighter h : active) {
             try {
                 h.dispose();

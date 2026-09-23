@@ -75,6 +75,7 @@ public final class DejuConfigurable implements Configurable {
     private JBTextField sourceRootsField;
     private JBTextField maxOpenFilesField;
     private JBTextField historyCapacityField;
+    private JBTextField maxCallsField;
     private Map<String, JBCheckBox> genericBoxes;
     private JBTextArea customPatternsArea;
 
@@ -106,6 +107,8 @@ public final class DejuConfigurable implements Configurable {
         maxOpenFilesField.setColumns(5);
         historyCapacityField = new JBTextField();
         historyCapacityField.setColumns(5);
+        maxCallsField = new JBTextField();
+        maxCallsField.setColumns(9);
 
         JComponent hostHint = hint("Loopback for a local app; a mapped host/port for a"
                 + " container or remote box (no socat bridge needed).");
@@ -152,6 +155,21 @@ public final class DejuConfigurable implements Configurable {
                         + " ordinary rotation; lowering this below the number of pinned runs deletes"
                         + " the oldest ones anyway, pinned or not, the moment you apply.</html>");
 
+        JComponent maxCallsHint = hint(
+                "<html>How many calls one recording keeps before the agent stops recording and the"
+                        + " report says <b>capped</b> (" + DejuSettings.MIN_MAX_CALLS + "\u2013"
+                        + DejuSettings.MAX_MAX_CALLS + ", default " + DejuSettings.DEFAULT_MAX_CALLS
+                        + "). Raise it when a report shows a large <b>Unrecorded</b> share \u2014"
+                        + " that share is the work that happened after the cap tripped."
+                        + "<br>It costs heap <b>in the application you are tracing</b>, about 28 bytes"
+                        + " a call (\u2248 5 MB at the default, \u2248 28 MB at a million), doubled"
+                        + " for a moment while the buffers grow."
+                        + "<br>A cap will not recover time spent in code outside <b>Includes</b>:"
+                        + " that was never instrumented, so no cap can record it."
+                        + "<br>Applies to IDE-launched runs at once; elsewhere it travels in the"
+                        + " <code>maxCalls=</code> argument of <b>Copy agent VM option</b>, and the"
+                        + " traced JVM has to be restarted to pick it up.</html>");
+
         JButton resetButton = UiStyle.compact(new JButton("Reset to defaults", AllIcons.General.Reset));
         resetButton.setToolTipText("Restore every field on this page, including the exclusion patterns");
         resetButton.addActionListener(e -> applyDefaultsToFields());
@@ -189,7 +207,9 @@ public final class DejuConfigurable implements Configurable {
                 .addLabeledComponent(new JBLabel("Max files to open:"), maxOpenFilesField)
                 .addComponentToRightColumn(maxOpenFilesHint)
                 .addLabeledComponent(new JBLabel("History capacity:"), historyCapacityField)
-                .addComponentToRightColumn(historyCapacityHint);
+                .addComponentToRightColumn(historyCapacityHint)
+                .addLabeledComponent(new JBLabel("Recording cap (calls):"), maxCallsField)
+                .addComponentToRightColumn(maxCallsHint);
 
         addExclusionSection(builder);
 
@@ -337,6 +357,7 @@ public final class DejuConfigurable implements Configurable {
                 || !sourceRootsField.getText().trim().equals(nullToEmpty(s.sourceRoots))
                 || !maxOpenFilesField.getText().trim().equals(String.valueOf(s.maxOpenFiles))
                 || !historyCapacityField.getText().trim().equals(String.valueOf(s.historyCapacity))
+                || !maxCallsField.getText().trim().equals(String.valueOf(s.maxCalls))
                 || exclusionsModified();
     }
 
@@ -394,6 +415,20 @@ public final class DejuConfigurable implements Configurable {
             throw new ConfigurationException("History capacity must be between "
                     + DejuHistoryStore.MIN_CAPACITY + " and " + DejuHistoryStore.MAX_CAPACITY + ".");
         }
+        int parsedMaxCalls;
+        try {
+            // Thousands separators are what a reader types for a seven-digit number, and
+            // rejecting "1,000,000" over its commas would be pedantry.
+            parsedMaxCalls = Integer.parseInt(maxCallsField.getText().trim().replace(",", "")
+                    .replace("_", ""));
+        } catch (NumberFormatException e) {
+            throw new ConfigurationException("Recording cap must be a number of calls.");
+        }
+        if (parsedMaxCalls < DejuSettings.MIN_MAX_CALLS || parsedMaxCalls > DejuSettings.MAX_MAX_CALLS) {
+            throw new ConfigurationException("Recording cap must be between "
+                    + DejuSettings.MIN_MAX_CALLS + " and " + DejuSettings.MAX_MAX_CALLS
+                    + " calls (default " + DejuSettings.DEFAULT_MAX_CALLS + ").");
+        }
         s.host = host;
         s.port = parsedPort;
         s.token = DejuSettings.DEFAULT_TOKEN;
@@ -403,6 +438,7 @@ public final class DejuConfigurable implements Configurable {
         s.sourceRoots = sourceRootsField.getText().trim();
         s.maxOpenFiles = parsedMax;
         s.historyCapacity = parsedHistory;
+        s.maxCalls = parsedMaxCalls;
         // Immediately, not on the next recording: a decrease is a deliberate, explicit action
         // here, and the tool window's list should reflect it the moment this page closes
         // rather than waiting for something to be recorded.
@@ -427,6 +463,7 @@ public final class DejuConfigurable implements Configurable {
         sourceRootsField.setText(nullToEmpty(s.sourceRoots));
         maxOpenFilesField.setText(String.valueOf(s.maxOpenFiles));
         historyCapacityField.setText(String.valueOf(s.historyCapacity));
+        maxCallsField.setText(String.valueOf(s.maxCalls));
 
         DejuExclusions x = DejuExclusions.getInstance(project);
         setTicks(x.genericPatterns());
@@ -481,6 +518,7 @@ public final class DejuConfigurable implements Configurable {
         sourceRootsField.setText(DejuSettings.DEFAULT_SOURCE_ROOTS);
         maxOpenFilesField.setText(String.valueOf(DejuSettings.DEFAULT_MAX_OPEN_FILES));
         historyCapacityField.setText(String.valueOf(DejuSettings.DEFAULT_HISTORY_CAPACITY));
+        maxCallsField.setText(String.valueOf(DejuSettings.DEFAULT_MAX_CALLS));
         setTicks(TypeExclusionMatcher.DEFAULT_GENERIC_PATTERNS);
         customPatternsArea.setText("");
     }
@@ -511,6 +549,7 @@ public final class DejuConfigurable implements Configurable {
         sourceRootsField = null;
         maxOpenFilesField = null;
         historyCapacityField = null;
+        maxCallsField = null;
         genericBoxes = null;
         customPatternsArea = null;
     }

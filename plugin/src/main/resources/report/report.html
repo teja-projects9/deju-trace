@@ -35,6 +35,18 @@ __STYLES__
   </button>
   </div>
 </header>
+<!-- One stacked bar for the whole run, before any tab is chosen: the first question about a
+     slow request is almost always "was it the database or was it us", and every answer this
+     report already had for that was two clicks and a tab away. Script fills it and unhides
+     it; a run with no timing at all leaves it hidden rather than drawing an empty track. -->
+<div class="timebar" id="timebar" hidden>
+  <div class="timebar-head">
+    <span class="timebar-title">Where the time goes</span>
+    <span class="timebar-total" id="timebarTotal"></span>
+  </div>
+  <div class="timebar-track" id="timebarTrack"></div>
+  <div class="timebar-legend" id="timebarLegend"></div>
+</div>
 <!-- Tabs, trace point, filter and count in one row, so which run this is and how to switch
      views both stay on screen together instead of separated by a row of buttons that read
      as "part of the tabs" but were not. The filter rides here rather than in the toolbar
@@ -419,15 +431,14 @@ Press Enter to apply, Esc to cancel.">
     <i>within</i> a method are shown in source order and merged across invocations, so a
     loop body appears once rather than once per iteration, and a method called twice shows
     the same lines under both frames.</p>
-    <p><b>Structure and detail fold apart.</b> The tree opens with every call already in
-    place &mdash; the full shape of who called what, with nothing collapsed &mdash; but a
-    frame's own source lines and the queries they issued stay out of the way until asked
-    for, marked by the <b>src</b> tag. Click anywhere on a row to show or hide that one
-    frame's detail; click its <b>caret</b> specifically to fold away everything <i>it</i>
-    called, for the rare branch that is wide enough to be worth putting away. The two stay
-    independent: reading one frame's lines never pulls in its children's lines too.
-    <b>Expand all</b> reveals every frame's detail at once, back to how every earlier
-    version of this tree read; <b>Collapse all</b> hides it all again and reopens anything
+    <p><b>Structure and detail fold apart.</b> The tree opens fully open &mdash; the shape
+    of who called what, with every frame's own source lines and the queries they issued
+    already showing, marked by the <b>src</b> tag. Click anywhere on a row to hide or show
+    that one frame's detail; click its <b>caret</b> specifically to fold away everything
+    <i>it</i> called, for the rare branch that is wide enough to be worth putting away. The
+    two stay independent: hiding one frame's lines never touches its children's.
+    <b>Collapse all</b> puts the structure-only view back &mdash; every frame on one line,
+    no code &mdash; and reopens anything
     folded by its caret.</p>
     <p><b>Essential / Full.</b> <i>Essential</i> folds calls into your excluded types
     (entities, DTOs, other data classes) into a single <b>&hellip; N excluded calls</b> row
@@ -457,11 +468,12 @@ Press Enter to apply, Esc to cancel.">
     control flow on its own.</p>
     <p><b>The IDE view.</b> A file list down the side, one file's full source filling the
     rest of the page &mdash; the same split as a real editor's project panel and the pane it
-    opens files into, and it opens on the trace point's own file. <b>Ctrl/Cmd+Alt+click</b> a
-    line that made a recorded call to open the class and method it called, wherever that
-    class lives; the small <b>↷</b> after a line is what marks one. This only ever knows
-    about a call the agent actually recorded, so a line into a JDK type or a third-party jar
-    has nowhere on this page to go, and the click quietly does nothing.</p>
+    opens files into, and it opens on the trace point's own file. A line that made a
+    recorded call carries a small <b>&#8631; Class.method</b> chip after it: click it, with
+    no modifier, to open the class and method it called, wherever that class lives.
+    (<b>Ctrl/Cmd+Alt+click</b> anywhere on such a line still does the same.) This only ever
+    knows about a call the agent actually recorded, so a line into a JDK type or a
+    third-party jar has no chip: there is nowhere on this page for it to go.</p>
     <p><b>Files.</b> The <b>Files</b> dropdown works in both views and means the same thing
     in each: unticking a file removes it from the IDE view's sidebar and hides its calls,
     and everything underneath them, from the Tree, so you can strip a trace down to the layer

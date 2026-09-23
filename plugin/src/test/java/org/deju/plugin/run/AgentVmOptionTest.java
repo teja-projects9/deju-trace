@@ -139,6 +139,24 @@ class AgentVmOptionTest {
     }
 
     @Test
+    void leavesTheDefaultRecordingCapOutOfTheFlag() {
+        // The cap is a setting almost nobody changes, and a flag that always carried it
+        // would put a number in front of every user that means nothing to most of them.
+        assertEquals("-javaagent:" + NEW + "=port=7391,token=devtoken,includes=com.example",
+                AgentVmOption.build(NEW, "7391", "devtoken", "com.example", false,
+                        AgentVmOption.DEFAULT_MAX_CALLS));
+    }
+
+    @Test
+    void carriesARaisedRecordingCap() {
+        // The whole point of raising it in Settings is that the container picks it up, and
+        // a container only ever sees what this string says.
+        assertEquals("-javaagent:" + NEW + "=port=7391,token=devtoken,bind=0.0.0.0,"
+                        + "includes=com.example,maxCalls=1000000",
+                AgentVmOption.build(NEW, "7391", "devtoken", "com.example", true, 1_000_000));
+    }
+
+    @Test
     void includesAreColonSeparatedForTheAgent() {
         // Commas already delimit the top-level pairs, so a comma-separated list would be
         // read as unknown keys and silently instrument nothing.

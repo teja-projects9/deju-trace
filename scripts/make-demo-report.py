@@ -708,6 +708,8 @@ def main():
         "files": files,
         "calls": encode_calls(calls),
         "callsTruncated": False,
+        # The agent's recording cap, so the demo carries the same field a real run does.
+        "maxCalls": 200000,
         "agentVersion": "2.1.0",
         "pluginVersion": "2.1.0",
         "excludedClasses": EXCLUDED,

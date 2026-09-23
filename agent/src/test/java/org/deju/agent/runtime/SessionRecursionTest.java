@@ -1,5 +1,7 @@
 package org.deju.agent.runtime;
 
+import org.deju.agent.AgentConfig;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,7 +22,7 @@ class SessionRecursionTest {
 
     @Test
     void nonRecursiveCallsStillSumNormally() {
-        Session s = new Session("t", 0);
+        Session s = new Session("t", 0, AgentConfig.DEFAULT_MAX_CALLS);
         s.onEnter(METHOD_GID, 0);
         s.onExit(100);      // first call: 100ns
         s.onEnter(METHOD_GID, 200);
@@ -32,7 +34,7 @@ class SessionRecursionTest {
 
     @Test
     void selfRecursionCountsTheOutermostSpanOnce() {
-        Session s = new Session("t", 0);
+        Session s = new Session("t", 0, AgentConfig.DEFAULT_MAX_CALLS);
         s.onEnter(METHOD_GID, 0);      // level 1 enters
         s.onEnter(METHOD_GID, 1_000);  // level 2 (recursive) enters
         s.onEnter(METHOD_GID, 2_000);  // level 3 (recursive) enters
@@ -50,7 +52,7 @@ class SessionRecursionTest {
 
     @Test
     void recursionDoesNotDisturbEachInvocationsOwnCallTreeTiming() {
-        Session s = new Session("t", 0);
+        Session s = new Session("t", 0, AgentConfig.DEFAULT_MAX_CALLS);
         s.onEnter(METHOD_GID, 0);
         s.onEnter(METHOD_GID, 1_000);
         s.onExit(3_000);   // inner call: 2_000ns of its own
@@ -67,7 +69,7 @@ class SessionRecursionTest {
 
     @Test
     void aMethodNeverCalledRecordsNoTime() {
-        Session s = new Session("t", 0);
+        Session s = new Session("t", 0, AgentConfig.DEFAULT_MAX_CALLS);
         assertNull(s.methodNanos.get(METHOD_GID));
     }
 }

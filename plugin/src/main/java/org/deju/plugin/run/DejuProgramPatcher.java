@@ -88,7 +88,11 @@ public final class DejuProgramPatcher extends JavaProgramPatcher {
         String arg = "-javaagent:" + agentJar
                 + "=port=" + settings.port
                 + ",token=" + settings.token
-                + ",includes=" + includesArg;
+                + ",includes=" + includesArg
+                // Only when it is not the agent's own default, so the flag an IDE run shows
+                // stays the one users have learned to recognise.
+                + (settings.maxCalls > 0 && settings.maxCalls != AgentVmOption.DEFAULT_MAX_CALLS
+                        ? ",maxCalls=" + settings.maxCalls : "");
         vmParameters.add(arg);
         LOG.info("Deju: auto-attached agent to run '" + safeName(configuration)
                 + "' (port=" + settings.port + ", includes=" + includesArg
