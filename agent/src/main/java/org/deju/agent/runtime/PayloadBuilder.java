@@ -136,6 +136,7 @@ final class PayloadBuilder {
             payload.getCalls().add(node);
         }
         payload.setCallsTruncated(s.callsTruncated);
+        payload.setMaxCalls(s.maxCalls());
     }
 
     /**

@@ -15,13 +15,23 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Renders a per-line timing column in the editor's left gutter, like VCS blame, but the
  * text is the wall-clock time recorded for that line. A method's first line shows the
- * method's inclusive total; other lines show their own self time (which, for a line that
+ * method's inclusive total; a line that called something shows what the call cost, marked
+ * with {@link #CALL_ARROW}; every other line shows its own self time (which, for a line that
  * calls an uninstrumented dependency such as a JDBC/Postgres driver, is that call's cost).
  *
  * <p>Registered per file via {@code editor.getGutter().registerTextAnnotation(this)} and
  * removed with {@code closeTextAnnotations(...)} so it never disturbs other annotations.
  */
 final class TimingGutterProvider implements TextAnnotationGutterProvider {
+
+    /**
+     * Marks a figure as the cost of what a line <i>called</i>, rather than the line's own.
+     *
+     * <p>The one glyph this column spends width on. Without it the two readings are
+     * indistinguishable, and a line showing 30% would be read as thirty percent of the run
+     * spent on that line — the exact misreading this figure exists to prevent.
+     */
+    static final String CALL_ARROW = "\u21b3";
 
     private final Map<Integer, String> text;     // 0-based line -> gutter text
     private final Map<Integer, String> tooltip;  // 0-based line -> tooltip

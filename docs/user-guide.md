@@ -52,11 +52,50 @@ You always deal with three things. Nothing else talks to anything else.
 | **Timing gutter** | How long each line took, shown in the left margin. |
 | **Clear highlights** | Removes all the colouring from your editors. |
 
+**Reading the timing gutter**
+
+| What you see | What it means |
+|---|---|
+| `45% [30 ms]` on a method's first line | The whole method, everything it called included, summed over every call to it in this run. |
+| `↳ 30% [12 ms]` on any other line | **What this line called** cost that much. The arrow is the marker: the number is the callee's, not the line's. |
+| `1% [8 µs]` on any other line | The line's own work. |
+
+The `↳` line is the one to know about. A line's own time **stops** the moment it calls
+something and only resumes when the call returns — that is what makes "this line is slow"
+mean the line and not its callees. The side effect is that the line costing you half the
+request reads as `0.2%`, and the half second only shows up after you open the callee and
+read a number in *there*. The `↳` figure puts that time back on the line you would actually
+go and change.
+
+It appears only when the call cost more than the line's own work, so a line calling a
+trivial getter still reports its own time. Hover for both figures, plus what was called.
+A query is timed while its line is still running, so a SQL line's own time **already
+includes** the query — the tooltip says so rather than showing the two as if they added up.
+
 ### The HTML report (5 tabs)
+
+**"Where the time goes"** — the stacked bar at the top of the report, before any tab.
+One bar, the whole run, split three ways:
+
+```
+  Where the time goes                                    1.1 s total
+  +------------------------+------------+--------+-------+---------+
+  |  insert into order_li.. | select id..| app code|untrack| others |
+  +------------------------+------------+--------+-------+---------+
+```
+
+| Segment | What it is |
+|---|---|
+| **A statement** (one per colour, biggest 6) | Every run of that exact statement, added up. Grouped by statement, not by table — a table name guessed out of a join would be wrong, and the biggest segment is the one you least want mislabelled. |
+| **other queries** | Everything past the biggest 6, in one segment. |
+| **application code** | Time executing your own lines, with the query time taken back out. |
+| **untracked** | Time no recorded line or query explains: framework, ORM internals, the JDBC driver, the JDK — anything outside **Includes**. A big slice here means Deju is not watching the code that is actually slow. |
+
+The segments always add up to the run's total. Hover any one of them for the full reading.
 
 | Tab | What it shows |
 |---|---|
-| **Call Tree** | Every call in the exact order it happened, with the source code. |
+| **Call Tree** | Every call in the exact order it happened, with the source code. A line that called something carries a `↷ Class.method` chip — click it to jump straight to that method, no modifier keys. |
 | **Breakdown** | Bar chart: which file (or method) burned the most time. |
 | **Flow** | The run as a picture — three views, see below. |
 | **Timeline** | One bar per step, laid out along the clock. Shows waiting vs working. |
@@ -113,6 +152,7 @@ Flow Chart controls:
 | **Refresh agent** | Re-writes the agent file on disk after a plugin update. |
 | **Fix run configs** | Points this project's run configs at the current agent file. |
 | **Includes** | Which packages to watch, e.g. `com.example`. **Required.** |
+| **Recording cap (calls)** | How many calls one run may record before it stops. Default 200,000. Raise it when a report says **Unrecorded**. |
 | **Source roots** | Where to read source from, if the IDE copy does not match the running build. |
 | **What Deju records… / Clear Deju data…** | Shows every file Deju wrote; deletes all of it. |
 
@@ -318,6 +358,9 @@ Two things are different from the normal setup, and both are easy to miss:
 | Line numbers, but no source code | The IDE source does not match the running build. | Set **Source roots** to the source that matches what is deployed. |
 | Report is huge or slow | Too many classes are in it. | Use **Excluded types…** to fold away entities/DTOs, or narrow **Includes**. |
 | Clicking a line number does nothing | Those are `jetbrains://` links; they need JetBrains Toolbox. | Use **Copy path** instead. |
+| Report says **capped** / **50% Unrecorded** | The run made more calls than the recording cap allows, so everything after that point was dropped. | Raise **Recording cap (calls)** in Settings → Tools → Deju Trace, re-copy the agent flag if your app is in a container, and restart it. It costs about 28 bytes a call in your app's heap — 200,000 ≈ 5 MB, 1,000,000 ≈ 28 MB. |
+| Big **untracked** slice, but the run was *not* capped | The slow code is outside **Includes**, so it was never instrumented and no cap can record it. | Widen **Includes** to cover it, and restart the app. Widening it also makes the cap trip sooner, so raise the cap at the same time. |
+| Raised the cap, nothing changed | The `-javaagent` line is read once, at JVM start. | Re-copy **Copy agent VM option** (it now carries `maxCalls=`) into your compose/env, and restart the app. Runs the IDE launches pick it up on their own. |
 | Colours look wrong or stale | Old highlighting is still painted. | Press **Clear highlights**, then **Show** again. |
 
 ### Still stuck? Check these four, in order

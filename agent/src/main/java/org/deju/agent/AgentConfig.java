@@ -13,6 +13,8 @@ import java.util.List;
  *   <li>{@code token}, shared secret for the socket AUTH handshake.</li>
  *   <li>{@code includes}, colon-separated package prefixes to instrument.</li>
  *   <li>{@code bind}, optional; address to listen on. Defaults to {@code 127.0.0.1}.</li>
+ *   <li>{@code maxCalls}, optional; ceiling on recorded invocations. Raise it when the
+ *       report says a run was capped, at the cost of heap in the traced JVM.</li>
  *   <li>{@code arm}, optional; arms a target at startup (console proof, phase 2).</li>
  * </ul>
  *
@@ -29,6 +31,28 @@ public final class AgentConfig {
     private String bind = LOOPBACK;
     private final List<String> includes = new ArrayList<>();
     private String armAtStart;
+    private int maxCalls = DEFAULT_MAX_CALLS;
+
+    /**
+     * Invocations one recording may keep before it starts dropping them.
+     *
+     * <p>Two hundred thousand costs roughly 5.6 MB of the traced application's heap, which
+     * is small enough to be invisible on a service and large enough for a normal request.
+     * A run that trips it is reported as capped rather than silently truncated.
+     */
+    public static final int DEFAULT_MAX_CALLS = 200_000;
+
+    /**
+     * Floor on {@code maxCalls}. Below this the cap trips on almost any real request, so a
+     * typo here would look like a broken agent rather than a mis-set number.
+     */
+    public static final int MIN_MAX_CALLS = 1_000;
+
+    /**
+     * Ceiling on {@code maxCalls}: about 280 MB of arrays inside the traced JVM, and twice
+     * that for a moment while they double. Past this the agent would be the outage.
+     */
+    public static final int MAX_MAX_CALLS = 10_000_000;
 
     public static AgentConfig parse(String args) {
         AgentConfig cfg = new AgentConfig();
@@ -65,6 +89,9 @@ public final class AgentConfig {
                         }
                     }
                     break;
+                case "maxCalls":
+                    cfg.maxCalls = safeMaxCalls(value, cfg.maxCalls);
+                    break;
                 case "arm":
                     cfg.armAtStart = value;
                     break;
@@ -74,6 +101,20 @@ public final class AgentConfig {
             }
         }
         return cfg;
+    }
+
+    /**
+     * Clamps rather than rejects. The alternative is an agent that refuses to start over a
+     * number, in a JVM whose startup the developer may not be watching; a value pulled back
+     * into range still traces, and the cap it actually used rides on the payload.
+     */
+    private static int safeMaxCalls(String value, int fallback) {
+        try {
+            int n = Integer.parseInt(value);
+            return Math.max(MIN_MAX_CALLS, Math.min(MAX_MAX_CALLS, n));
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private static int safePort(String value, int fallback) {
@@ -118,5 +159,10 @@ public final class AgentConfig {
 
     public String getArmAtStart() {
         return armAtStart;
+    }
+
+    /** Invocations a recording may keep; {@value #DEFAULT_MAX_CALLS} unless {@code maxCalls=} was given. */
+    public int getMaxCalls() {
+        return maxCalls;
     }
 }

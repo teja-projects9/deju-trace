@@ -1083,6 +1083,20 @@
     return mtr;
   }
 
+  /**
+   * What to write on the jump chip: the method, and the class too when the call leaves the
+   * file being read.
+   *
+   * <p>Repeating the class on every call inside the same file would put the one word that
+   * is already at the top of the page onto a dozen chips, pushing the method name — the
+   * part that differs line to line — further from the code it belongs to.
+   */
+  function gotoLabel(target, f) {
+    var method = methodLabel(target.methodName, target.className);
+    return target.className === f.fqClassName
+      ? method : simpleName(target.className) + '.' + method;
+  }
+
   /** One source line: the timing cell, the line number, and the coloured code. */
   function lineRow(rec, f) {
     var l = rec.model;
@@ -1109,10 +1123,30 @@
         '   (' + l.branchesCovered + '/' + l.branchesTotal + ' branches)'));
     }
     if (target) {
-      var arrow = el('span', 'goarrow', '↷');
-      arrow.title = 'Ctrl/Cmd+Alt+click to open '
-        + (methodLabel(target.methodName, target.className)) + '()';
-      code.appendChild(arrow);
+      // A button, not a hint about a keystroke. The bare glyph this replaces marked the
+      // line but said nothing about where it went, and the chord that opened it was two
+      // modifiers plus a click on a row whose plain click does nothing — a feature nobody
+      // finds without being told. The chip names the destination and takes one click.
+      var go = el('span', 'goto');
+      go.appendChild(el('span', 'gotoicon', '↷'));
+      go.appendChild(el('span', null, gotoLabel(target, f)));
+      go.title = 'Open ' + target.className + '.'
+        + methodLabel(target.methodName, target.className) + '() in this report';
+      go.setAttribute('role', 'link');
+      go.tabIndex = 0;
+      function goNow(ev) {
+        // The row underneath carries its own handlers, and the code cell is selectable
+        // text: neither should also fire because a button inside them was used.
+        ev.preventDefault();
+        ev.stopPropagation();
+        navigateToMethod(target.className, target.methodName);
+      }
+      go.addEventListener('click', goNow);
+      go.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') goNow(ev);
+      });
+      code.appendChild(go);
+      // Kept as the shortcut it always was, for anyone already used to it.
       tr.addEventListener('click', function (ev) {
         if (ev.altKey && (ev.ctrlKey || ev.metaKey)) navigateToMethod(target.className, target.methodName);
       });
@@ -1218,7 +1252,11 @@
    *  plain estimate rather than risk seeding it from an unrelated row's height. */
   function rowKey(r) {
     if (r.kind === 'frame') return 'f' + r.node.seq;
-    if (r.sql) return 's' + r.node.seq;
+    // The kind has to be checked too, not just the flag: a folded run of identical queries
+    // is also marked sql (so it hides with the rest) but stands for many nodes and carries
+    // none of them, so reading r.node.seq here threw and took the whole rebuild with it.
+    // It is a fold, and a fold has no stable identity — it falls through to null below.
+    if (r.kind === 'line' && r.sql && r.node) return 's' + r.node.seq;
     if (r.kind === 'line' && r.file) return 'l' + r.file.fqClassName + ':' + r.line;
     return null;
   }
@@ -1242,11 +1280,13 @@
 
   calls.forEach(function (c) {
     nodeBySeq[c.seq] = c;
+    // Every frame opens showing its own source. The reader came here to read code against
+    // timings, and a tree of thirteen frames that each need their own src click before any
+    // of it appears is thirteen clicks spent getting to the starting point. "Collapse all"
+    // puts the structure-only view back in one.
+    detailShown[c.seq] = true;
     if (c.parentSeq < 0) {
       roots.push(c);
-      // The trace point's own source is the one frame the reader always came here to read,
-      // so it starts open; every other frame's detail still waits for a click.
-      detailShown[c.seq] = true;
     } else {
       // calls[] is already in execution order, so pushing in order keeps siblings in it.
       (childrenBySeq[c.parentSeq] = childrenBySeq[c.parentSeq] || []).push(c);
@@ -1254,8 +1294,8 @@
   });
 
   /**
-   * Where a ctrl+alt+click on a line of source actually goes: caller class#method + line ->
-   * the class and method it called there.
+   * Where a line's jump chip actually goes: caller class#method + line -> the class and
+   * method it called there.
    *
    * <p>There is no real parser here, only what was recorded, so this only ever knows about a
    * line that made a call the agent actually saw. The first invocation recorded at a call
@@ -1302,6 +1342,19 @@
     var kidsTotal = 0;
     (childrenBySeq[deepest.seq] || []).forEach(function (k) { kidsTotal += k.totalMicros || 0; });
     if (rootTotal > 0) unrecordedShare = Math.max(0, (rootTotal - kidsTotal) / rootTotal);
+  }
+
+  /**
+   * The cap this run was recorded under, spelled out, or '' when the agent that produced
+   * the payload predates the field.
+   *
+   * <p>Worth carrying at all because "the agent's cap" is advice the reader cannot act on:
+   * it names no number, so it does not say what to raise it from.
+   */
+  function capText() {
+    var n = data.maxCalls;
+    if (!n || n <= 0) return '';
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
   /** The unrecorded share as a rounded percentage, or '' when there is nothing to report. */
@@ -2569,8 +2622,9 @@
   }
 
   /**
-   * Ctrl+Alt+click on a line that made a recorded call: opens the class it called into, at
-   * the method it called, the same "go to declaration" a real IDE gives a ctrl/cmd+click.
+   * Opens the class a line called into, at the method it called: the same "go to
+   * declaration" a real IDE gives a ctrl/cmd+click, reached here by clicking the chip the
+   * line carries.
    *
    * <p>Only ever knows about calls the agent actually recorded — see callTargetByLine — so a
    * class with no resolved source (a JDK type, a third-party jar) has nowhere to go, and this
@@ -3527,16 +3581,280 @@
     // limit was reached; the number says whether what is left is most of the run or a
     // sixth of it, which is the difference between a caveat and a warning.
     var missingPct = unrecordedPct();
+    var cap = capText();
     var capped = stat(missingPct || 'capped', missingPct ? 'Unrecorded' : 'Recording',
-      'The agent hit its recording cap, so later invocations were never recorded.'
+      'The agent hit its recording cap' + (cap ? ' of ' + cap + ' calls' : '')
+      + ', so later invocations were never recorded.'
       + ' Every count and total above is a lower bound, not the whole run.'
       + (missingPct
         ? ' ' + missingPct + ' of the run\'s time is not accounted for by any call in this'
           + ' report: the recording stopped before that work was reached.'
-        : ''));
+        : '')
+      + ' Raise the recording cap in Settings \u2192 Tools \u2192 Deju Trace, or narrow'
+      + ' Includes so the budget is spent on your own code, and record again.');
     capped.classList.add('warn');
     summary.appendChild(capped);
   }
+
+  // ------------------------------------------------ where the time goes ---
+
+  /**
+   * The one stacked bar above the tabs: the whole run split into where its wall clock
+   * actually went.
+   *
+   * <p><b>The arithmetic, and why it adds up.</b> A line's own time is measured with the
+   * callee frames taken out ({@code onEnter} closes the caller's line before pushing), but
+   * with its queries left in — a query runs part-way through the line that issued it, and
+   * that line has not stopped executing. So the sum of every line's own time is "time this
+   * run spent inside instrumented code", queries included, and the three buckets fall
+   * straight out of it:
+   *
+   * <ul>
+   *   <li><b>each query</b>, measured on its own node;</li>
+   *   <li><b>application code</b>, the line total with the query time taken back out;</li>
+   *   <li><b>untracked</b>, whatever the run's total has left over — framework, ORM
+   *       internals, the JDBC driver, the JDK, anything outside {@code includes=}.</li>
+   * </ul>
+   *
+   * <p>Queries are grouped by statement rather than by table. Pulling a table name out of
+   * SQL is reliable for {@code update x set …} and wrong the moment a join, a CTE or a
+   * subquery turns up, and a bar that silently mislabels the biggest segment in the report
+   * is worse than one that quotes the statement it is actually measuring.
+   */
+  var TIMEBAR_TOP_SQL = 6;
+  /* A distinct hue per statement rather than one ramp. Every segment carries its own label
+     inside the bar, and label text needs a background it contrasts against far more than the
+     set needs to read as a family; six shades of one colour also make the boundary between
+     the two biggest segments — always neighbours — the hardest edge on the page to see.
+     All eight take white text. */
+  var TIMEBAR_SQL_COLOURS = ['#9b1c1c', '#d9722a', '#1f74b8', '#12868c', '#3f8f3f', '#7d4a9e'];
+  var TIMEBAR_OTHER_SQL_COLOUR = '#a8752e';
+  var TIMEBAR_CODE_COLOUR = '#39424d';
+  var TIMEBAR_UNTRACKED_COLOUR = '#6f777f';
+
+  /**
+   * A short name for a segment sitting inside the bar: what the statement did, and to what.
+   *
+   * <p>This is the one place a table name is guessed out of SQL, and it is deliberately the
+   * only place: the legend and the tooltip under it both carry the statement verbatim, so a
+   * join or a CTE this gets wrong is a label a reader can immediately check against the real
+   * thing rather than the only account of what they are looking at. With no target to be
+   * found it degrades to the bare verb, which is never wrong.
+   */
+  function sqlShortLabel(sql) {
+    var s = splitSqlLead(sql).sql.replace(/\s+/g, ' ').trim();
+    var verb = (/^\s*([a-z]+)/i.exec(s) || [, ''])[1].toLowerCase();
+    var m =
+      /^\s*insert\s+into\s+([`"\[\]\w.]+)/i.exec(s)
+      || /^\s*update\s+(?:only\s+)?([`"\[\]\w.]+)/i.exec(s)
+      || /^\s*delete\s+from\s+([`"\[\]\w.]+)/i.exec(s)
+      // Only a FROM whose next token is a plain name: "from (select" is a subquery, and
+      // naming the segment after the first table inside it would be a guess about a guess.
+      || /\bfrom\s+([`"\[\]\w.]+)/i.exec(s);
+    var plural = { select: 'selects', insert: 'inserts', update: 'updates',
+      delete: 'deletes', merge: 'merges', call: 'calls' }[verb] || (verb || 'queries');
+    if (!m) return plural;
+    var target = m[1].replace(/[`"\[\]]/g, '');
+    // schema.table reads as the table everywhere else in this report.
+    target = target.slice(target.lastIndexOf('.') + 1);
+    return target ? target + ' ' + plural : plural;
+  }
+
+  function buildTimeBar() {
+    var host = byId('timebar');
+    if (!host) return;
+    var total = runMicrosTotal;
+    if (!(total > 0)) return;
+
+    var groups = {};
+    var sqlRaw = 0;
+    calls.forEach(function (c) {
+      if (c.sql == null) return;
+      var micros = c.totalMicros || 0;
+      sqlRaw += micros;
+      var text = String(c.sql).replace(/\s+/g, ' ').trim();
+      var key = text.toLowerCase();
+      var g = groups[key] || (groups[key] = { n: 0, micros: 0, sql: text });
+      g.n++;
+      g.micros += micros;
+    });
+
+    var lineTotal = 0;
+    files.forEach(function (f) {
+      (f.lines || []).forEach(function (l) {
+        if (l.timeMicros != null) lineTotal += l.timeMicros;
+      });
+    });
+
+    // Clamped in this order so the three buckets always sum to exactly the run and none of
+    // them can go negative. They can disagree with the run in a report whose SQL was kept
+    // but whose issuing class was not, and a bar that totals 104% would be read as a bug in
+    // the measurement rather than in the export.
+    var sqlMicros = Math.min(sqlRaw, total);
+    var codeMicros = Math.max(0, Math.min(lineTotal - sqlRaw, total - sqlMicros));
+    var untracked = Math.max(0, total - sqlMicros - codeMicros);
+    var sqlScale = sqlRaw > 0 ? sqlMicros / sqlRaw : 1;
+
+    var ranked = Object.keys(groups).map(function (k) { return groups[k]; })
+      .sort(function (a, b) { return b.micros - a.micros; });
+
+    var segs = [];
+    ranked.slice(0, TIMEBAR_TOP_SQL).forEach(function (g, i) {
+      var micros = g.micros * sqlScale;
+      if (micros <= 0) return;
+      segs.push({
+        micros: micros,
+        colour: TIMEBAR_SQL_COLOURS[i % TIMEBAR_SQL_COLOURS.length],
+        name: sqlLabel(g.sql),
+        short: sqlShortLabel(g.sql),
+        note: g.n === 1 ? 'One query.' : g.n + ' runs of this statement, added together.'
+      });
+    });
+    var restSql = 0;
+    var restCount = 0;
+    ranked.slice(TIMEBAR_TOP_SQL).forEach(function (g) {
+      restSql += g.micros * sqlScale;
+      restCount += g.n;
+    });
+    if (restSql > 0) {
+      segs.push({
+        micros: restSql,
+        colour: TIMEBAR_OTHER_SQL_COLOUR,
+        name: 'other queries',
+        short: 'other queries',
+        note: restCount + ' further quer' + (restCount === 1 ? 'y' : 'ies')
+          + ', in ' + (ranked.length - TIMEBAR_TOP_SQL) + ' distinct statements.'
+      });
+    }
+    if (codeMicros > 0) {
+      segs.push({
+        micros: codeMicros,
+        colour: TIMEBAR_CODE_COLOUR,
+        name: 'application code',
+        short: 'app code',
+        note: 'Time executing the lines in this report, with the query time above taken out.'
+      });
+    }
+    if (untracked > 0) {
+      segs.push({
+        micros: untracked,
+        colour: TIMEBAR_UNTRACKED_COLOUR,
+        name: 'untracked',
+        short: 'untracked',
+        note: 'Time no recorded line or query accounts for: code outside the agent’s'
+          + ' includes= packages — framework, ORM internals, the driver, the JDK.'
+          + (data.callsTruncated
+            ? ' This run also hit the recording cap, so work that happened after the cap'
+              + ' tripped is in here too; raise the cap in Settings to record it.'
+            : ' Widening includes= is the only thing that moves time out of here; no'
+              + ' recording cap can reach it.')
+      });
+    }
+    if (!segs.length) return;
+
+    segs.sort(function (a, b) { return b.micros - a.micros; });
+
+    var track = byId('timebarTrack');
+    var legend = byId('timebarLegend');
+    track.textContent = '';
+    legend.textContent = '';
+    byId('timebarTotal').textContent = fmt(total) + ' total';
+
+    segs.forEach(function (sg) {
+      var share = (sg.micros / total) * 100;
+      var reading = fmt(Math.round(sg.micros)) + '  ' + shareText(share);
+
+      var seg = el('div', 'timebar-seg');
+      seg.style.width = share.toFixed(3) + '%';
+      seg.style.background = sg.colour;
+      seg.title = sg.name + '\n' + reading + '\n' + sg.note;
+      // Both lines always exist in the DOM; fitSegmentLabels() decides which of them a
+      // segment is wide enough to show. Building them conditionally would mean rebuilding
+      // the bar on every resize instead of re-measuring it.
+      seg.appendChild(el('span', 'timebar-pct', shareText(share)));
+      seg.appendChild(el('span', 'timebar-lab', sg.short || sg.name));
+      track.appendChild(seg);
+
+      var item = el('div', 'timebar-item');
+      var sw = el('span', 'timebar-sw');
+      sw.style.background = sg.colour;
+      item.appendChild(sw);
+      item.appendChild(el('span', 'timebar-name', sg.name));
+      item.appendChild(el('span', 'timebar-num', reading));
+      item.title = seg.title;
+      legend.appendChild(item);
+    });
+
+    host.hidden = false;
+    fitSegmentLabels();
+    // A narrow window turns a 20% segment into 60px, and text clipped mid-word reads as a
+    // rendering fault. Re-measured rather than recomputed: the numbers have not changed.
+    if (window.ResizeObserver) new ResizeObserver(fitSegmentLabels).observe(track);
+    else window.addEventListener('resize', fitSegmentLabels);
+  }
+
+  /**
+   * Drops each segment's text down to what actually fits in it.
+   *
+   * <p>Measured in pixels after layout rather than guessed from the percentage, because the
+   * same 6% is a comfortable label on a desktop and four clipped characters on a phone.
+   * Three states: both lines, the percentage alone, or nothing at all — and a segment that
+   * shows nothing still has its full reading on hover and its row in the legend, so no
+   * segment is ever unidentifiable.
+   */
+  function fitSegmentLabels() {
+    var track = byId('timebarTrack');
+    if (!track) return;
+    var segs = track.querySelectorAll('.timebar-seg');
+    for (var i = 0; i < segs.length; i++) {
+      var seg = segs[i];
+      var w = seg.getBoundingClientRect().width;
+      var lab = seg.querySelector('.timebar-lab');
+      var pct = seg.querySelector('.timebar-pct');
+      // Measured off-DOM against the label's own font, not from scrollWidth: the label is
+      // already capped at max-width:100%, so its scrollWidth is the width of the segment
+      // it is clipped inside, and asking it whether it fits would always get a yes.
+      var wantLabel = w >= Math.max(TIMEBAR_LABEL_MIN_PX,
+        textWidth(lab.textContent, labelFont(lab)) + 10);
+      lab.hidden = !wantLabel;
+      pct.hidden = w < TIMEBAR_PCT_MIN_PX;
+      seg.classList.toggle('one-line', !wantLabel);
+    }
+  }
+
+  /** Room for a name plus breathing space, and for a bare "37.3%", at the bar's font size. */
+  var TIMEBAR_LABEL_MIN_PX = 64;
+  var TIMEBAR_PCT_MIN_PX = 34;
+
+  /** The rendered width of a string, without putting it on the page to find out. */
+  var measureCtx = null;
+  function textWidth(text, font) {
+    if (!measureCtx) {
+      measureCtx = document.createElement('canvas').getContext('2d');
+    }
+    if (!measureCtx) return text.length * 6;   // no canvas: a rough, deliberate over-estimate
+    measureCtx.font = font;
+    return measureCtx.measureText(text).width;
+  }
+
+  /**
+   * The label's font as canvas wants it. Read from the live element rather than hardcoded,
+   * so a reader who has zoomed the page or set a larger default font gets labels fitted to
+   * what is actually being drawn.
+   */
+  function labelFont(lab) {
+    var cs = window.getComputedStyle(lab);
+    return cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+  }
+
+  /** A share of the run, kept readable below 1% instead of rounding away to "0%". */
+  function shareText(pct) {
+    if (pct >= 10) return Math.round(pct) + '%';
+    if (pct >= 1) return pct.toFixed(1) + '%';
+    return pct < 0.1 ? '<0.1%' : pct.toFixed(1) + '%';
+  }
+
+  buildTimeBar();
 
   // ------------------------------------------------- sticky offset + startup ---
 
@@ -3576,8 +3894,11 @@
     if (mismatch) msgs.push(mismatch);
     if (data.callsTruncated) {
       var missing = unrecordedPct();
-      msgs.push('The call tree hit the agent\'s recording cap, later invocations are missing.'
-        + (missing ? ' About ' + missing + ' of the run is not accounted for by any recorded call.' : ''));
+      var cap = capText();
+      msgs.push('The call tree hit the agent\'s recording cap'
+        + (cap ? ' of ' + cap + ' calls' : '') + ', later invocations are missing.'
+        + (missing ? ' About ' + missing + ' of the run is not accounted for by any recorded call.' : '')
+        + ' Raise it in Settings \u2192 Tools \u2192 Deju Trace.');
     }
     if (treeTruncated) {
       msgs.push('Tree display truncated at ' + MAX_TREE_ROWS
@@ -4225,6 +4546,7 @@
   function findRecordingLimits() {
     if (data.callsTruncated) {
       var gone = unrecordedPct();
+      var cap = capText();
       addFinding('high', gone
         ? 'The recording hit the agent\'s cap — ' + gone + ' of the run is missing'
         : 'The recording hit the agent\'s cap',
@@ -4232,7 +4554,11 @@
           ? gone + ' of the run\'s time is not accounted for by any call below: the cap was '
             + 'reached before that work ran. Every total on this page is a lower bound. '
           : 'Later invocations were dropped, so every total on this page is a lower bound. ')
-        + 'Narrow Includes, or put the trace point deeper in, and record again.', null);
+        + 'Raise the recording cap'
+        + (cap ? ' (currently ' + cap + ' calls)' : '')
+        + ' in Settings → Tools → Deju Trace and record again — it costs about 28 bytes '
+        + 'a call in the traced application\'s heap. Narrowing Includes, or putting the trace '
+        + 'point deeper in, spends the same budget on less of the framework.', null);
     }
     if (data.excludedOmitted) {
       addFinding('info', 'Excluded types were exported without their source',

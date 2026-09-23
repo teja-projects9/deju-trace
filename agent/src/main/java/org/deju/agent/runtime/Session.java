@@ -86,8 +86,16 @@ final class Session {
     // Stored as parallel primitive arrays rather than a list of objects: onEnter runs on
     // hot application paths, and this way a call costs four array stores and no allocation.
 
-    /** Ceiling on recorded invocations, a runaway loop must not exhaust the traced app's heap. */
-    private static final int MAX_CALLS = 200_000;
+    /**
+     * Ceiling on recorded invocations for THIS session: a runaway loop must not exhaust the
+     * traced app's heap.
+     *
+     * <p>Per session rather than a constant because it is configurable ({@code maxCalls=} on
+     * the agent flag), and read once here so the value cannot change underneath a recording
+     * that is already running — half a run at one cap and half at another would make
+     * "capped" mean nothing.
+     */
+    private final int maxCalls;
 
     /** Invocation i: which method ran. Index i is the call's sequence number (execution order). */
     int[] callMethodGid = new int[64];
@@ -100,7 +108,7 @@ final class Session {
     /** Invocation i: the SQL executed, when this node is a query rather than a method call. */
     String[] callSql = new String[64];
     int callCount;
-    /** True once {@link #MAX_CALLS} was hit and later invocations were dropped. */
+    /** True once {@link #maxCalls} was hit and later invocations were dropped. */
     boolean callsTruncated;
 
     /**
@@ -110,9 +118,10 @@ final class Session {
      */
     int depth = 0;
 
-    Session(String target, int targetGid) {
+    Session(String target, int targetGid, int maxCalls) {
         this.target = target;
         this.targetGid = targetGid;
+        this.maxCalls = maxCalls;
         this.startedAtIso = Instant.now().toString();
         this.startNanos = System.nanoTime();
         this.cpuStartNanos = CPU_TIME_SUPPORTED ? THREAD_MX.getCurrentThreadCpuTime() : -1;
@@ -208,7 +217,7 @@ final class Session {
      * the cap is reached (the frame still unwinds correctly, it just banks no time).
      */
     private int recordCall(int methodGid, int parentSeq, int callSite) {
-        if (callCount >= MAX_CALLS) {
+        if (callCount >= maxCalls) {
             callsTruncated = true;
             return -1;
         }
@@ -225,6 +234,11 @@ final class Session {
         callParent[seq] = parentSeq;
         callSiteProbe[seq] = callSite;
         return seq;
+    }
+
+    /** The cap this recording ran under, carried on the payload so the report can name it. */
+    int maxCalls() {
+        return maxCalls;
     }
 
     private void closeCurrentLine(long now) {

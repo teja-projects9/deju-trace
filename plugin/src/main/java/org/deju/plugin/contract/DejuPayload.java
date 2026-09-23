@@ -20,6 +20,8 @@ public class DejuPayload {
     private List<FileCoverage> files = new ArrayList<>();
     private List<CallNode> calls = new ArrayList<>();
     private boolean callsTruncated;
+    /** The agent's recording cap for this run; 0 when the agent predates this field. */
+    private int maxCalls;
 
     public String getSessionId() {
         return sessionId;
@@ -102,6 +104,14 @@ public class DejuPayload {
 
     public void setCallsTruncated(boolean callsTruncated) {
         this.callsTruncated = callsTruncated;
+    }
+
+    public int getMaxCalls() {
+        return maxCalls;
+    }
+
+    public void setMaxCalls(int maxCalls) {
+        this.maxCalls = maxCalls;
     }
 
     public int totalLines() {

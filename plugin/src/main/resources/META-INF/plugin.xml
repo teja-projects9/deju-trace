@@ -18,6 +18,11 @@
         SQL each line issued. Entities, DTOs and generated builders can be folded out of
         it, so the report shows the code you are actually debugging.
         <br/><br/>
+        The report opens on <b>Where the time goes</b>: one stacked bar splitting the whole
+        run into the queries that cost the most, your own code, and the time nothing in the
+        report accounts for &mdash; so "was it the database or was it us" is answered before
+        you pick a tab.
+        <br/><br/>
         Works against a JVM you launch from the IDE, one in a Docker container, or one on
         another machine.
         <br/><br/>
@@ -56,6 +61,12 @@
             app after updating the plugin. A JVM keeps the agent it started with.</li>
             <li><b>The report is huge or slow.</b> Exclude entities and DTOs under
             <b>Excluded types</b>, or narrow <b>Includes</b>.</li>
+            <li><b>The report says "capped", or a large "Unrecorded" share.</b> The run made
+            more calls than the recording cap allows and the rest were dropped. Raise
+            <b>Recording cap (calls)</b> in Settings, re-copy the VM option if your app is in
+            a container, and restart it. A large <b>untracked</b> slice on a run that was
+            <i>not</i> capped is the other case: that code is outside <b>Includes</b>, so no
+            cap can reach it &mdash; widen Includes instead.</li>
             <li><b>Clicking a line number does nothing.</b> Those are
             <code>jetbrains://</code> links and need JetBrains Toolbox installed. Use
             <b>Copy path</b> instead.</li>
@@ -77,6 +88,53 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>2.7.0</b>: where the run's time actually went, a callee's cost on the line
+        that called it, and a recording cap you can raise</p>
+        <ul>
+          <li><b>New: "Where the time goes"</b> &mdash; one stacked bar at the top of the
+          report, above the tabs. It splits the whole run into the queries that cost the
+          most (grouped by statement, biggest six named), your own code, and
+          <b>untracked</b>: time no recorded line or query explains, which is almost
+          always code outside <b>Includes</b>. The segments always add up to the run, and
+          each one reads out its time and share on hover, with its percentage and name
+          drawn inside the segment itself.</li>
+          <li><b>New: the timing gutter charges a call back to the line that made it.</b>
+          A line's own time stops when it calls something, which is the right measurement
+          but means the line costing you half the request reads as <code>0.2%</code> &mdash;
+          the half second was only visible after opening the callee and finding a number in
+          there. Such a line now shows <code>&#8627; 30% [12 ms]</code>: the arrow marks the
+          figure as what the line <i>called</i>, not what it kept. It appears only when the
+          call cost more than the line's own work, so a line calling a trivial getter still
+          reports its own time, and the tooltip carries both figures plus what was
+          called.</li>
+          <li><b>New: the recording cap is a setting.</b> <b>Settings &rarr; Tools &rarr;
+          Deju Trace &rarr; Recording cap (calls)</b>, 1,000 to 10,000,000, default the
+          200,000 it has always been. Raise it when a report says <b>capped</b> or shows a
+          large <b>Unrecorded</b> share &mdash; that share is the work that happened after
+          the cap tripped. It costs roughly 28 bytes a call in the traced application's
+          heap. Runs the IDE launches pick it up immediately; anything else gets it through
+          the new <code>maxCalls=</code> argument in <b>Copy agent VM option</b>, and has to
+          be restarted.</li>
+          <li><b>Capped reports now name the number.</b> The warning used to say "the
+          agent's cap", which told you nothing you could act on; it now says which cap was
+          in force and where to change it.</li>
+          <li><b>Jumping to a called method is now a click.</b> In the report's <b>IDE</b>
+          view, a line that called something carries a small <code>&#8627; Class.method</code>
+          chip: one plain click opens that method, wherever its class lives. It replaces a
+          bare <b>&#8631;</b> glyph that named no destination and only opened under
+          Ctrl/Cmd+Alt+click &mdash; which still works, for anyone used to it.</li>
+          <li><b>The Call Tree opens with every frame's source showing.</b> 2.6.0 made each
+          frame's lines a separate <b>src</b> toggle and left them off, which meant a tree
+          of thirteen frames needed thirteen clicks before any code appeared. They are on
+          by default now; <b>Collapse all</b> puts the structure-only view back in one
+          click.</li>
+          <li><b>Fixed: "Expand all" broke the Call Tree.</b> A folded run of identical
+          queries is marked as SQL but stands for many calls and carries none of them, and
+          the row-identity cache read a field off the one it did not have. The rebuild threw
+          and the tree was left empty until the page was reloaded. Present since folding was
+          added.</li>
+        </ul>
+
         <p><b>2.6.0</b>: a call tree you can read at a glance, an IDE-style file view,
         and per-operand branch coloring</p>
         <ul>

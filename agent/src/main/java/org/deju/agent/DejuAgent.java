@@ -52,6 +52,8 @@ public final class DejuAgent {
 
         AgentConfig cfg = AgentConfig.parse(args);
 
+        CoverageRuntime.setMaxCalls(cfg.getMaxCalls());
+
         installTransformer(inst, cfg);
 
         // Primary sink is the token-gated socket the plugin connects to, loopback unless
@@ -81,6 +83,7 @@ public final class DejuAgent {
         }
 
         System.out.println("[deju] agent ready. includes=" + cfg.getIncludes()
+                + " maxCalls=" + cfg.getMaxCalls()
                 + (cfg.getArmAtStart() != null ? " armed=" + cfg.getArmAtStart() : " (unarmed)"));
     }
 

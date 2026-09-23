@@ -260,6 +260,9 @@ public final class HtmlReportGenerator {
         model.put("files", files);
         model.put("calls", callModel(payload));
         model.put("callsTruncated", payload.isCallsTruncated());
+        // The cap itself, so a capped report can name the number to raise instead of
+        // describing a limit the reader then has to go looking for.
+        model.put("maxCalls", payload.getMaxCalls());
         // Carried so the report can explain a missing call tree instead of just hiding it:
         // an older agent still loaded in the traced JVM is the usual cause.
         model.put("agentVersion", payload.getAgentVersion());

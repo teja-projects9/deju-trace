@@ -490,7 +490,8 @@ public final class DejuToolWindowPanel extends JBPanel<DejuToolWindowPanel> impl
         // The plugin cannot detect that case, the IDE still connects to localhost either
         // way, so it follows the setting the developer set for their own environment.
         boolean bindAll = settings.containerOrRemoteJvm;
-        String vmOption = AgentVmOption.build(agentPath, port, settings.token, includes, bindAll);
+        String vmOption = AgentVmOption.build(agentPath, port, settings.token, includes, bindAll,
+                settings.maxCalls);
         CopyPasteManager.getInstance().setContents(new StringSelection(vmOption));
 
         String note = includes.isEmpty()

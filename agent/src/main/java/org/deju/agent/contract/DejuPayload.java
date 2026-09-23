@@ -36,6 +36,11 @@ public class DejuPayload {
     private List<FileCoverage> files = new ArrayList<>();
     private List<CallNode> calls = new ArrayList<>();
     private boolean callsTruncated;
+    /**
+     * The recording cap this session ran under, so the report can name the number the user
+     * would have to raise rather than saying "a cap" and leaving them to find it.
+     */
+    private int maxCalls;
 
     public DejuPayload() {
         // Jackson.
@@ -117,5 +122,13 @@ public class DejuPayload {
 
     public void setCallsTruncated(boolean callsTruncated) {
         this.callsTruncated = callsTruncated;
+    }
+
+    public int getMaxCalls() {
+        return maxCalls;
+    }
+
+    public void setMaxCalls(int maxCalls) {
+        this.maxCalls = maxCalls;
     }
 }

@@ -174,8 +174,20 @@ h1{font-size:1.05rem;margin:0;}
    arrow after the line rather than on the token itself, since the report has no real parser
    to point at just the call expression — same treatment as the branch-coverage note beside
    it, not a claim about exactly which word is special. */
-.goarrow{color:var(--accent);font-weight:700;margin-left:.4rem;}
-tr.gorow:hover td.code{background:var(--control-hover);cursor:pointer;}
+/* The jump chip after a line that called something. Named, not a bare glyph, and clicked
+   with no modifier: it is the only clickable thing on a row of otherwise selectable code,
+   so it has to look like a control rather than like more source. */
+.goto{display:inline-flex;align-items:center;gap:.25rem;margin-left:.55rem;padding:0 .35rem;
+  border:1px solid var(--border);border-radius:10px;cursor:pointer;vertical-align:baseline;
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.68rem;line-height:1.5;
+  color:var(--muted);background:var(--panel);white-space:nowrap;user-select:none;}
+.goto:hover{border-color:var(--accent);color:var(--accent);}
+.goto:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.gotoicon{color:var(--accent);font-weight:700;}
+/* The row still marks itself as a line that went somewhere, but the pointer belongs to the
+   chip: the row's own plain click does nothing, and a pointer cursor over all of it would
+   promise otherwise. */
+tr.gorow:hover td.code{background:var(--control-hover);}
 /* No overflow on .file: an overflow value here would make it the nearest scroll
    container and the sticky h2 would never stick. The radius is clipped by
    .scroll instead. */
@@ -464,6 +476,40 @@ tr.fold td.tframe{
 /* A stat the reader must not take at face value: something was capped or dropped. */
 .summary .stat.warn b{color:var(--sql-ink);}
 .summary .stat.warn{cursor:help;}
+/* ------------------------------------------------- where the time goes --- */
+/* One stacked bar, full width, above the tabs. Segment widths are set inline as
+   percentages of the run; nothing here depends on the number of segments, so a run with
+   two queries and a run with eight lay out the same. */
+.timebar{padding:.55rem .9rem .7rem;border-bottom:1px solid var(--hairline);}
+.timebar-head{display:flex;align-items:baseline;gap:.5rem;margin-bottom:.35rem;}
+.timebar-title{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.timebar-total{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;}
+.timebar-track{display:flex;width:100%;height:42px;border-radius:4px;overflow:hidden;
+  background:var(--panel);border:1px solid var(--border);}
+/* Each segment carries its own reading, centred in two lines, percentage over name. White
+   text on every one of the segment colours, so the bar looks the same in both themes: the
+   segment colour is the background here, not the page.
+
+   min-width so a 0.2% segment is still a thing the pointer can find, and the flex-shrink
+   that comes with it so a dozen of them cannot push the bar past its container. */
+.timebar-seg{min-width:3px;flex:0 1 auto;cursor:help;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:1px;overflow:hidden;padding:0 2px;
+  color:#fff;line-height:1.15;text-align:center;}
+.timebar-pct{font-size:.72rem;font-weight:700;font-variant-numeric:tabular-nums;
+  text-shadow:0 1px 2px rgba(0,0,0,.45);}
+.timebar-lab{font-size:.66rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.45);opacity:.95;}
+/* A hairline in the page's own colour, not a dark overlay: two neighbouring segments read
+   as one block without it, which is exactly the case the bar exists to separate. */
+.timebar-seg + .timebar-seg{box-shadow:inset 1.5px 0 0 var(--bg);}
+.timebar-legend{display:flex;flex-wrap:wrap;gap:.1rem .9rem;margin-top:.4rem;}
+.timebar-item{display:flex;align-items:center;gap:.35rem;font-size:.72rem;
+  max-width:100%;min-width:0;}
+.timebar-sw{width:9px;height:9px;border-radius:2px;flex:0 0 auto;}
+.timebar-name{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.timebar-num{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;
+  flex:0 0 auto;}
+
 .empty{color:var(--muted);font-size:.85rem;padding:1rem;border:1px dashed var(--border);border-radius:8px;text-align:center;}
 .notice{color:var(--muted);font-size:.76rem;margin:0 0 .75rem;}
 
@@ -808,6 +854,18 @@ tr.landed td,.file.landed h2,.tlrow.landed{
   </button>
   </div>
 </header>
+<!-- One stacked bar for the whole run, before any tab is chosen: the first question about a
+     slow request is almost always "was it the database or was it us", and every answer this
+     report already had for that was two clicks and a tab away. Script fills it and unhides
+     it; a run with no timing at all leaves it hidden rather than drawing an empty track. -->
+<div class="timebar" id="timebar" hidden>
+  <div class="timebar-head">
+    <span class="timebar-title">Where the time goes</span>
+    <span class="timebar-total" id="timebarTotal"></span>
+  </div>
+  <div class="timebar-track" id="timebarTrack"></div>
+  <div class="timebar-legend" id="timebarLegend"></div>
+</div>
 <!-- Tabs, trace point, filter and count in one row, so which run this is and how to switch
      views both stay on screen together instead of separated by a row of buttons that read
      as "part of the tabs" but were not. The filter rides here rather than in the toolbar
@@ -1192,15 +1250,14 @@ Press Enter to apply, Esc to cancel.">
     <i>within</i> a method are shown in source order and merged across invocations, so a
     loop body appears once rather than once per iteration, and a method called twice shows
     the same lines under both frames.</p>
-    <p><b>Structure and detail fold apart.</b> The tree opens with every call already in
-    place &mdash; the full shape of who called what, with nothing collapsed &mdash; but a
-    frame's own source lines and the queries they issued stay out of the way until asked
-    for, marked by the <b>src</b> tag. Click anywhere on a row to show or hide that one
-    frame's detail; click its <b>caret</b> specifically to fold away everything <i>it</i>
-    called, for the rare branch that is wide enough to be worth putting away. The two stay
-    independent: reading one frame's lines never pulls in its children's lines too.
-    <b>Expand all</b> reveals every frame's detail at once, back to how every earlier
-    version of this tree read; <b>Collapse all</b> hides it all again and reopens anything
+    <p><b>Structure and detail fold apart.</b> The tree opens fully open &mdash; the shape
+    of who called what, with every frame's own source lines and the queries they issued
+    already showing, marked by the <b>src</b> tag. Click anywhere on a row to hide or show
+    that one frame's detail; click its <b>caret</b> specifically to fold away everything
+    <i>it</i> called, for the rare branch that is wide enough to be worth putting away. The
+    two stay independent: hiding one frame's lines never touches its children's.
+    <b>Collapse all</b> puts the structure-only view back &mdash; every frame on one line,
+    no code &mdash; and reopens anything
     folded by its caret.</p>
     <p><b>Essential / Full.</b> <i>Essential</i> folds calls into your excluded types
     (entities, DTOs, other data classes) into a single <b>&hellip; N excluded calls</b> row
@@ -1230,11 +1287,12 @@ Press Enter to apply, Esc to cancel.">
     control flow on its own.</p>
     <p><b>The IDE view.</b> A file list down the side, one file's full source filling the
     rest of the page &mdash; the same split as a real editor's project panel and the pane it
-    opens files into, and it opens on the trace point's own file. <b>Ctrl/Cmd+Alt+click</b> a
-    line that made a recorded call to open the class and method it called, wherever that
-    class lives; the small <b>↷</b> after a line is what marks one. This only ever knows
-    about a call the agent actually recorded, so a line into a JDK type or a third-party jar
-    has nowhere on this page to go, and the click quietly does nothing.</p>
+    opens files into, and it opens on the trace point's own file. A line that made a
+    recorded call carries a small <b>&#8631; Class.method</b> chip after it: click it, with
+    no modifier, to open the class and method it called, wherever that class lives.
+    (<b>Ctrl/Cmd+Alt+click</b> anywhere on such a line still does the same.) This only ever
+    knows about a call the agent actually recorded, so a line into a JDK type or a
+    third-party jar has no chip: there is nowhere on this page for it to go.</p>
     <p><b>Files.</b> The <b>Files</b> dropdown works in both views and means the same thing
     in each: unticking a file removes it from the IDE view's sidebar and hides its calls,
     and everything underneath them, from the Tree, so you can strip a trace down to the layer
@@ -1278,7 +1336,7 @@ Press Enter to apply, Esc to cancel.">
 <!-- What the export dialog chose. Read once at load; absent in a report written by an older
      plugin, in which case the script's own defaults apply and nothing changes. -->
 <script type="application/json" id="deju-prefs">{"openTab": "trace", "view": "tree", "density": "normal", "theme": "auto", "showTime": true, "showPercent": true, "showStep": true, "showLine": true, "sql": true, "groupRepeats": false, "collapseTree": false, "collapseSections": false}</script>
-<script type="application/json" id="deju-data">{"target": "com.example.order.OrderController#placeOrder", "startedAtIso": "2026-07-31T09:24:18.221Z", "durationMs": 48, "cpuMicros": 43100, "projectName": "example-api", "files": [{"fqClassName": "com.example.order.OrderController", "sourceFileName": "OrderController.java", "path": "src/main/java/com/example/order/OrderController.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderController.java", "lines": [{"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3, "methodTotalMicros": 47900, "methodSelfMicros": 560, "methodName": "placeOrder", "methodStart": true, "code": "    @PostMapping"}, {"line": 22, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "operandStatus": null, "timeMicros": 41, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        if (request.items().isEmpty()) {"}, {"line": 23, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "            return ResponseEntity.badRequest().build();"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 47340, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        OrderDto receipt = orders.place(request);"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        return ResponseEntity.ok(receipt);"}]}, {"fqClassName": "com.example.order.OrderService", "sourceFileName": "OrderService.java", "path": "src/main/java/com/example/order/OrderService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderService.java", "lines": [{"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 18, "methodTotalMicros": 47340, "methodSelfMicros": 350, "methodName": "place", "methodStart": true, "code": "        for (String name : request.items()) {"}, {"line": 22, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "            order.add(menu.findByName(name));   // one query per drink"}, {"line": 23, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12650, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        }"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 640, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        Money total = discounts.apply(subtotal, request.customerId());"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3980, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        loyalty.award(request.customerId(), total);"}, {"line": 27, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 2210, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        orders.save(order, total);"}, {"line": 28, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 27200, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        return OrderDto.of(order, total);"}, {"line": 29, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 310, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "    }"}]}, {"fqClassName": "com.example.menu.MenuRepository", "sourceFileName": "MenuRepository.java", "path": "src/main/java/com/example/menu/MenuRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/menu/MenuRepository.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12650, "methodTotalMicros": 12650, "methodSelfMicros": 190, "methodName": "findByName", "methodStart": true, "code": "        return jdbc.queryForObject("}]}, {"fqClassName": "com.example.pricing.PriceCalculator", "sourceFileName": "PriceCalculator.java", "path": "src/main/java/com/example/pricing/PriceCalculator.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/PriceCalculator.java", "lines": [{"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 11, "methodTotalMicros": 640, "methodSelfMicros": 90, "methodName": "total", "methodStart": true, "code": "        Money sum = Money.ZERO;"}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 17, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 512, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "            sum = sum.plus(priceOf(line.drink(), size));"}, {"line": 19, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        return sum;"}, {"line": 22, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 180, "methodTotalMicros": 512, "methodSelfMicros": 512, "methodName": "priceOf", "methodStart": true, "code": "    Money priceOf(Drink drink, Size size) {"}, {"line": 23, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 121, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        Money price = drink.basePrice();"}, {"line": 24, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 96, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        if (size == Size.LARGE) {"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 115, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        }"}]}, {"fqClassName": "com.example.pricing.DiscountPolicy", "sourceFileName": "DiscountPolicy.java", "path": "src/main/java/com/example/pricing/DiscountPolicy.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/DiscountPolicy.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": 3980, "methodSelfMicros": 70, "methodName": "apply", "methodStart": true, "code": "        Money total = subtotal;"}, {"line": 14, "status": "PARTIAL", "branchesCovered": 2, "branchesTotal": 4, "operandStatus": ["TRUE_ONLY", "FALSE_ONLY"], "timeMicros": 3910, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (loyalty.isMember(customerId) && loyalty.hasCredit(customerId)) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 22, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(10);"}, {"line": 17, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "operandStatus": null, "timeMicros": 27, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (total.isOver(Money.pounds(20))) {"}, {"line": 18, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(5);"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        return total;"}]}, {"fqClassName": "com.example.loyalty.LoyaltyService", "sourceFileName": "LoyaltyService.java", "path": "src/main/java/com/example/loyalty/LoyaltyService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/loyalty/LoyaltyService.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3860, "methodTotalMicros": 3910, "methodSelfMicros": 50, "methodName": "isMember", "methodStart": true, "code": "                \"select count(*) from membership where customer_id = ?\","}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "isMember", "methodStart": false, "code": "    }"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 18, "methodTotalMicros": 2210, "methodSelfMicros": 60, "methodName": "award", "methodStart": true, "code": "        int points = total.wholePounds();"}, {"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 2150, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "award", "methodStart": false, "code": "        jdbc.update(\"update customer set points = points + ? where id = ?\","}]}, {"fqClassName": "com.example.order.OrderRepository", "sourceFileName": "OrderRepository.java", "path": "src/main/java/com/example/order/OrderRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderRepository.java", "lines": [{"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3100, "methodTotalMicros": 27200, "methodSelfMicros": 200, "methodName": "save", "methodStart": true, "code": "        jdbc.update(\"insert into customer_order (customer_id, total_pence) values (?, ?)\","}, {"line": 14, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 21, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 23900, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "            jdbc.update(\"insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)\","}]}, {"fqClassName": "com.example.order.OrderDto", "sourceFileName": "OrderDto.java", "path": "src/main/java/com/example/order/OrderDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderDto.java", "lines": [{"line": 9, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": 310, "methodSelfMicros": 120, "methodName": "of", "methodStart": true, "code": "        return new OrderDto("}, {"line": 10, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.id(),"}, {"line": 11, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 11, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.currency(),"}, {"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.pence(),"}, {"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 190, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.lines().stream().map(OrderLineDto::of).toList());"}]}, {"fqClassName": "com.example.order.OrderLineDto", "sourceFileName": "OrderLineDto.java", "path": "src/main/java/com/example/order/OrderLineDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderLineDto.java", "lines": [{"line": 6, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 190, "methodTotalMicros": 190, "methodSelfMicros": 190, "methodName": "of", "methodStart": true, "code": "        return new OrderLineDto(line.drink().name(), line.pricePence());"}]}], "calls": {"n": 36, "classTable": ["com.example.order.OrderController", "com.example.order.OrderService", "com.example.menu.MenuRepository", "com.example.pricing.PriceCalculator", "com.example.pricing.DiscountPolicy", "com.example.loyalty.LoyaltyService", "com.example.order.OrderRepository", "com.example.order.OrderDto", "com.example.order.OrderLineDto"], "methodTable": ["placeOrder", "place", "findByName", "total", "priceOf", "apply", "isMember", "award", "save", "of"], "sqlTable": ["select id, name, base_price_pence from drink where name = ?", "select count(*) from membership where customer_id = ?", "update customer set points = points + ? where id = ?", "insert into customer_order (customer_id, total_pence) values (?, ?)", "insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)"], "parentSeq": [-1, 0, 1, 2, 1, 4, 1, 6, 1, 8, 1, 10, 1, 12, 12, 12, 12, 12, 1, 18, 19, 1, 21, 1, 23, 23, 23, 23, 23, 23, 1, 30, 30, 30, 30, 30], "className": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 3, 3, 3, 3, 3, 4, 5, -1, 5, -1, 6, -1, -1, -1, -1, -1, -1, 7, 8, 8, 8, 8, 8], "methodName": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 4, 4, 4, 4, 4, 5, 6, -1, 7, -1, 8, -1, -1, -1, -1, -1, -1, 9, 9, 9, 9, 9, 9], "sql": [-1, -1, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, 2, -1, 3, 4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1], "callSiteLine": [null, 25, 23, 13, 23, 13, 23, 13, 23, 13, 23, 13, 25, 17, 17, 17, 17, 17, 26, 14, 13, 27, 21, 28, 12, 15, 15, 15, 15, 15, 29, 13, 13, 13, 13, 13], "totalMicros": [47900, 47340, 8120, 8000, 1180, 1060, 1090, 970, 1150, 1030, 1110, 990, 640, 140, 96, 92, 94, 90, 3980, 3910, 3860, 2210, 2150, 27200, 3100, 4900, 4780, 4760, 4740, 4720, 310, 52, 36, 34, 34, 34]}, "callsTruncated": false, "agentVersion": "2.1.0", "pluginVersion": "2.1.0", "excludedClasses": ["com.example.order.OrderDto", "com.example.order.OrderLineDto"], "excludedOmitted": false}</script>
+<script type="application/json" id="deju-data">{"target": "com.example.order.OrderController#placeOrder", "startedAtIso": "2026-07-31T09:24:18.221Z", "durationMs": 48, "cpuMicros": 43100, "projectName": "example-api", "files": [{"fqClassName": "com.example.order.OrderController", "sourceFileName": "OrderController.java", "path": "src/main/java/com/example/order/OrderController.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderController.java", "lines": [{"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3, "methodTotalMicros": 47900, "methodSelfMicros": 560, "methodName": "placeOrder", "methodStart": true, "code": "    @PostMapping"}, {"line": 22, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "operandStatus": null, "timeMicros": 41, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        if (request.items().isEmpty()) {"}, {"line": 23, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "            return ResponseEntity.badRequest().build();"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 47340, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        OrderDto receipt = orders.place(request);"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "placeOrder", "methodStart": false, "code": "        return ResponseEntity.ok(receipt);"}]}, {"fqClassName": "com.example.order.OrderService", "sourceFileName": "OrderService.java", "path": "src/main/java/com/example/order/OrderService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderService.java", "lines": [{"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 18, "methodTotalMicros": 47340, "methodSelfMicros": 350, "methodName": "place", "methodStart": true, "code": "        for (String name : request.items()) {"}, {"line": 22, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "            order.add(menu.findByName(name));   // one query per drink"}, {"line": 23, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12650, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        }"}, {"line": 25, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 640, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        Money total = discounts.apply(subtotal, request.customerId());"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3980, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        loyalty.award(request.customerId(), total);"}, {"line": 27, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 2210, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        orders.save(order, total);"}, {"line": 28, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 27200, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "        return OrderDto.of(order, total);"}, {"line": 29, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 310, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "place", "methodStart": false, "code": "    }"}]}, {"fqClassName": "com.example.menu.MenuRepository", "sourceFileName": "MenuRepository.java", "path": "src/main/java/com/example/menu/MenuRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/menu/MenuRepository.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12650, "methodTotalMicros": 12650, "methodSelfMicros": 190, "methodName": "findByName", "methodStart": true, "code": "        return jdbc.queryForObject("}]}, {"fqClassName": "com.example.pricing.PriceCalculator", "sourceFileName": "PriceCalculator.java", "path": "src/main/java/com/example/pricing/PriceCalculator.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/PriceCalculator.java", "lines": [{"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 11, "methodTotalMicros": 640, "methodSelfMicros": 90, "methodName": "total", "methodStart": true, "code": "        Money sum = Money.ZERO;"}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 17, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 512, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "            sum = sum.plus(priceOf(line.drink(), size));"}, {"line": 19, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "total", "methodStart": false, "code": "        return sum;"}, {"line": 22, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 180, "methodTotalMicros": 512, "methodSelfMicros": 512, "methodName": "priceOf", "methodStart": true, "code": "    Money priceOf(Drink drink, Size size) {"}, {"line": 23, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 121, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        Money price = drink.basePrice();"}, {"line": 24, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 96, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        if (size == Size.LARGE) {"}, {"line": 26, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 115, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "priceOf", "methodStart": false, "code": "        }"}]}, {"fqClassName": "com.example.pricing.DiscountPolicy", "sourceFileName": "DiscountPolicy.java", "path": "src/main/java/com/example/pricing/DiscountPolicy.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/pricing/DiscountPolicy.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": 3980, "methodSelfMicros": 70, "methodName": "apply", "methodStart": true, "code": "        Money total = subtotal;"}, {"line": 14, "status": "PARTIAL", "branchesCovered": 2, "branchesTotal": 4, "operandStatus": ["TRUE_ONLY", "FALSE_ONLY"], "timeMicros": 3910, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (loyalty.isMember(customerId) && loyalty.hasCredit(customerId)) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 22, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(10);"}, {"line": 17, "status": "PARTIAL", "branchesCovered": 1, "branchesTotal": 2, "operandStatus": null, "timeMicros": 27, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        if (total.isOver(Money.pounds(20))) {"}, {"line": 18, "status": "NONE", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": null, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "            total = total.minusPercent(5);"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 12, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "apply", "methodStart": false, "code": "        return total;"}]}, {"fqClassName": "com.example.loyalty.LoyaltyService", "sourceFileName": "LoyaltyService.java", "path": "src/main/java/com/example/loyalty/LoyaltyService.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/loyalty/LoyaltyService.java", "lines": [{"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3860, "methodTotalMicros": 3910, "methodSelfMicros": 50, "methodName": "isMember", "methodStart": true, "code": "                \"select count(*) from membership where customer_id = ?\","}, {"line": 16, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "isMember", "methodStart": false, "code": "    }"}, {"line": 20, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 18, "methodTotalMicros": 2210, "methodSelfMicros": 60, "methodName": "award", "methodStart": true, "code": "        int points = total.wholePounds();"}, {"line": 21, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 2150, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "award", "methodStart": false, "code": "        jdbc.update(\"update customer set points = points + ? where id = ?\","}]}, {"fqClassName": "com.example.order.OrderRepository", "sourceFileName": "OrderRepository.java", "path": "src/main/java/com/example/order/OrderRepository.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderRepository.java", "lines": [{"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 3100, "methodTotalMicros": 27200, "methodSelfMicros": 200, "methodName": "save", "methodStart": true, "code": "        jdbc.update(\"insert into customer_order (customer_id, total_pence) values (?, ?)\","}, {"line": 14, "status": "FULL", "branchesCovered": 2, "branchesTotal": 2, "operandStatus": null, "timeMicros": 21, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "        for (OrderLine line : order.lines()) {"}, {"line": 15, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 23900, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "save", "methodStart": false, "code": "            jdbc.update(\"insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)\","}]}, {"fqClassName": "com.example.order.OrderDto", "sourceFileName": "OrderDto.java", "path": "src/main/java/com/example/order/OrderDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderDto.java", "lines": [{"line": 9, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 14, "methodTotalMicros": 310, "methodSelfMicros": 120, "methodName": "of", "methodStart": true, "code": "        return new OrderDto("}, {"line": 10, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 9, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.id(),"}, {"line": 11, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 11, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.currency(),"}, {"line": 12, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 8, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                total.pence(),"}, {"line": 13, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 190, "methodTotalMicros": null, "methodSelfMicros": null, "methodName": "of", "methodStart": false, "code": "                order.lines().stream().map(OrderLineDto::of).toList());"}]}, {"fqClassName": "com.example.order.OrderLineDto", "sourceFileName": "OrderLineDto.java", "path": "src/main/java/com/example/order/OrderLineDto.java", "absPath": "/Users/dev/example-api/src/main/java/com/example/order/OrderLineDto.java", "lines": [{"line": 6, "status": "FULL", "branchesCovered": null, "branchesTotal": null, "operandStatus": null, "timeMicros": 190, "methodTotalMicros": 190, "methodSelfMicros": 190, "methodName": "of", "methodStart": true, "code": "        return new OrderLineDto(line.drink().name(), line.pricePence());"}]}], "calls": {"n": 36, "classTable": ["com.example.order.OrderController", "com.example.order.OrderService", "com.example.menu.MenuRepository", "com.example.pricing.PriceCalculator", "com.example.pricing.DiscountPolicy", "com.example.loyalty.LoyaltyService", "com.example.order.OrderRepository", "com.example.order.OrderDto", "com.example.order.OrderLineDto"], "methodTable": ["placeOrder", "place", "findByName", "total", "priceOf", "apply", "isMember", "award", "save", "of"], "sqlTable": ["select id, name, base_price_pence from drink where name = ?", "select count(*) from membership where customer_id = ?", "update customer set points = points + ? where id = ?", "insert into customer_order (customer_id, total_pence) values (?, ?)", "insert into order_line (order_id, drink_id, price_pence) values (?, ?, ?)"], "parentSeq": [-1, 0, 1, 2, 1, 4, 1, 6, 1, 8, 1, 10, 1, 12, 12, 12, 12, 12, 1, 18, 19, 1, 21, 1, 23, 23, 23, 23, 23, 23, 1, 30, 30, 30, 30, 30], "className": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 3, 3, 3, 3, 3, 4, 5, -1, 5, -1, 6, -1, -1, -1, -1, -1, -1, 7, 8, 8, 8, 8, 8], "methodName": [0, 1, 2, -1, 2, -1, 2, -1, 2, -1, 2, -1, 3, 4, 4, 4, 4, 4, 5, 6, -1, 7, -1, 8, -1, -1, -1, -1, -1, -1, 9, 9, 9, 9, 9, 9], "sql": [-1, -1, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, 2, -1, 3, 4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1], "callSiteLine": [null, 25, 23, 13, 23, 13, 23, 13, 23, 13, 23, 13, 25, 17, 17, 17, 17, 17, 26, 14, 13, 27, 21, 28, 12, 15, 15, 15, 15, 15, 29, 13, 13, 13, 13, 13], "totalMicros": [47900, 47340, 8120, 8000, 1180, 1060, 1090, 970, 1150, 1030, 1110, 990, 640, 140, 96, 92, 94, 90, 3980, 3910, 3860, 2210, 2150, 27200, 3100, 4900, 4780, 4760, 4740, 4720, 310, 52, 36, 34, 34, 34]}, "callsTruncated": false, "maxCalls": 200000, "agentVersion": "2.1.0", "pluginVersion": "2.1.0", "excludedClasses": ["com.example.order.OrderDto", "com.example.order.OrderLineDto"], "excludedOmitted": false}</script>
 <script>
 /*
  * Deju HTML report behaviour. Inlined verbatim into a <script> element by
@@ -2365,6 +2423,20 @@ Press Enter to apply, Esc to cancel.">
     return mtr;
   }
 
+  /**
+   * What to write on the jump chip: the method, and the class too when the call leaves the
+   * file being read.
+   *
+   * <p>Repeating the class on every call inside the same file would put the one word that
+   * is already at the top of the page onto a dozen chips, pushing the method name — the
+   * part that differs line to line — further from the code it belongs to.
+   */
+  function gotoLabel(target, f) {
+    var method = methodLabel(target.methodName, target.className);
+    return target.className === f.fqClassName
+      ? method : simpleName(target.className) + '.' + method;
+  }
+
   /** One source line: the timing cell, the line number, and the coloured code. */
   function lineRow(rec, f) {
     var l = rec.model;
@@ -2391,10 +2463,30 @@ Press Enter to apply, Esc to cancel.">
         '   (' + l.branchesCovered + '/' + l.branchesTotal + ' branches)'));
     }
     if (target) {
-      var arrow = el('span', 'goarrow', '↷');
-      arrow.title = 'Ctrl/Cmd+Alt+click to open '
-        + (methodLabel(target.methodName, target.className)) + '()';
-      code.appendChild(arrow);
+      // A button, not a hint about a keystroke. The bare glyph this replaces marked the
+      // line but said nothing about where it went, and the chord that opened it was two
+      // modifiers plus a click on a row whose plain click does nothing — a feature nobody
+      // finds without being told. The chip names the destination and takes one click.
+      var go = el('span', 'goto');
+      go.appendChild(el('span', 'gotoicon', '↷'));
+      go.appendChild(el('span', null, gotoLabel(target, f)));
+      go.title = 'Open ' + target.className + '.'
+        + methodLabel(target.methodName, target.className) + '() in this report';
+      go.setAttribute('role', 'link');
+      go.tabIndex = 0;
+      function goNow(ev) {
+        // The row underneath carries its own handlers, and the code cell is selectable
+        // text: neither should also fire because a button inside them was used.
+        ev.preventDefault();
+        ev.stopPropagation();
+        navigateToMethod(target.className, target.methodName);
+      }
+      go.addEventListener('click', goNow);
+      go.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') goNow(ev);
+      });
+      code.appendChild(go);
+      // Kept as the shortcut it always was, for anyone already used to it.
       tr.addEventListener('click', function (ev) {
         if (ev.altKey && (ev.ctrlKey || ev.metaKey)) navigateToMethod(target.className, target.methodName);
       });
@@ -2500,7 +2592,11 @@ Press Enter to apply, Esc to cancel.">
    *  plain estimate rather than risk seeding it from an unrelated row's height. */
   function rowKey(r) {
     if (r.kind === 'frame') return 'f' + r.node.seq;
-    if (r.sql) return 's' + r.node.seq;
+    // The kind has to be checked too, not just the flag: a folded run of identical queries
+    // is also marked sql (so it hides with the rest) but stands for many nodes and carries
+    // none of them, so reading r.node.seq here threw and took the whole rebuild with it.
+    // It is a fold, and a fold has no stable identity — it falls through to null below.
+    if (r.kind === 'line' && r.sql && r.node) return 's' + r.node.seq;
     if (r.kind === 'line' && r.file) return 'l' + r.file.fqClassName + ':' + r.line;
     return null;
   }
@@ -2524,11 +2620,13 @@ Press Enter to apply, Esc to cancel.">
 
   calls.forEach(function (c) {
     nodeBySeq[c.seq] = c;
+    // Every frame opens showing its own source. The reader came here to read code against
+    // timings, and a tree of thirteen frames that each need their own src click before any
+    // of it appears is thirteen clicks spent getting to the starting point. "Collapse all"
+    // puts the structure-only view back in one.
+    detailShown[c.seq] = true;
     if (c.parentSeq < 0) {
       roots.push(c);
-      // The trace point's own source is the one frame the reader always came here to read,
-      // so it starts open; every other frame's detail still waits for a click.
-      detailShown[c.seq] = true;
     } else {
       // calls[] is already in execution order, so pushing in order keeps siblings in it.
       (childrenBySeq[c.parentSeq] = childrenBySeq[c.parentSeq] || []).push(c);
@@ -2536,8 +2634,8 @@ Press Enter to apply, Esc to cancel.">
   });
 
   /**
-   * Where a ctrl+alt+click on a line of source actually goes: caller class#method + line ->
-   * the class and method it called there.
+   * Where a line's jump chip actually goes: caller class#method + line -> the class and
+   * method it called there.
    *
    * <p>There is no real parser here, only what was recorded, so this only ever knows about a
    * line that made a call the agent actually saw. The first invocation recorded at a call
@@ -2584,6 +2682,19 @@ Press Enter to apply, Esc to cancel.">
     var kidsTotal = 0;
     (childrenBySeq[deepest.seq] || []).forEach(function (k) { kidsTotal += k.totalMicros || 0; });
     if (rootTotal > 0) unrecordedShare = Math.max(0, (rootTotal - kidsTotal) / rootTotal);
+  }
+
+  /**
+   * The cap this run was recorded under, spelled out, or '' when the agent that produced
+   * the payload predates the field.
+   *
+   * <p>Worth carrying at all because "the agent's cap" is advice the reader cannot act on:
+   * it names no number, so it does not say what to raise it from.
+   */
+  function capText() {
+    var n = data.maxCalls;
+    if (!n || n <= 0) return '';
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
   /** The unrecorded share as a rounded percentage, or '' when there is nothing to report. */
@@ -3851,8 +3962,9 @@ Press Enter to apply, Esc to cancel.">
   }
 
   /**
-   * Ctrl+Alt+click on a line that made a recorded call: opens the class it called into, at
-   * the method it called, the same "go to declaration" a real IDE gives a ctrl/cmd+click.
+   * Opens the class a line called into, at the method it called: the same "go to
+   * declaration" a real IDE gives a ctrl/cmd+click, reached here by clicking the chip the
+   * line carries.
    *
    * <p>Only ever knows about calls the agent actually recorded — see callTargetByLine — so a
    * class with no resolved source (a JDK type, a third-party jar) has nowhere to go, and this
@@ -4809,16 +4921,280 @@ Press Enter to apply, Esc to cancel.">
     // limit was reached; the number says whether what is left is most of the run or a
     // sixth of it, which is the difference between a caveat and a warning.
     var missingPct = unrecordedPct();
+    var cap = capText();
     var capped = stat(missingPct || 'capped', missingPct ? 'Unrecorded' : 'Recording',
-      'The agent hit its recording cap, so later invocations were never recorded.'
+      'The agent hit its recording cap' + (cap ? ' of ' + cap + ' calls' : '')
+      + ', so later invocations were never recorded.'
       + ' Every count and total above is a lower bound, not the whole run.'
       + (missingPct
         ? ' ' + missingPct + ' of the run\'s time is not accounted for by any call in this'
           + ' report: the recording stopped before that work was reached.'
-        : ''));
+        : '')
+      + ' Raise the recording cap in Settings \u2192 Tools \u2192 Deju Trace, or narrow'
+      + ' Includes so the budget is spent on your own code, and record again.');
     capped.classList.add('warn');
     summary.appendChild(capped);
   }
+
+  // ------------------------------------------------ where the time goes ---
+
+  /**
+   * The one stacked bar above the tabs: the whole run split into where its wall clock
+   * actually went.
+   *
+   * <p><b>The arithmetic, and why it adds up.</b> A line's own time is measured with the
+   * callee frames taken out ({@code onEnter} closes the caller's line before pushing), but
+   * with its queries left in — a query runs part-way through the line that issued it, and
+   * that line has not stopped executing. So the sum of every line's own time is "time this
+   * run spent inside instrumented code", queries included, and the three buckets fall
+   * straight out of it:
+   *
+   * <ul>
+   *   <li><b>each query</b>, measured on its own node;</li>
+   *   <li><b>application code</b>, the line total with the query time taken back out;</li>
+   *   <li><b>untracked</b>, whatever the run's total has left over — framework, ORM
+   *       internals, the JDBC driver, the JDK, anything outside {@code includes=}.</li>
+   * </ul>
+   *
+   * <p>Queries are grouped by statement rather than by table. Pulling a table name out of
+   * SQL is reliable for {@code update x set …} and wrong the moment a join, a CTE or a
+   * subquery turns up, and a bar that silently mislabels the biggest segment in the report
+   * is worse than one that quotes the statement it is actually measuring.
+   */
+  var TIMEBAR_TOP_SQL = 6;
+  /* A distinct hue per statement rather than one ramp. Every segment carries its own label
+     inside the bar, and label text needs a background it contrasts against far more than the
+     set needs to read as a family; six shades of one colour also make the boundary between
+     the two biggest segments — always neighbours — the hardest edge on the page to see.
+     All eight take white text. */
+  var TIMEBAR_SQL_COLOURS = ['#9b1c1c', '#d9722a', '#1f74b8', '#12868c', '#3f8f3f', '#7d4a9e'];
+  var TIMEBAR_OTHER_SQL_COLOUR = '#a8752e';
+  var TIMEBAR_CODE_COLOUR = '#39424d';
+  var TIMEBAR_UNTRACKED_COLOUR = '#6f777f';
+
+  /**
+   * A short name for a segment sitting inside the bar: what the statement did, and to what.
+   *
+   * <p>This is the one place a table name is guessed out of SQL, and it is deliberately the
+   * only place: the legend and the tooltip under it both carry the statement verbatim, so a
+   * join or a CTE this gets wrong is a label a reader can immediately check against the real
+   * thing rather than the only account of what they are looking at. With no target to be
+   * found it degrades to the bare verb, which is never wrong.
+   */
+  function sqlShortLabel(sql) {
+    var s = splitSqlLead(sql).sql.replace(/\s+/g, ' ').trim();
+    var verb = (/^\s*([a-z]+)/i.exec(s) || [, ''])[1].toLowerCase();
+    var m =
+      /^\s*insert\s+into\s+([`"\[\]\w.]+)/i.exec(s)
+      || /^\s*update\s+(?:only\s+)?([`"\[\]\w.]+)/i.exec(s)
+      || /^\s*delete\s+from\s+([`"\[\]\w.]+)/i.exec(s)
+      // Only a FROM whose next token is a plain name: "from (select" is a subquery, and
+      // naming the segment after the first table inside it would be a guess about a guess.
+      || /\bfrom\s+([`"\[\]\w.]+)/i.exec(s);
+    var plural = { select: 'selects', insert: 'inserts', update: 'updates',
+      delete: 'deletes', merge: 'merges', call: 'calls' }[verb] || (verb || 'queries');
+    if (!m) return plural;
+    var target = m[1].replace(/[`"\[\]]/g, '');
+    // schema.table reads as the table everywhere else in this report.
+    target = target.slice(target.lastIndexOf('.') + 1);
+    return target ? target + ' ' + plural : plural;
+  }
+
+  function buildTimeBar() {
+    var host = byId('timebar');
+    if (!host) return;
+    var total = runMicrosTotal;
+    if (!(total > 0)) return;
+
+    var groups = {};
+    var sqlRaw = 0;
+    calls.forEach(function (c) {
+      if (c.sql == null) return;
+      var micros = c.totalMicros || 0;
+      sqlRaw += micros;
+      var text = String(c.sql).replace(/\s+/g, ' ').trim();
+      var key = text.toLowerCase();
+      var g = groups[key] || (groups[key] = { n: 0, micros: 0, sql: text });
+      g.n++;
+      g.micros += micros;
+    });
+
+    var lineTotal = 0;
+    files.forEach(function (f) {
+      (f.lines || []).forEach(function (l) {
+        if (l.timeMicros != null) lineTotal += l.timeMicros;
+      });
+    });
+
+    // Clamped in this order so the three buckets always sum to exactly the run and none of
+    // them can go negative. They can disagree with the run in a report whose SQL was kept
+    // but whose issuing class was not, and a bar that totals 104% would be read as a bug in
+    // the measurement rather than in the export.
+    var sqlMicros = Math.min(sqlRaw, total);
+    var codeMicros = Math.max(0, Math.min(lineTotal - sqlRaw, total - sqlMicros));
+    var untracked = Math.max(0, total - sqlMicros - codeMicros);
+    var sqlScale = sqlRaw > 0 ? sqlMicros / sqlRaw : 1;
+
+    var ranked = Object.keys(groups).map(function (k) { return groups[k]; })
+      .sort(function (a, b) { return b.micros - a.micros; });
+
+    var segs = [];
+    ranked.slice(0, TIMEBAR_TOP_SQL).forEach(function (g, i) {
+      var micros = g.micros * sqlScale;
+      if (micros <= 0) return;
+      segs.push({
+        micros: micros,
+        colour: TIMEBAR_SQL_COLOURS[i % TIMEBAR_SQL_COLOURS.length],
+        name: sqlLabel(g.sql),
+        short: sqlShortLabel(g.sql),
+        note: g.n === 1 ? 'One query.' : g.n + ' runs of this statement, added together.'
+      });
+    });
+    var restSql = 0;
+    var restCount = 0;
+    ranked.slice(TIMEBAR_TOP_SQL).forEach(function (g) {
+      restSql += g.micros * sqlScale;
+      restCount += g.n;
+    });
+    if (restSql > 0) {
+      segs.push({
+        micros: restSql,
+        colour: TIMEBAR_OTHER_SQL_COLOUR,
+        name: 'other queries',
+        short: 'other queries',
+        note: restCount + ' further quer' + (restCount === 1 ? 'y' : 'ies')
+          + ', in ' + (ranked.length - TIMEBAR_TOP_SQL) + ' distinct statements.'
+      });
+    }
+    if (codeMicros > 0) {
+      segs.push({
+        micros: codeMicros,
+        colour: TIMEBAR_CODE_COLOUR,
+        name: 'application code',
+        short: 'app code',
+        note: 'Time executing the lines in this report, with the query time above taken out.'
+      });
+    }
+    if (untracked > 0) {
+      segs.push({
+        micros: untracked,
+        colour: TIMEBAR_UNTRACKED_COLOUR,
+        name: 'untracked',
+        short: 'untracked',
+        note: 'Time no recorded line or query accounts for: code outside the agent’s'
+          + ' includes= packages — framework, ORM internals, the driver, the JDK.'
+          + (data.callsTruncated
+            ? ' This run also hit the recording cap, so work that happened after the cap'
+              + ' tripped is in here too; raise the cap in Settings to record it.'
+            : ' Widening includes= is the only thing that moves time out of here; no'
+              + ' recording cap can reach it.')
+      });
+    }
+    if (!segs.length) return;
+
+    segs.sort(function (a, b) { return b.micros - a.micros; });
+
+    var track = byId('timebarTrack');
+    var legend = byId('timebarLegend');
+    track.textContent = '';
+    legend.textContent = '';
+    byId('timebarTotal').textContent = fmt(total) + ' total';
+
+    segs.forEach(function (sg) {
+      var share = (sg.micros / total) * 100;
+      var reading = fmt(Math.round(sg.micros)) + '  ' + shareText(share);
+
+      var seg = el('div', 'timebar-seg');
+      seg.style.width = share.toFixed(3) + '%';
+      seg.style.background = sg.colour;
+      seg.title = sg.name + '\n' + reading + '\n' + sg.note;
+      // Both lines always exist in the DOM; fitSegmentLabels() decides which of them a
+      // segment is wide enough to show. Building them conditionally would mean rebuilding
+      // the bar on every resize instead of re-measuring it.
+      seg.appendChild(el('span', 'timebar-pct', shareText(share)));
+      seg.appendChild(el('span', 'timebar-lab', sg.short || sg.name));
+      track.appendChild(seg);
+
+      var item = el('div', 'timebar-item');
+      var sw = el('span', 'timebar-sw');
+      sw.style.background = sg.colour;
+      item.appendChild(sw);
+      item.appendChild(el('span', 'timebar-name', sg.name));
+      item.appendChild(el('span', 'timebar-num', reading));
+      item.title = seg.title;
+      legend.appendChild(item);
+    });
+
+    host.hidden = false;
+    fitSegmentLabels();
+    // A narrow window turns a 20% segment into 60px, and text clipped mid-word reads as a
+    // rendering fault. Re-measured rather than recomputed: the numbers have not changed.
+    if (window.ResizeObserver) new ResizeObserver(fitSegmentLabels).observe(track);
+    else window.addEventListener('resize', fitSegmentLabels);
+  }
+
+  /**
+   * Drops each segment's text down to what actually fits in it.
+   *
+   * <p>Measured in pixels after layout rather than guessed from the percentage, because the
+   * same 6% is a comfortable label on a desktop and four clipped characters on a phone.
+   * Three states: both lines, the percentage alone, or nothing at all — and a segment that
+   * shows nothing still has its full reading on hover and its row in the legend, so no
+   * segment is ever unidentifiable.
+   */
+  function fitSegmentLabels() {
+    var track = byId('timebarTrack');
+    if (!track) return;
+    var segs = track.querySelectorAll('.timebar-seg');
+    for (var i = 0; i < segs.length; i++) {
+      var seg = segs[i];
+      var w = seg.getBoundingClientRect().width;
+      var lab = seg.querySelector('.timebar-lab');
+      var pct = seg.querySelector('.timebar-pct');
+      // Measured off-DOM against the label's own font, not from scrollWidth: the label is
+      // already capped at max-width:100%, so its scrollWidth is the width of the segment
+      // it is clipped inside, and asking it whether it fits would always get a yes.
+      var wantLabel = w >= Math.max(TIMEBAR_LABEL_MIN_PX,
+        textWidth(lab.textContent, labelFont(lab)) + 10);
+      lab.hidden = !wantLabel;
+      pct.hidden = w < TIMEBAR_PCT_MIN_PX;
+      seg.classList.toggle('one-line', !wantLabel);
+    }
+  }
+
+  /** Room for a name plus breathing space, and for a bare "37.3%", at the bar's font size. */
+  var TIMEBAR_LABEL_MIN_PX = 64;
+  var TIMEBAR_PCT_MIN_PX = 34;
+
+  /** The rendered width of a string, without putting it on the page to find out. */
+  var measureCtx = null;
+  function textWidth(text, font) {
+    if (!measureCtx) {
+      measureCtx = document.createElement('canvas').getContext('2d');
+    }
+    if (!measureCtx) return text.length * 6;   // no canvas: a rough, deliberate over-estimate
+    measureCtx.font = font;
+    return measureCtx.measureText(text).width;
+  }
+
+  /**
+   * The label's font as canvas wants it. Read from the live element rather than hardcoded,
+   * so a reader who has zoomed the page or set a larger default font gets labels fitted to
+   * what is actually being drawn.
+   */
+  function labelFont(lab) {
+    var cs = window.getComputedStyle(lab);
+    return cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+  }
+
+  /** A share of the run, kept readable below 1% instead of rounding away to "0%". */
+  function shareText(pct) {
+    if (pct >= 10) return Math.round(pct) + '%';
+    if (pct >= 1) return pct.toFixed(1) + '%';
+    return pct < 0.1 ? '<0.1%' : pct.toFixed(1) + '%';
+  }
+
+  buildTimeBar();
 
   // ------------------------------------------------- sticky offset + startup ---
 
@@ -4858,8 +5234,11 @@ Press Enter to apply, Esc to cancel.">
     if (mismatch) msgs.push(mismatch);
     if (data.callsTruncated) {
       var missing = unrecordedPct();
-      msgs.push('The call tree hit the agent\'s recording cap, later invocations are missing.'
-        + (missing ? ' About ' + missing + ' of the run is not accounted for by any recorded call.' : ''));
+      var cap = capText();
+      msgs.push('The call tree hit the agent\'s recording cap'
+        + (cap ? ' of ' + cap + ' calls' : '') + ', later invocations are missing.'
+        + (missing ? ' About ' + missing + ' of the run is not accounted for by any recorded call.' : '')
+        + ' Raise it in Settings \u2192 Tools \u2192 Deju Trace.');
     }
     if (treeTruncated) {
       msgs.push('Tree display truncated at ' + MAX_TREE_ROWS
@@ -5507,6 +5886,7 @@ Press Enter to apply, Esc to cancel.">
   function findRecordingLimits() {
     if (data.callsTruncated) {
       var gone = unrecordedPct();
+      var cap = capText();
       addFinding('high', gone
         ? 'The recording hit the agent\'s cap — ' + gone + ' of the run is missing'
         : 'The recording hit the agent\'s cap',
@@ -5514,7 +5894,11 @@ Press Enter to apply, Esc to cancel.">
           ? gone + ' of the run\'s time is not accounted for by any call below: the cap was '
             + 'reached before that work ran. Every total on this page is a lower bound. '
           : 'Later invocations were dropped, so every total on this page is a lower bound. ')
-        + 'Narrow Includes, or put the trace point deeper in, and record again.', null);
+        + 'Raise the recording cap'
+        + (cap ? ' (currently ' + cap + ' calls)' : '')
+        + ' in Settings → Tools → Deju Trace and record again — it costs about 28 bytes '
+        + 'a call in the traced application\'s heap. Narrowing Includes, or putting the trace '
+        + 'point deeper in, spends the same budget on less of the framework.', null);
     }
     if (data.excludedOmitted) {
       addFinding('info', 'Excluded types were exported without their source',

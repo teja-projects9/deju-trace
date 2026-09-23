@@ -36,14 +36,35 @@ public final class AgentVmOption {
      */
     public static String build(String agentPath, String port, String token,
                                String includes, boolean bindAllInterfaces) {
+        return build(agentPath, port, token, includes, bindAllInterfaces, DEFAULT_MAX_CALLS);
+    }
+
+    /**
+     * @param maxCalls recording cap. Emitted only when it differs from the agent's own
+     *                 default, so the common flag stays as short as it has always been and
+     *                 a pasted command does not carry a number that means nothing.
+     */
+    public static String build(String agentPath, String port, String token,
+                               String includes, boolean bindAllInterfaces, int maxCalls) {
         StringBuilder sb = new StringBuilder(FLAG).append(agentPath)
                 .append("=port=").append(port)
                 .append(",token=").append(token == null ? "" : token);
         if (bindAllInterfaces) {
             sb.append(",bind=").append(BIND_ALL_INTERFACES);
         }
-        return sb.append(",includes=").append(toAgentIncludes(includes)).toString();
+        sb.append(",includes=").append(toAgentIncludes(includes));
+        if (maxCalls > 0 && maxCalls != DEFAULT_MAX_CALLS) {
+            sb.append(",maxCalls=").append(maxCalls);
+        }
+        return sb.toString();
     }
+
+    /**
+     * The agent's built-in cap, duplicated here rather than imported: this class is
+     * deliberately free of agent classes so it can be unit-tested as plain Java, and the
+     * agent clamps whatever it is given anyway.
+     */
+    public static final int DEFAULT_MAX_CALLS = 200_000;
 
     /** The address that makes the agent reachable from outside its container. */
     public static final String BIND_ALL_INTERFACES = "0.0.0.0";
